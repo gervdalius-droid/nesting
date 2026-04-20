@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>FabFlow Nesting — SWOOD Board Optimizer</title>
+<title>Dėdės Baldai — Nesting</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#F2EFE8;color:#1C1A14;height:100vh;overflow:hidden;font-size:13px}
@@ -103,6 +103,20 @@ input[type=color]{padding:2px 3px;height:27px;cursor:pointer}
 .hist-row .hbtn{padding:2px 7px;font-size:10px;border:1px solid #D4CFC2;background:#fff;border-radius:4px;cursor:pointer;color:#6B6455}
 .hist-row .hbtn:hover{background:#EAE6DC;color:#1C1A14}
 .hist-row .hbtn.hdel:hover{background:#FCE4E4;color:#B84040;border-color:#e0b0b0}
+/* Move-to-sheet popover */
+.mv-pop{display:none;position:absolute;top:36px;right:12px;background:#FDFCF9;border:1px solid #D4CFC2;border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.15);z-index:150;min-width:240px;max-height:340px;overflow-y:auto}
+.mv-pop.open{display:block}
+.mv-pop .mv-hdr{padding:8px 12px;font-size:10px;color:#A09888;text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid #EAE6DC;font-family:monospace}
+.mv-pop .mv-row{display:flex;align-items:center;gap:8px;padding:7px 12px;cursor:pointer;border-bottom:1px solid #F2EFE8;font-size:12px}
+.mv-pop .mv-row:hover{background:#F5F2EC}
+.mv-pop .mv-row.current{background:#EEF7EE;cursor:default}
+.mv-pop .mv-row.full{opacity:.45;cursor:not-allowed}
+.mv-pop .mv-row.full:hover{background:transparent}
+.mv-pop .mv-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.mv-pop .mv-label{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mv-pop .mv-free{font-family:monospace;font-size:10px;color:#6B6455;white-space:nowrap}
+.mv-pop .mv-new{padding:9px 12px;font-size:11px;color:#3D6B4F;font-weight:500;cursor:pointer;border-top:1px solid #EAE6DC;background:#F7F5F0}
+.mv-pop .mv-new:hover{background:#EEF7EE}
 .pli{display:flex;align-items:center;gap:5px;padding:4px 5px;border-radius:4px;font-size:11px;background:#FDFCF9;border:1px solid transparent;margin-bottom:2px}
 .pli:hover{border-color:#D4CFC2}
 .pli-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
@@ -202,88 +216,91 @@ input[type=color]{padding:2px 3px;height:27px;cursor:pointer}
 </head>
 <body>
 <div class="hdr">
-  <span style="font-size:20px">🪵</span>
-  <div><div class="ht">FabFlow — Board Optimizer</div><div class="hs">SWOOD cut list · QR codes · DXF for vCarve · Zebra GK420d</div></div>
+  <img src="data:image/png;base64,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" alt="Dėdės Baldai" width="28" height="28" style="display:block;object-fit:contain">
+  <div><div class="ht">Dėdės Baldai</div><div class="hs" data-i18n="tagline">SWOOD cut list · QR codes · DXF for vCarve · Zebra GK420d</div></div>
   <div style="margin-left:auto;display:flex;align-items:center;gap:8px">
-    <label style="font-size:10px;color:#A09888;font-family:monospace">PROJECT</label>
-    <input id="projName" placeholder="Untitled" onchange="onProjectNameChange()" oninput="scheduleSave()" style="width:190px;font-size:12px;font-weight:500;padding:4px 8px;border:1px solid #D4CFC2;background:#FDFCF9;border-radius:6px;outline:none">
+    <select id="langSel" onchange="setLanguage(this.value)" title="Language" style="font-size:11px;padding:4px 6px;border:1px solid #D4CFC2;background:#FDFCF9;border-radius:6px;cursor:pointer;width:auto">
+      <option value="en">🇬🇧 EN</option>
+      <option value="lt">🇱🇹 LT</option>
+    </select>
+    <label data-i18n="project" style="font-size:10px;color:#A09888;font-family:monospace">PROJECT</label>
+    <input id="projName" data-i18n-ph="untitled" placeholder="Untitled" onchange="onProjectNameChange()" oninput="scheduleSave()" style="width:190px;font-size:12px;font-weight:500;padding:4px 8px;border:1px solid #D4CFC2;background:#FDFCF9;border-radius:6px;outline:none">
     <span id="saveStatus" class="save-status" title="Save status"></span>
-    <button class="btn bs" onclick="openHistory()" title="Open project history" style="padding:4px 10px">🗂 History</button>
+    <button class="btn bs" onclick="openHistory()" data-i18n-title="openHistory" title="Open project history" style="padding:4px 10px"><span data-i18n="history">🗂 History</span></button>
   </div>
   <span id="albl" style="font-size:10px;color:#A09888;font-family:monospace"></span>
-  <a href="index.html" style="margin-left:8px;font-size:11px;color:#6B6455;text-decoration:none;padding:4px 10px;border:1px solid #C0BAA8;border-radius:6px;background:#FDFCF9">← FabFlow</a>
 </div>
 <div class="app">
 <div class="side">
   <div>
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px">
-      <div class="sec" style="margin:0">Material Boards</div>
-      <button class="btn bs" onclick="addBoard()">+ Add</button>
+      <div class="sec" data-i18n="materialBoards" style="margin:0">Material Boards</div>
+      <button class="btn bs" onclick="addBoard()" data-i18n="addBtn">+ Add</button>
     </div>
     <div id="blist"></div>
-    <div id="bempty" style="font-size:11px;color:#A09888;text-align:center;padding:10px;border:1px dashed #D4CFC2;border-radius:8px">Import parts → boards auto-created</div>
+    <div id="bempty" data-i18n="importHint" style="font-size:11px;color:#A09888;text-align:center;padding:10px;border:1px dashed #D4CFC2;border-radius:8px">Import parts → boards auto-created</div>
   </div>
   <div>
-    <div class="sec">Cut settings</div>
+    <div class="sec" data-i18n="cutSettings">Cut settings</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
-      <div><label class="fl">Saw kerf (mm)</label><input id="kerf" type="number" value="3" min="0" max="20"></div>
-      <div><label class="fl">Board trim (mm)</label><input id="trim" type="number" value="15" min="0" max="100"></div>
+      <div><label class="fl" data-i18n="sawKerf">Saw kerf (mm)</label><input id="kerf" type="number" value="3" min="0" max="20"></div>
+      <div><label class="fl" data-i18n="boardTrim">Board trim (mm)</label><input id="trim" type="number" value="15" min="0" max="100"></div>
     </div>
   </div>
   <div>
-    <div class="sec">Import SWOOD file or DXF parts</div>
+    <div class="sec" data-i18n="importFile">Import SWOOD file or DXF parts</div>
     <div class="drop" id="dropz" onclick="document.getElementById('fin').click()"
       ondragover="event.preventDefault();this.classList.add('ov')"
       ondragleave="this.classList.remove('ov')"
       ondrop="handleDrop(event)">
-      📂 Drop .xlsm / .xlsx / .csv / .dxf here<br>
-      <span style="font-size:10px;opacity:.6">SWOOD: full project · CSV: part list · DXF: shaped parts</span>
+      <span data-i18n="dropHint">📂 Drop .xlsm / .xlsx / .csv / .dxf here</span><br>
+      <span data-i18n="dropSub" style="font-size:10px;opacity:.6">SWOOD: full project · CSV: part list · DXF: shaped parts</span>
       <input type="file" id="fin" accept=".xlsm,.xlsx,.xls,.csv,.dxf,.DXF" multiple style="display:none" onchange="loadFile(this)">
     </div>
     <div id="ist" style="font-size:11px;margin-top:4px;min-height:14px"></div>
   </div>
   <div>
-    <div class="sec">Add part manually</div>
+    <div class="sec" data-i18n="addManual">Add part manually</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:4px">
-      <div><label class="fl">Name</label><input id="pn" placeholder="FRONT_1" onkeydown="if(event.key==='Enter')addManual()"></div>
-      <div><label class="fl">Board</label><select id="pm" onkeydown="if(event.key==='Enter')addManual()"></select></div>
+      <div><label class="fl" data-i18n="name">Name</label><input id="pn" placeholder="FRONT_1" onkeydown="if(event.key==='Enter')addManual()"></div>
+      <div><label class="fl" data-i18n="board">Board</label><select id="pm" onkeydown="if(event.key==='Enter')addManual()"></select></div>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;margin-bottom:4px">
-      <div><label class="fl">L (mm)</label><input id="pl" type="number" placeholder="600" onkeydown="if(event.key==='Enter')addManual()"></div>
-      <div><label class="fl">W (mm)</label><input id="pw2" type="number" placeholder="200" onkeydown="if(event.key==='Enter')addManual()"></div>
-      <div><label class="fl">Qty</label><input id="pq" type="number" value="1" min="1" onkeydown="if(event.key==='Enter')addManual()"></div>
+      <div><label class="fl" data-i18n="lengthMm">L (mm)</label><input id="pl" type="number" placeholder="600" onkeydown="if(event.key==='Enter')addManual()"></div>
+      <div><label class="fl" data-i18n="widthMm">W (mm)</label><input id="pw2" type="number" placeholder="200" onkeydown="if(event.key==='Enter')addManual()"></div>
+      <div><label class="fl" data-i18n="qty">Qty</label><input id="pq" type="number" value="1" min="1" onkeydown="if(event.key==='Enter')addManual()"></div>
     </div>
-    <button class="btn bs" onclick="addManual()" style="width:100%">+ Add part</button>
+    <button class="btn bs" onclick="addManual()" data-i18n="addPart" style="width:100%">+ Add part</button>
   </div>
   <div>
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px">
-      <div class="sec" style="margin:0">Part Groups <span style="color:#A09888;font-size:9px">(same grain pattern)</span></div>
-      <button class="btn bs" onclick="addGroup()">+ Group</button>
+      <div class="sec" style="margin:0"><span data-i18n="partGroups">Part Groups</span> <span style="color:#A09888;font-size:9px" data-i18n="sameGrain">(same grain pattern)</span></div>
+      <button class="btn bs" onclick="addGroup()" data-i18n="addGroupBtn">+ Group</button>
     </div>
-    <div id="glist"><div id="gempty" style="font-size:11px;color:#A09888;text-align:center;padding:8px;border:1px dashed #D4CFC2;border-radius:6px">No groups yet — select parts then assign</div></div>
+    <div id="glist"><div id="gempty" data-i18n="noGroups" style="font-size:11px;color:#A09888;text-align:center;padding:8px;border:1px dashed #D4CFC2;border-radius:6px">No groups yet — select parts then assign</div></div>
   </div>
   <div style="flex:1;min-height:120px;display:flex;flex-direction:column">
     <div style="display:flex;align-items:center;gap:4px;margin-bottom:5px">
-      <div class="sec" style="margin:0;flex:1">Parts (<span id="pc">0</span>)</div>
-      <button class="btn bs br" onclick="clearAllParts()" id="btn-clear-parts" style="display:none">Clear</button>
-      <button class="btn bs" onclick="openPartsWindow()" style="color:#3D6B4F;border-color:#3D6B4F">📋 Manage</button>
+      <div class="sec" style="margin:0;flex:1"><span data-i18n="parts">Parts</span> (<span id="pc">0</span>)</div>
+      <button class="btn bs br" onclick="clearAllParts()" id="btn-clear-parts" data-i18n="clearBtn" style="display:none">Clear</button>
+      <button class="btn bs" onclick="openPartsWindow()" data-i18n="manageBtn" style="color:#3D6B4F;border-color:#3D6B4F">📋 Manage</button>
     </div>
     <div id="plist" style="flex:1;min-height:0;overflow-y:auto;border:1px solid #D4CFC2;border-radius:6px;background:#F2EFE8;padding:3px">
-      <div id="pempty" style="font-size:11px;color:#A09888;text-align:center;padding:14px 8px">No parts yet — add one above<br>or import a file</div>
+      <div id="pempty" data-i18n="noParts" style="font-size:11px;color:#A09888;text-align:center;padding:14px 8px">No parts yet — add one above<br>or import a file</div>
     </div>
   </div>
-  <button class="btn bp" onclick="optimize()" style="width:100%;padding:9px;font-size:13px;margin-top:auto">▶ Optimize &amp; Cut</button>
+  <button class="btn bp" onclick="optimize()" data-i18n="optimize" style="width:100%;padding:9px;font-size:13px;margin-top:auto">▶ Optimize &amp; Cut</button>
 </div>
 <div class="main">
   <div id="stats" class="stats" style="display:none">
-    <div class="stat"><div class="sv" id="sv1">–</div><div class="sl">Sheets</div></div>
-    <div class="stat"><div class="sv" id="sv2">–</div><div class="sl">Parts</div></div>
-    <div class="stat"><div class="sv" id="sv3">–</div><div class="sl">Efficiency</div><div class="efb"><div class="eff" id="ef" style="width:0%"></div></div></div>
-    <div class="stat"><div class="sv" id="sv4">–</div><div class="sl">Waste m²</div></div>
+    <div class="stat"><div class="sv" id="sv1">–</div><div class="sl" data-i18n="statSheets">Sheets</div></div>
+    <div class="stat"><div class="sv" id="sv2">–</div><div class="sl" data-i18n="statParts">Parts</div></div>
+    <div class="stat"><div class="sv" id="sv3">–</div><div class="sl" data-i18n="statEfficiency">Efficiency</div><div class="efb"><div class="eff" id="ef" style="width:0%"></div></div></div>
+    <div class="stat"><div class="sv" id="sv4">–</div><div class="sl" data-i18n="statWaste">Waste m²</div></div>
   </div>
   <div id="ep" class="ep" style="display:none">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:7px">
-      <div class="sec" style="margin:0">Export — parts only · vCarve DXF</div>
+      <div class="sec" data-i18n="exportHdr" style="margin:0">Export — parts only · vCarve DXF</div>
     </div>
     <div id="erows"></div>
   </div>
@@ -291,17 +308,20 @@ input[type=color]{padding:2px 3px;height:27px;cursor:pointer}
   <div id="cvc" style="display:none">
     <div class="cvw">
       <div class="cvb">
-        <label><input type="checkbox" id="ssnap" checked> Snap 1mm</label>
-        <button class="rot-btn" id="rot-btn" onclick="rotateSel()" title="Rotate selected part 90° (R key)" style="display:none">↻ Rotate (R)</button>
-        <span style="margin-left:auto;font-size:10px;color:#A09888">Drag · R = rotate · Double-click → label</span>
+        <label><input type="checkbox" id="ssnap" checked> <span data-i18n="snap1mm">Snap 1mm</span></label>
+        <button class="rot-btn" id="rot-btn" onclick="rotateSel()" data-i18n-title="rotateTip" title="Rotate selected part 90° (R key)" style="display:none"><span data-i18n="rotateBtn">↻ Rotate (R)</span></button>
+        <button class="rot-btn" id="mv-btn" onclick="openMovePopover(event)" data-i18n-title="moveTip" title="Move selected part to a different sheet" style="display:none;color:#3D6B4F;border-color:#3D6B4F"><span data-i18n="moveBtn">📋 Move…</span></button>
+        <button class="btn bs" onclick="consolidateSheets()" data-i18n-title="consolidateTip" title="Repack current placements — merge nearly-empty sheets" style="margin-left:auto;font-size:10px;padding:3px 8px"><span data-i18n="consolidateBtn">✨ Consolidate sheets</span></button>
+        <span data-i18n="canvasHint" style="font-size:10px;color:#A09888">Drag · R = rotate · Double-click → label</span>
       </div>
       <canvas id="cv"></canvas>
       <div class="tip" id="tip"></div>
+      <div class="mv-pop" id="mv-pop"></div>
     </div>
   </div>
   <div class="wlc" id="wlc">
-    <div style="font-size:44px;margin-bottom:12px">🪵</div>
-    <h2>FabFlow Board Optimizer</h2>
+    <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAIAAAACACAYAAADDPmHLAAAjMElEQVR42u19a3hV1bXomHM99lp77b1X9ivPnXcCYUuEEAzQAjFEMRKUD9uoV/nQqsUWqtdC6ePec8uhtT5qa1v7OEf86qOVot5z9HCrtUqLaEVqDVDQg0J4PwQChIRkZz/WWnPeH5kLFpvsR0IIAfb4vvklX7L3XGPMOeZ4z7EAMpCBDGQgAxnIQAYykIEMZCADGchABjJwRQC6Auk1aaZsZOAK2HQ+xf/Qlbo43BWw+RQAiCiKMH/+fL8kSfnl5eWe2bNno02bNvVSSgn7LM5IhMtQvf3iF79wVVZW/sDj8WyRZfmkKIqaKIqa3W4/kZWV9U5VVdUiSqlkYYIMXC66fvHixT6v17sJY0wtOv+swfM89fl8W2bMmBHMMMHlAzwAQGVl5VKEEAWAMAAYAEDihg4AMQCgiqIcuvHGG0cx5skwwSUO4rJly3iv1/sS23gtkQRgIwoANCsr61WEECQxGjNwCQAGAOB5HpxO5xa2wUYKBtCZRPgL+z53RS3W5UQPQog0NzfX5uTkLA+HwxUDoBMhhCKMEbjMOboEXVqEENTU1Nxjt9sNpvvTHQQAiM1m2zd16tTaK8RFvvxcvrvuuivLbreftOr1ATIBlWU5VlVVtYDZAhlj8FJSZdOnT68RRfH0Zg5iGNAXNKLV1dU3XwmS4HLhcAoAqKGhYY8kSceYQjcGuR56LBYje/fuvd0qXTJwCdgAAADBYLBFEATzNOuDkAIxhBAtKipaao0pZOASYoKKiop77Xa7YdXtadoAMQCgDofjREtLix/Ozh5m4FLyBurq6qYpirKNSQIjHSZACFGXy3VkypQpMy5TN/mKARsAQFVV1f9geQAtlQuoKMq+srKyn9xzzz35mc2/PFQBrq6uniAIAkmhBnSO4+j48ePnMNfvitr8y5VQAgBk/vz52zmOa7f8rV8PglIK7e3tXkopDwBiks9m4BICHiEEubm5P2MnPZEa0ACAss8hU31k4NIHBAD4gQce8KuqegQSJ4V0AKBOp3OTzWazqpCM9X+5qLjGxsYpdru9G87UBPRXGBKqrKz8Y01Nzdc47nTwj88Yg5f25osAALNmzcqVJKkLzhSC9OsCAgAVRZGWlJT8urW11R43V0YqXCJi//RGIYSgtbXVnpOT8weruIfkdQEGxpg6nc5PA4HA92fMmBHkeT7ew8gwwwh0+87IbZ6H6dOn1xQUFDzucrn2cBw30ASRbkoFSZJiPp/v7WAwePcjjzzixfgsjZBRESNg4/tkNMawZMmS7Kqqqvt8Pt87kiQRS03AYLKDZ5WS8TxPnU7n0dzc3BW1tbXXUkozGz8CxD0IggCTJ0+uz8/Pf9rpdB5jp93q4hkwuNSwlXl0q/oQRZGqqrqltLT0f8+cObOCSYWMShhOAw8hBKNHj/6yqqqtrAbAKr7189z0ZMygmRKFqYhIZWXlgniJlIELe/LRO++843C73R2WTddg8IUggy0eCQMAdbvdz2aqiYcPeACA6urqL/M8P5jSr6EcOgAQl8v1BlMDl5wEuBQNGcpxHBw5cuQeXdfpCKABEUIChmFwkLlbODwMywI74fOw8IdSDVBJko5YvAKUkQAXUPeLoggnT55s0DRNYpuPLvb6GYYhNjY2fuvee+/1QKaK6ML5/BhjGDt27PeLiooOQJK4/nAPQRBCXq+XBgKBp5ktkDEGhxJaWlo4JvonybJsXvoYEZtvVQeiKNJrrrmmMeMSDr3o5yilgtvt3gLJc/sXc+gAQBwOx+4nnnhCYeohowrOF2prawWO46CkpORRhBBFCOkjcPPPyiEUFBQ8w1SBkNnB84BgMCgCAMyePXuC3W633uKlI3hoNpuN1tbWNjMyxMxODlLsAwD84Ac/qPT7/R9A6nSuAcPr/iWqKzAAgLjd7j3f/va3r7J4Cxl1MADXCnEcB8Fg8Csej6c7nXTuAG8Dn9dI1nLG+pmsrKye0aNHL7FUGGUMwxSnngcAoJTy+fn5P7ckeZKdbkMQBL2oqGjdMASGDACgpaWl62w226kUrigBlkbOz8//3TvvvONgdPIZaZBg4xFCMG/evFK/3/8uO2U6QijZhmoYY1pYWPj4lClTvsAkxYU0EjWMMa2srJxVUlKygD1PSyKVCABoCCHq9Xo3NTc3j7UUlGQYwRqJXLRokbeiouJhRVE60nT1DOjr6/MZpVSoqanJFwQhcoGlABEEgVx11VXjeJ6H7OzsdWyjUzGdBn2NqELFxcU/vu+++wJX4iWUcyJ7AABPP/20OmrUqO8qinLQoluNNDZfE0UxNmHChFoAgIULF473+/0dlpN3IWoBqMvlCs2fP78BANDdd99d6HQ6OwCApMEEhmmrOByOExUVFQ+z0PEVZxsg0z9ubm6uzcrK2mmp4kknp68DALXZbHTMmDHfZicJlZSUzFdVlVxgb0B3uVwkGAx+0yRmwoQJc2VZpmlKLbOghCKEqNPpPHjdddeZkUPhSlAJHEBf/d71118/3e12H2cLE0tTbJuitHP8+PH3CoJw2s+uqKj4JvMELmSUUEMI0cLCwocYPTaEEEydOrXR4/HsZs9PJ1Zx+iq6y+UKTZ8+fdbl7imcbr742GOPqcXFxT+XZdmA9Eq1TfFpcBxH/X7/uzfffPNoi/7kAQAURXloOBgAY0yrq6sfshhyHADAT37yE19+fv6LrDnFQOiiNpuNBgKBFV/72teyL8e4wem+fRMmTLg1KytrlyWZk8yFMjt8xKAv505LS0t/SCnlLIt/+mdxcfFjw5An6I8BTp9ajuOgurr6qw6H45RFsulpuIsGQogqirK/qqrqLss9hEteGvAAAB988IFcUFDwvMWv1xLoxnOqeBFCVFXVndOmTbvB1PdxljMPAOByuX58ERngrOjlTTfddJXP51sfV6FsrTDur1pZM+MGBQUFqx955BFvP8+49Hz72bNnV7nd7o9M/cis5X4rdzHGVBAEKklS1G63t2VlZf25uLj48e9+97veJL4zjxACr9e74iIzwFkMSSnly8rKHvL5fP/hdDr/KctypyiKiaKIumVtNOgrNN0+bdq0CRZJMCLcRS6NwZvicNKkSbc5HI6Ufr2iKAdyc3NXBAKBJdXV1Tded911lc8995xkMYxMY6+/59laWlo4v9//0nAxwNixYxebz06Ak2A1eCml+Pbbb8+fOHHiF0pLS+/Nz89/0uv1vocxJsmMXVmWe+rq6u633Frm09yDC2c/IIRSjoULF+YGAoHfxRlEBGNMHQ5Hm8fj+YOqqn/mef4os4QPUEqFwT4PYwyyLK8cLgaoq6u7Px28LMGes08Rx8GYMWO+xSTeCVVV31ZVdaXT6fyEMcVpd1YQBJqfn//q/PnzyzmOG9TzUonqdD5Dly5d6nz22Wd/GQ6H5RRzUQCY2tvbmw9navYQIwZUVV0fi8V2cBwnRKPRab29vSUIIZBluQ0h9DGlFFn0I0DqSluEMaa6rl8biUSy2ecv1AmgCCHkcDj+aRjGDiaWSZprjKDvQgtCCDlisdi1sVhMUBTliCiKfzEMI2az2YpPnTp1bTQaNb0A027gFEXpxBj/xTCMpOsiiiJMmjTpobfeeuuwZY7z1uewYMECnyXgkXZxxECibJlx/mtps9nozJkzq9INM6dtYTJxfhwAstI4ZVwSF4ZYJAO2SAgC59ebZzivbJ8vrlbarQcAJ9g0zhI3SCid2HyGYRhp45Y2AzidToIQclqQGaxVmohIfAklRoYSV5Smv49S7JfpNvMcxw15kytMKUU+n+9/WoozMmJ7hFUl8zxPA4HAj1555ZUL4jZihBAwJojB8JZgZUaKzec4zggEAj9i9QYXRJKejsAhhHbA8NfhZUYSA1oUxROvvPKKONA8wkA5hUBfjf7FugRp+scGjEwwLhZ+lFL61FNPKQM1TvlBbsJFTSyNYBiq5A2Ni6GgON+/3xMuSdKA94Yf4tOZTlCEG8AiGNYAjKqqW1jrV66zs/MLhmFIFvcnlRtopBEUGYh1H08vVVX1A57nezHGjo6OjimGYQx0ra2vseXicL/oncmsEa3t8TYAQohyHNfviEuApO1BWL9vs9noxIkTb8IYgyiKIMtyR4L5E5Zpp4mfMVD8zBEIBAowxvDDH/6w3OVynfW/dHW5IAhUUZRDkiRtkGV5qyzLEYa/LkmSLkmSzty8+O8dv+6669QBRHiHTAIQhBAuKChYnZOTszYWiyFWkwcAgHieR93d3bSrqys/FotdGwqFJmmaBkmCSQQAsNPp/LSysvJpTdMAY2zwPI88Hs+nhBB+ypQpfCgU+lYsFlNYHh1t27btf3V2duYihCgLJ58VIMnLy/uV3+9vI4ScJUp5nkednZ0QDocrw+FwQ09PT1DX9VSnFOfn5/89Nzf3JU3TACFEEEKEENJ78OBBYf369adGjx79YDQaNb9j+/TTT7+vaZozAd0EALDL5WorLy//1qJFi965//77u3VdF+bOnVu6adOmx6PRKBk3btx3CgsL4U9/+tOqw4cPT0QIGcPZrSyRBNDYK1a+miqJxPM8TJw48WaHw3E0SQhYBwBqt9tfTRcxURTB7/d/DGdu5vR3Y2hsKvwopXwwGFzATl0iSaABAC0rK3tqIAk0QRAOJ6DZgL5LpYcs7yo4J3lUV1c3zvw9Ly9vHZypRj4vCYCHiDEox3GjmpqaAgBgq62tFQCAnzZtWt4NN9wwmlKKKKWg6zrf2tr6/+rq6m6SJCliWYT+Fs3X1NQUbGxs9AIAz+ZEDQ0NxY2NjaNmzJgRrKurcwGAtH37dom1ek9oT/j9/oktLS25Jn719fV8c3NzWXNzcyXP80ApRQghsm3bthWVlZV3C4KQ6HXyCACAEJLf1NQUHD16tJNJUn7ZsmV8c3NzZUNDw+ipU6eOysvLswOAVFlZ6UsWGscYo5ycnJ8+++yznwcCARkAUGNjY43L5XqyqKjoX5YuXer9xz/+saW4uFjSdV2wVEWNGBtAEwSBeL3e50yDFADA4/E8Ksuy5vV619XX1wfYdyXWxv1XkCR9izHWnU4nmT59+i2musIYg9PpbLXZbDGXyxX7+te/XggAIMsy+P3+TxJIAPPCJhk7duzDpkjmeR5KSkrW2O32WCAQ+M/HHntMZQdC5DgOvF7vmiSJGMJxHFUURQsGg+bbSWHp0qX5Xq/3pM1mi0mStNN6ggVBOJJAAhBBEOjVV19dY4Z7eZ4Hv9+/ybRdsrOzPzJFPc/zkJ+f/85IkgAAAKBpGurt7T3rwdFoFIXDYf7EiRP1n3322a+ZMWRQSnFxcfFLoigmxIEQAr29vciiRwEAIBKJeKLRqBAKhYQXX3zxdgCYI8vy3EgkkpT4aDSKIpEIipsL9fb2CocOHbplxYoV/4fZLtgwDKSq6h9YVK1fCWUYBoTDYWzFDyGEo9FoVjQaFSKRSAnG+E4AmCNJ0p0AICfWEAgopb2mfUAIAVmW/y6KIlBK4dixYxOzs7N/7Ha7p4wdO/aaWCyWNdCNHg43EOL66ALGGJhRZnR1dTXeeuutvlWrVh0HAAgGg9u3bt3aDQCJDCNg1rk12AEY41cAoNgwDBIOh78BAEUdHR3Wz6BEejgeP1ZAQSmlpL29/SZCyHcQQuabw/7JcRwlhHBJ6LW6gQhjHAKAF4C9dIIQ8hQAeEKhUH+S1MJLBqdpWjEA7KitrYWNGzeiffv2PVBVVfV/I5HImGg06iGEfDEWiz308ccfc8yQBSYV6IhQAdBX2vW8VQU4nc7TlbqiKJL6+vrx5hw7duywKYqyDxLf5NEFQaCTJk26BQCgvr7+HGYtKipaxkR0JIXrpiGE6KhRo35kVQF5eXl/gTN59OMtLS2mFIHq6uqAKIqJOpGZFz/18vLyZC+ofsaCX9Jcf05OzptxL6zg4g9Tc3NzpcfjeT9u7UeGCkgV1MEYg6IoNgCAZcuWocrKSmIYRsw8ggOxqDHGgDEGwzCEOHdv8L4sIdDe3n564fx+P42XGAPFL07C0iTRQ3L8+PEmv9//3IwZM3IwxvHhZIEQwr/xxhttDz/88E0Oh2PIqn2Gq+QYE0L0UCh0FABg+fLlJBKJODHG7nQ59t133wWEELhcrt9FIpEKjDHp7OysEkWRQwhxhmFACv89KYOKohh5/vnnI6WlpQgAaE9Pj0oIESD9EjOybNky329+85tXTp06JWGMKaV0PCGEQwhxmqaBKboTHMTI0aNH7+7q6rohKyvrHzzPf2qz2Y7l5+ev/+ijjz4khCAAEBcuXHgyLy/vxZ6enqVMenAjhQH6CwUTFqxAsizvX7du3UGEEAcA5P333w/oup6VZIEpsAsT1tMViUQmRaPRUayw8ufZ2dlvAwDs3r172r59+75HKSUJJNs5+DHVowMAb7PZtpaXl0egr/pY6+zsrGTdP40Ei3xOhc6pU6ds4XD42mg0igAAysvLHygoKNjF8zwcOHDg3ra2ti/1Nx/P81BQUDBLkqTtsixntbW1fdjR0TEHIQTHjh2jwWDwS5988slrZl4gFov9kxmOMJIkACaEKHFGm0wp5Ww2G3i93h8ihPTi4mJp3759kUOHDt2o6zpnbkB/uDEChThRfZpZHA7HhrVr177J7A2OLQpNkC3DhBA5bi4HAPAOhwMqKyt//OGHH5pWOT116tTNLJafaJURpVQkhOC455zGb9euXW/s2rVrDwBAVVXVF5OpAkLI/u3bt38OAJ9PnDjxrs8++2xVKBQSdV1HlNJii6REPM9LQ7VpQ8EAFCGEXC7XDlVVW/fv34+CwSDZtm0beDye/1YU5b/y8vJWbt269T+CwaC4bdu2yPvvv++cNWvWNwgh/ZWWUUZku8/n22K32w9bMp7g8/nWRiKRvTzPg91uP1lbWys4HA66detWR5KkElJVtdXr9f73zp07EQAQSil4PJ71hmHsHT169NMbNmx4t6KiwrZz587o3Llzy958883b2He5fuYDu91+yOl0fuxwOHotdkPE6/X+URRFidkBuKioSHA4HPTzzz+XU6yjZNoDra2trzY1NU3dvXt3kyzLHS+88MLzr732Gl65ciXdtWsX4Tiu8WJk5JOGgsvKyh40DRZrCjO+Vp1SKpaUlPyRuXgJX+OGEPqj5bsofk7L/wQAQC6X6zazq0h/oWCe5ydbmD5hO9fFixf7srKyPoTEBS8aANC8vLx/t3QIP2u+/vCrqKh4IlHgi+d5WlVVNQoA4L777iu9/fbbr0q0CdOmTatjfZINa2INIXTc7XZflGSQSTTPAjua1W83ddWSJUvcb7/99rVer/d7nZ2d15A+iyiZmY15nj/tq1vnjPPjNQAAt9ut9fT0JJzM4XCIvb29wBjkHPxuu+227PXr11//zDPPLO/p6Sk3EzRJ6OUEQQBKqREfq+gPP/Y284Rw/PjxXADo3Lhx44RDhw79sqam5hs333zz248++mgPpRQeeOAB35o1a27ZuHHjI5FIxJoGp+ZzT548OehTnXbMn/38DABGgaVoQVXVg6xr9lnuCUIIRaNRHI1GC3Rdz2aZQCOJ9Uqhryl0l9vtboufL0EkjUajUU9XV1cZswHOocvtdm8XRbG7P/xCoRBvGEZxLBbLYno/2eZTAECKohx3uVx7DcNIF79AZ2dnbhKjN8SMZqCUOgVBAJ7n9zgcjhOapnHRaLRY0zQP83Ssc5i/nwCAcgDoGoiLOBQMMBBnmQxz/GGgYMC5t48vBpjqAfeDX3zN33kxwFB6AWZE75yHs1M30IWllrqClIzJnpFsfmJ1KRPgxw0FvQkODk4Upu7HOzh9WcZS3zBQ/C6oDWDA2flyq/6jSTh6YByVnqVLE/nlA5jvfPCjaeI3qFpKyzNoMpUEgyxEHSwDqJD8+lcGhh+yYBDZwUExgNvtfgtjXED7INP18iIDy7r2ZGdn69u2bbtgXkD8AzMrP8KAEDLg8PBgdzFVifL5hKnQIOdKRctQzHO+4bcLRVtaNtCwS6bL1EYYjO0zYsXloBCrra1VZVk+x+Xq6uqC6upquOuuu2LNzc0hFrRIp4sGAADMmzdP2bt371kvWHj//fdThrfq6+t5wzCcCXeM4+i7777blerEzZ49297Z2Wnr739Tp06FRx999BTHcQZL66ZNFwBAS0uL4/Dhw2clttavX38ylchuaWnhDh8+7Eo1fzgcJhs3buwaDmZBgiBsEAThOBsdbBzjeb7dZrMddzgcB3NyctZMmDBhNrMVUvr/ra2tgqqqrWyu44IgHJMkqaOmpqbJcvL6O41QXFw8XpKkdkEQjlnwMedpt9vtu2tra31JmJ4HACgoKPix+Z1+5jimqur2goKClZMnT/5imnQhAIDvfOc7qqqqbZb5TsiyfOKaa66ZaJGW/UlQEEWxiuHTH30nBEE4IghCu6IoGywGObqgDAAA7ZBmu5Jx48bNTbKBp/8+adKkSZamUqdHIBD4tyTv5eUAALKzsycnux3E8zwNBoO5qRggOzv7d+nQJUkSLS8v/14aV7E5AIAxY8bc2N/toMLCwn9N4o2Z845PBydRFNsHwwADDnkuW7aMkyTpJQD4mIlAHSFEBUH40G63r3Y4HIdZNiwajUbp3r17v5WsutZE9siRI83sVbAaSwIZAEBPnTrVQAjhExg4FADA4/F0YIxfFkXx7yzaZ3bYOoYQehkAXpBlOZzCgEKSJL1nt9s3WnoZUkEQ9qmq+mdZlk8CACCEtEgkQg4ePPhITU1NM1uDRMyNEELQ3t4+izV30ljrO53RNpN1BSVJDM4TCKFXEEIv8zy/hjG6eSW8WxTFlwHgZZ7nXxouW0NgJ/LbDMkwQoj6/f5bMMbQ0tJSKknSMYYkURTl0AcffCAn4UzE8zy43e5WNh8pLS39O8dxZldw0tjYWMOYDydjomAw2MJOWgT6mi2+F9drMGVMZNKkSXezOcLQVx38HMdxcMcddxR7vd7N0BcCjgKA4fV6N6QIQSNKqeBwONqgry5SKykp2WC+3kaSpMisWbOK0z2MNputDCx3H7xe73ZJkmC4wWxW+K9WBvB4PF9iOgscDsdu8xSqqrqL9QBEiSTQzJkzK2w2WxT6bhhpU6dOnS2KotmHnwYCgaUpAlcCAHBlZWVfsTKAqqofsFs01hoFlEQN4HHjxi2yMoDdbn/RxLOurm4az/NmGRm12Wzh5ubmggQbyAEATJ48uc5ms5kqsaupqWmuIAgxYM2vy8rKvgLJ+/+Y7fU5AKixMoDH42mjlJoNNAcV1Bts1suwiC2zuH58IBCoz8vLWxEOh0sBANtsNup2u3+AENKSGDqora3tBl3XRQAASZKO/u1vf1srCMJedoIgFAqZ7dRJCh84/v+U53kzbxGvN/uNpfSTgDKTPtxtt93WKgjCUbbghmEY0o4dO8oSSDcEALB///6mWCzWx2E8v/vNN998S5Kko9B3AQV6enqaLfZLMtoSNZ44r6YUQ5H25Cil0NXV9S+HDx9et2/fvq8KghCrqKhYN2fOnC/s3bv3BXPB+iMOY0w7OjqazLv0iqKsRQj1yrL8V6ZqSCQSqWtpabE2nhwwNDU12ebNm6dcf/31yrx585RBhLDR4sWLI4SQdsvCgyiK2QkYgHAcBz09PbNMV09RlDUIoV5Jkt416Q+FQtNXrFjhhDOp6GEP1gwJUEq7CSEneJ6HWCwmHjhwYNxbb731+NSpU+vhTB47/oQYCxYsyNY0rZ5ZTOBwOLSGhoZbPB6PjTGAHovF7Bs3bqxP4U0kjZJu2LDh5y+//PLOdevW7Xj99dc/ffDBBwtS2BUpYyeUUiCE6AnWlVx77bVl0Wi0hqk28Hq9QkNDwy2qqhKTtmg06v/pT386aaj3Y0CGz3mCjhDiXS7XEqfT+Z95eXn1W7dufT4ajbqj0ej0LVu2rL7zzjvHrFy58gicnTvnAEB/77336mOxmBP67gxye/bsuWf//v33GIZhxrWxYRjQ3d3djBBaNdj+RJqmeTVNy2W/QywWGyjt5MEHH3RijE2dz2OMgfU7jvdyMADQnTt3ztQ0TQQA3TAMfvv27Q+1tbU9ZKEN6boO3d3dNyGE/nIxEmuD5bhz+tBhjLsPHjzY8dFHH70mCMI69ufeUCikfvjhh43Qf4UtOn78eLNZ5sRxHNhstm6O4zrZz9M4hkKhGatXr7YnUQOcYRjnSJlVq1aZoVuzWNRACEWZoXfOevQ3BzMkydq1a6fEYjEPmwtxHNdZV1e3w2SQOP+Pdnd3N7OoIeJ5HkRRNGnrsdLW1dXVyFxdkkDicElC0BycR2p+UAzAcZzB8/xZfrXdbo9xHAcrV670IYSuYovNAwBhN2ziidJlWaahUKiRGVq83+9/ZvPmzQX19fVXb968uaCoqOjfEUIYALRIJJL35JNPVjMXCveHU1ZWVijub/q8efMMhq+WwgsAhBBRVbU3jrFjPM8bd9555+gDBw78zDAM0wpHWVlZ65577rkOONM91VxTnRCiRCKRacyw5IqLix9/9dVXAw0NDdXhcDjP6/W+ZH42Go2OueOOO0rN28nxjMRxnMZxnKGqalccfcThcMQ4jjMwxvqFlhbmouGSkpJfO53Obew06Qgh4vP5WgsLC19zOp1tGGPz7romyzK9/vrrx5vfZToXzZkzZ3xxcfEajLGBEDIQQrrP59scCATuAwAoKipakJOTs4nNryOENK/Xu6W8vLwB4ppC5eXl2YuKip7Pzs7eyNq16ABA7Hb78ZKSkteKiopeUxTlgBmbcDgckYULFxZbbAAOAFBtbe39eXl5/zSfyeIY+3Jyct5wOp09cOY1MNRut2uMrtNxgJaWFg4A0I033vjFQCDwnpW27OzsvwcCgdsBAAoLCxd7vd5PmPrUEUJ6Xl5ea21tbZ1lPszC01cXFRX9V1FR0avZ2dl/NdvRAACRZbm7tLT0tcLCwtdKS0t/t2DBAvtwhYIPQ5pNlHJycp5m4o6zLBJMnz795ri7AebPP7BnvBz3d/PnVy32i4mTCwCikGZzRbvdrsUxAA8A4PP5noc0GmDa7fZQTU3N7fFS1LzBXFtbexec3VzCnO+XDOc1/dGmquqX+8k4NqVDE8ZYr6+vzxooAwzYCFy2bBl64oknjhFCsuIWgEBfuxNMKY3wPL8nNzd31Y4dO36K+kxeEhfVijidzjBrsMCx04ARQh29vb1UkqQOhFCE3fXjzf9TSsORSOQcJ0SW5cMAkGMpoDQNs/hKZCTLcozn+XNsAEVROkOhkPWZpqtqUEo1juOOulyu96qqqn62du3abYncW0VRwk6nM6xpGrXiDgCd4XCYOhyOk4ZhWJ9jcByHFEWJdHV1xUf/ohjjsOXOY7yu11mC7oQsy2Swp3og7h6aPXt2fn89eWKxGHW5XEhV1d7f//73x5Ld1v3mN78p79u3LzsWi1FCCMIYU0IIikajPX/9619PNDY2em02m8P8u/lT07Tja9asCcXbMk1NTfkY47QMIUVRaDAY/Hz58uV6XOrVEwqFnOazTJrcbjdwHBddtWrVCYyxbnoniQJTS5YsUfbs2eOLp00QhK7Vq1d3zp07NzsajcrxtGGMj73++uu9caluSVGUnDTCxMbVV1/9+fLlyy9mI88L4maONBgxL3AaSr0+UM8hnZNGz+P5NMX/hoIWOog56HmuLU2D7vOhzYABlp+jQWw+yRSEjkxIpZrOlwEwAJDm5uZxmzdvXqppGrLe1c/AEEbnMAZCCITD4bSjlJIk4WnTpq1YvXr1uoEyQdoBozlz5ox3u91HIdOjf0QOj8cTuvXWWxsQQoPJcSSVEuhXv/qVw+v17mcPi8KZV6BmxsUfuhkH8Xg8PYsWLcpPFvEcjJVOt27dKoVCoSwmWni4At51fwka9KS7u1v55JNPXADwOZPcdEjcNEEQKAvo4Mxaj1yPjmUoh/61cZFIhCKETsCZFicZCTDCnAC2J5QQYgwlA1AAgN/+9rcnVVUdn9n4kQ2SJIHP5ztlegeZFcnAkAaCMqf/0lEHGchABjKQgQxkIAMZyED/8P8BcRGcwd8GgYEAAAAASUVORK5CYII=" alt="Dėdės Baldai" width="80" height="80" style="display:block;object-fit:contain;margin:0 auto 12px">
+    <h2 data-i18n="welcomeTitle">Dėdės Baldai — Nesting</h2>
     <p>Drop your SWOOD .xlsm — boards auto-created from materials.<br>Reads <strong>PARTLIST</strong> (SA_GA_VIRT / RIMANTE_ZAB format) with edgebands &amp; QR op IDs from LABEL sheet automatically.<br><br><span style="font-size:11px;opacity:.6">Drag parts · Double-click → Zebra label with QR · DXF export for vCarve</span></p>
   </div>
 </div>
@@ -820,6 +840,227 @@ var COLORS=['#4A7FC1','#C1694A','#4A9E5C','#9E4A8F','#B8914A','#4A9EA8','#7A6AB8
 var GROUP_COLORS=['#E8A838','#D44A9A','#3AB8B8','#A852D4','#C8542A','#4460C8','#38B060'];
 
 // ═══════════════════════════════════════════════════════════════
+// INTERNATIONALIZATION (i18n) — English / Lithuanian
+// ═══════════════════════════════════════════════════════════════
+var I18N_STORAGE_KEY='fabflow_lang';
+var _lang='en';
+var I18N={
+  en:{
+    // header
+    tagline:'SWOOD cut list · QR codes · DXF for vCarve · Zebra GK420d',
+    welcomeTitle:'Dėdės Baldai — Nesting',
+    project:'PROJECT',
+    untitled:'Untitled',
+    history:'🗂 History',
+    openHistory:'Open project history',
+    // sidebar sections
+    materialBoards:'Material Boards',
+    addBtn:'+ Add',
+    importHint:'Import parts → boards auto-created',
+    cutSettings:'Cut settings',
+    sawKerf:'Saw kerf (mm)',
+    boardTrim:'Board trim (mm)',
+    importFile:'Import SWOOD file or DXF parts',
+    dropHint:'📂 Drop .xlsm / .xlsx / .csv / .dxf here',
+    dropSub:'SWOOD: full project · CSV: part list · DXF: shaped parts',
+    addManual:'Add part manually',
+    name:'Name',
+    board:'Board',
+    lengthMm:'L (mm)',
+    widthMm:'W (mm)',
+    qty:'Qty',
+    addPart:'+ Add part',
+    partGroups:'Part Groups',
+    sameGrain:'(same grain pattern)',
+    addGroupBtn:'+ Group',
+    noGroups:'No groups yet — select parts then assign',
+    parts:'Parts',
+    clearBtn:'Clear',
+    manageBtn:'📋 Manage',
+    noParts:'No parts yet — add one above<br>or import a file',
+    optimize:'▶ Optimize & Cut',
+    // stats
+    statSheets:'Sheets',
+    statParts:'Parts',
+    statEfficiency:'Efficiency',
+    statWaste:'Waste m²',
+    // canvas / export
+    exportHdr:'Export — parts only · vCarve DXF',
+    snap1mm:'Snap 1mm',
+    rotateBtn:'↻ Rotate (R)',
+    rotateTip:'Rotate selected part 90° (R key)',
+    moveBtn:'📋 Move…',
+    moveTip:'Move selected part to a different sheet',
+    consolidateBtn:'✨ Consolidate sheets',
+    consolidateTip:'Repack current placements — merge nearly-empty sheets',
+    canvasHint:'Drag · R = rotate · Double-click → label',
+    // save status
+    saving:'Saving…',
+    saved:'✓ Saved',
+    savedLocal:'✓ Saved (local)',
+    loadingMsg:'Loading…',
+    loaded:'✓ Loaded',
+    imported:'✓ Imported',
+    newProject:'New project',
+    offline:'⚠ Offline — local only',
+    notFound:'⚠ Not found',
+    nameRequired:'Name required',
+    // move-to-sheet popover
+    moveSel:'Move',
+    sheetN:'Sheet #{n}',
+    newSheet:'+ New sheet',
+    noOtherSheets:'No other sheets of this material. Use + New sheet below.',
+    current:'(current)',
+    willNotFit:'won\'t fit',
+    pctFree:'% free',
+    // alerts
+    alertAddBoardsParts:'Add boards and parts first',
+    alertNoFreeSpace:'No free space on Sheet #{n} for this part.',
+    alertDiffMaterial:'Target sheet is a different material.',
+    alertPartLargerBoard:'Part is larger than the board itself.',
+    alertNoBoard:'No board defined for material "{mat}".',
+    confirmEmptySheet:'Sheet #{n} is now empty. Remove it?',
+    confirmConsolidate:'Re-pack every sheet to merge nearly-empty ones?\n\nThis uses the same optimizer as the ▶ Optimize button, but only on the parts already placed — so imports and groupings stay intact.',
+    consolidatedMsg:'✓ Consolidated — {before} sheets → {after} sheets.',
+    alreadyOptimal:'Already optimal. No sheets to merge ({n} sheets).',
+    repackedMsg:'Re-packed into {n} sheets.',
+    noLayouts:'No layouts yet. Run Optimize first.',
+    noPartsConsolidate:'No parts to consolidate.',
+    confirmClearParts:'Remove all {n} parts?',
+    confirmDeleteSelected:'Delete {n} selected parts?',
+    confirmDeleteProject:'Delete project "{name}"? This cannot be undone.',
+    enterValidNumber:'Enter a valid number',
+    lwLocked:'Length/width are locked for DXF-imported parts (they come from the shape). Re-import the DXF if dimensions need to change.',
+    enterLW:'Enter length and width'
+  },
+  lt:{
+    tagline:'SWOOD pjovimas · QR kodai · DXF vCarve · Zebra GK420d',
+    welcomeTitle:'Dėdės Baldai — Nesting',
+    project:'PROJEKTAS',
+    untitled:'Be pavadinimo',
+    history:'🗂 Istorija',
+    openHistory:'Atidaryti projektų istoriją',
+    materialBoards:'Medžiagos plokštės',
+    addBtn:'+ Pridėti',
+    importHint:'Importuokite detales → plokštės sukurtos automatiškai',
+    cutSettings:'Pjovimo parametrai',
+    sawKerf:'Pjūklo plotis (mm)',
+    boardTrim:'Plokštės apkirpimas (mm)',
+    importFile:'Importuoti SWOOD arba DXF detales',
+    dropHint:'📂 Nutempkite .xlsm / .xlsx / .csv / .dxf čia',
+    dropSub:'SWOOD: visas projektas · CSV: detalių sąrašas · DXF: formuotos detalės',
+    addManual:'Pridėti detalę rankiniu būdu',
+    name:'Pavadinimas',
+    board:'Plokštė',
+    lengthMm:'Ilgis (mm)',
+    widthMm:'Plotis (mm)',
+    qty:'Kiekis',
+    addPart:'+ Pridėti detalę',
+    partGroups:'Detalių grupės',
+    sameGrain:'(ta pati pluošto kryptis)',
+    addGroupBtn:'+ Grupė',
+    noGroups:'Grupių dar nėra — pasirinkite detales ir priskirkite',
+    parts:'Detalės',
+    clearBtn:'Išvalyti',
+    manageBtn:'📋 Valdyti',
+    noParts:'Detalių dar nėra — pridėkite aukščiau<br>arba importuokite failą',
+    optimize:'▶ Optimizuoti ir pjauti',
+    statSheets:'Plokštės',
+    statParts:'Detalės',
+    statEfficiency:'Efektyvumas',
+    statWaste:'Atliekos m²',
+    exportHdr:'Eksportas — tik detalės · vCarve DXF',
+    snap1mm:'Lipdyti 1mm',
+    rotateBtn:'↻ Pasukti (R)',
+    rotateTip:'Pasukti pasirinktą detalę 90° (R klavišas)',
+    moveBtn:'📋 Perkelti…',
+    moveTip:'Perkelti pasirinktą detalę į kitą plokštę',
+    consolidateBtn:'✨ Sujungti plokštes',
+    consolidateTip:'Perdėlioti esamas detales — sujungti beveik tuščias plokštes',
+    canvasHint:'Tempkite · R = pasukti · Dvigubas spragtelėjimas → etiketė',
+    saving:'Saugoma…',
+    saved:'✓ Išsaugota',
+    savedLocal:'✓ Išsaugota (vietoje)',
+    loadingMsg:'Įkeliama…',
+    loaded:'✓ Įkelta',
+    imported:'✓ Importuota',
+    newProject:'Naujas projektas',
+    offline:'⚠ Neprisijungta — tik vietoje',
+    notFound:'⚠ Nerasta',
+    nameRequired:'Reikalingas pavadinimas',
+    moveSel:'Perkelti',
+    sheetN:'Plokštė Nr. {n}',
+    newSheet:'+ Nauja plokštė',
+    noOtherSheets:'Nėra kitų šios medžiagos plokščių. Naudokite „Nauja plokštė" žemiau.',
+    current:'(dabartinė)',
+    willNotFit:'netilps',
+    pctFree:'% laisva',
+    alertAddBoardsParts:'Pirma pridėkite plokštes ir detales',
+    alertNoFreeSpace:'Plokštėje Nr. {n} nėra vietos šiai detalei.',
+    alertDiffMaterial:'Pasirinkta plokštė yra kitos medžiagos.',
+    alertPartLargerBoard:'Detalė didesnė už pačią plokštę.',
+    alertNoBoard:'Medžiagai „{mat}" nėra apibrėžtos plokštės.',
+    confirmEmptySheet:'Plokštė Nr. {n} dabar tuščia. Pašalinti?',
+    confirmConsolidate:'Perdėlioti visas plokštes ir sujungti beveik tuščias?\n\nNaudojamas tas pats optimizavimas kaip ir ▶ Optimizuoti mygtukas, bet tik su jau sudėliotomis detalėmis — importai ir grupės išlieka.',
+    consolidatedMsg:'✓ Sujungta — {before} plokščių → {after} plokštės.',
+    alreadyOptimal:'Jau optimalu. Sujungimui plokščių nėra ({n}).',
+    repackedMsg:'Perdėliota į {n} plokštes.',
+    noLayouts:'Išdėliojimų dar nėra. Pirma paleiskite Optimizuoti.',
+    noPartsConsolidate:'Nėra detalių sujungimui.',
+    confirmClearParts:'Pašalinti visas {n} detales?',
+    confirmDeleteSelected:'Ištrinti {n} pažymėtas detales?',
+    confirmDeleteProject:'Ištrinti projektą „{name}"? Veiksmas negrįžtamas.',
+    enterValidNumber:'Įveskite teisingą skaičių',
+    lwLocked:'Ilgis ir plotis užrakinti iš DXF importuotoms detalėms (jie paimti iš formos). Jei reikia kitų matmenų — importuokite DXF iš naujo.',
+    enterLW:'Įveskite ilgį ir plotį'
+  }
+};
+function t(key,vars){
+  var s=(I18N[_lang]&&I18N[_lang][key])||I18N.en[key]||key;
+  if(vars){Object.keys(vars).forEach(function(k){s=s.replace(new RegExp('\\{'+k+'\\}','g'),vars[k]);});}
+  return s;
+}
+function translateAll(){
+  // Elements with data-i18n — replace textContent (innerHTML for keys containing <br> etc)
+  document.querySelectorAll('[data-i18n]').forEach(function(el){
+    var k=el.getAttribute('data-i18n');
+    var v=t(k);
+    if(v.indexOf('<')>=0) el.innerHTML=v; else el.textContent=v;
+  });
+  document.querySelectorAll('[data-i18n-ph]').forEach(function(el){
+    el.setAttribute('placeholder',t(el.getAttribute('data-i18n-ph')));
+  });
+  document.querySelectorAll('[data-i18n-title]').forEach(function(el){
+    el.setAttribute('title',t(el.getAttribute('data-i18n-title')));
+  });
+  // Sync picker
+  var sel=document.getElementById('langSel');if(sel)sel.value=_lang;
+}
+function setLanguage(lang){
+  if(!I18N[lang])lang='en';
+  _lang=lang;
+  try{localStorage.setItem(I18N_STORAGE_KEY,lang);}catch(e){}
+  translateAll();
+  // Rerender dynamic bits that use t() for labels
+  try{renderBoards();renderParts();renderGroups();}catch(e){}
+  // Refresh export list if visible (file labels, etc don't change but refresh anyway)
+  // Refresh history panel if open
+  if(document.getElementById('hist-overlay')&&document.getElementById('hist-overlay').classList.contains('open'))renderHistory();
+}
+function detectLanguage(){
+  try{
+    var saved=localStorage.getItem(I18N_STORAGE_KEY);
+    if(saved&&I18N[saved])return saved;
+  }catch(e){}
+  var bl=(navigator.language||navigator.userLanguage||'').toLowerCase();
+  if(bl.indexOf('lt')===0)return 'lt';
+  return 'en';
+}
+// Initialize language as early as possible (before DOMContentLoaded renders static HTML)
+_lang=detectLanguage();
+document.addEventListener('DOMContentLoaded',function(){translateAll();});
+
+// ═══════════════════════════════════════════════════════════════
 // PROJECT PERSISTENCE — Supabase with localStorage fallback
 // ═══════════════════════════════════════════════════════════════
 var SUPABASE_URL='https://qnnhvngjxrvqamikkocw.supabase.co';
@@ -851,15 +1092,17 @@ function supaConfigured(){
 
 function collectProjectState(){
   // Snapshot everything the app needs to fully restore a project.
+  // NOTE: returned references are live — JSON.stringify will make its own copy when serializing.
+  // Deep-copying here just wastes CPU during saves.
   return {
     v:1,
-    boards:boards.map(function(b){return Object.assign({},b);}),
+    boards:boards,
     bId:bId,
-    parts:parts.map(function(p){return Object.assign({},p);}),
-    partGroups:partGroups.map(function(g){return Object.assign({},g);}),
+    parts:parts,
+    partGroups:partGroups,
     gId:gId,
     layouts:layouts.map(function(l){
-      // Layout placements reference parts by object ref — save by id, re-link on load
+      // Placements reference parts by object — store partId for round-trip re-link.
       return {
         idx:l.idx,uw:l.uw,uh:l.uh,sw:l.sw,sh:l.sh,trim:l.trim,
         matName:l.matName,matColor:l.matColor,grainLocked:!!l.grainLocked,
@@ -876,6 +1119,19 @@ function collectProjectState(){
     },
     opIdMap:opIdMap
   };
+}
+// Cheap change-detector fingerprint — way faster than JSON.stringify.
+// Used to decide "did anything actually change since last save?"
+function cheapFingerprint(){
+  var fp=boards.length+'|'+parts.length+'|'+partGroups.length+'|'+layouts.length+'|'+curSheet;
+  // Hash the last few boards/parts by id+key props (enough to detect edits, cheap to compute)
+  for(var i=0;i<boards.length;i++){var b=boards[i];fp+='|b'+b.id+':'+b.mat+','+b.w+','+b.h+','+b.qty+','+(b.grain?1:0);}
+  for(var i=0;i<parts.length;i++){var p=parts[i];fp+='|p'+p.id+':'+p.l+','+p.w+','+p.mat+','+(p.groupId||'')+','+(p.rot?1:0);}
+  for(var i=0;i<layouts.length;i++){
+    var l=layouts[i];fp+='|L'+i+':'+(l.placements||[]).length;
+    (l.placements||[]).forEach(function(pl){fp+=','+pl.x+','+pl.y+','+(pl.rot?1:0);});
+  }
+  return fp;
 }
 function getSettingsTrim(){
   // Read trim values from board cards if present
@@ -919,11 +1175,15 @@ function applyProjectState(d){
       document.getElementById('ep').style.display='block';
       buildExport();
     } else {
-      // Hide export / stats / tabs
+      // Hide export / stats / tabs — but do NOT wipe #cvc's inner HTML,
+      // that would destroy #ssnap, #rot-btn, #tip and break drag on next use.
       document.getElementById('stats').style.display='none';
       document.getElementById('ep').style.display='none';
       document.getElementById('tabs').innerHTML='';
-      var cvc=document.getElementById('cvc');if(cvc)cvc.innerHTML='<canvas id="cv"></canvas>';
+      var cvc=document.getElementById('cvc');if(cvc)cvc.style.display='none';
+      // Clear any drawing on the existing canvas
+      var cv=document.getElementById('cv');
+      if(cv){var ctx=cv.getContext('2d');ctx.clearRect(0,0,cv.width,cv.height);}
     }
   } finally {
     _suppressSave=false;
@@ -931,34 +1191,25 @@ function applyProjectState(d){
   _lastSavedHash=JSON.stringify(collectProjectState());
 }
 
-function hashProjectState(){return JSON.stringify(collectProjectState());}
+function hashProjectState(){return cheapFingerprint();}
 
-// Debounced auto-save: schedule a save 1s after the last change.
-function scheduleSave(){
-  if(_suppressSave)return;
-  clearTimeout(_saveTimer);
-  _saveTimer=setTimeout(saveProject,1000);
-  setStatus('saving','Saving…');
-}
-function setStatus(cls,text){
-  var el=document.getElementById('saveStatus');if(!el)return;
-  el.className='save-status '+(cls||'');
-  el.textContent=text||'';
-  el.title=text||'';
-}
 async function saveProject(){
   if(_suppressSave||_savingNow)return;
   var name=(document.getElementById('projName').value||'').trim();
-  if(!name){setStatus('','Name required');return;}
-  var data=collectProjectState();
-  var payloadHash=JSON.stringify(data);
-  if(payloadHash===_lastSavedHash){setStatus('saved','✓ Saved');return;}
+  if(!name){setStatus('',t('nameRequired'));return;}
+  // Cheap change detection — no full JSON stringification unless we actually save.
+  var fp=cheapFingerprint();
+  if(fp===_lastSavedHash&&name===currentProjectName){setStatus('saved',t('saved'));return;}
   _savingNow=true;
   currentProjectName=name;
   try{localStorage.setItem(LS_LAST_PROJECT,name);}catch(e){}
+  var data=collectProjectState();
+  var serialized;
+  try{serialized=JSON.stringify(data);}catch(e){_savingNow=false;setStatus('error','⚠ Serialize failed');console.error(e);return;}
+  var updatedAt=new Date().toISOString();
   // Always write to localStorage as a mirror (backup + offline fallback)
   try{
-    localStorage.setItem(LS_PROJECT_PREFIX+name,JSON.stringify({name:name,data:data,updated_at:new Date().toISOString()}));
+    localStorage.setItem(LS_PROJECT_PREFIX+name,JSON.stringify({name:name,data:data,updated_at:updatedAt}));
   }catch(e){console.warn('localStorage save failed',e);}
   // Attempt cloud save
   if(supaConfigured()){
@@ -966,27 +1217,47 @@ async function saveProject(){
       var r=await fetch(SUPABASE_URL+'/rest/v1/'+PROJECT_TABLE+'?on_conflict=name',{
         method:'POST',
         headers:Object.assign(supaHeaders(),{'Prefer':'resolution=merge-duplicates,return=representation'}),
-        body:JSON.stringify({name:name,data:data,updated_at:new Date().toISOString()})
+        body:'{"name":'+JSON.stringify(name)+',"data":'+serialized+',"updated_at":'+JSON.stringify(updatedAt)+'}'
       });
       if(!r.ok){
         var errText=await r.text();
         throw new Error('HTTP '+r.status+': '+errText.substring(0,120));
       }
       _supabaseOnline=true;
-      _lastSavedHash=payloadHash;
-      setStatus('saved','✓ Saved');
+      _lastSavedHash=fp;
+      setStatus('saved',t('saved'));
       drainPendingQueue();
     }catch(err){
       _supabaseOnline=false;
       queueForLater(name);
-      setStatus('offline','⚠ Offline — local only');
+      setStatus('offline',t('offline'));
       console.warn('Supabase save failed',err);
     }
   } else {
-    _lastSavedHash=payloadHash;
-    setStatus('saved','✓ Saved (local)');
+    _lastSavedHash=fp;
+    setStatus('saved',t('savedLocal'));
   }
   _savingNow=false;
+}
+function scheduleSave(){
+  if(_suppressSave)return;
+  if(dragging)return; // never save while user is dragging — defer until drag-end
+  clearTimeout(_saveTimer);
+  _saveTimer=setTimeout(function(){
+    // Run save on idle to never compete with user input
+    if(typeof requestIdleCallback==='function'){
+      requestIdleCallback(saveProject,{timeout:2000});
+    } else {
+      saveProject();
+    }
+  },1000);
+  setStatus('saving',t('saving'));
+}
+function setStatus(cls,text){
+  var el=document.getElementById('saveStatus');if(!el)return;
+  el.className='save-status '+(cls||'');
+  el.textContent=text||'';
+  el.title=text||'';
 }
 
 function queueForLater(name){
@@ -1076,7 +1347,7 @@ async function loadProjectByName(name){
   if(currentProjectName&&hashProjectState()!==_lastSavedHash){
     await saveProject();
   }
-  setStatus('saving','Loading…');
+  setStatus('saving',t('loadingMsg'));
   // Try cloud first, then local.
   var loaded=null;
   if(supaConfigured()){
@@ -1093,12 +1364,12 @@ async function loadProjectByName(name){
     var raw=localStorage.getItem(LS_PROJECT_PREFIX+name);
     if(raw){try{loaded=JSON.parse(raw);}catch(e){}}
   }
-  if(!loaded){setStatus('error','⚠ Not found');return false;}
+  if(!loaded){setStatus('error',t('notFound'));return false;}
   currentProjectName=loaded.name;
   document.getElementById('projName').value=loaded.name;
   try{localStorage.setItem(LS_LAST_PROJECT,loaded.name);}catch(e){}
   applyProjectState(loaded.data);
-  setStatus('saved','✓ Loaded');
+  setStatus('saved',t('loaded'));
   return true;
 }
 
@@ -1197,7 +1468,7 @@ async function histAction(action,name){
     await deleteProjectByName(name);
     renderHistory();
   } else if(action==='del'){
-    if(!confirm('Delete project "'+name+'"? This cannot be undone.'))return;
+    if(!confirm(t('confirmDeleteProject',{name:name})))return;
     await deleteProjectByName(name);
     if(name===currentProjectName){newProject();}
     renderHistory();
@@ -1220,12 +1491,14 @@ function newProject(){
     document.getElementById('stats').style.display='none';
     document.getElementById('ep').style.display='none';
     document.getElementById('tabs').innerHTML='';
-    var cvc=document.getElementById('cvc');if(cvc)cvc.innerHTML='<canvas id="cv"></canvas>';
+    var cvc=document.getElementById('cvc');if(cvc)cvc.style.display='none';
+    var cv=document.getElementById('cv');
+    if(cv){var ctx=cv.getContext('2d');ctx.clearRect(0,0,cv.width,cv.height);}
   } finally {
     _suppressSave=false;
   }
   _lastSavedHash=hashProjectState();
-  setStatus('','New project');
+  setStatus('',t('newProject'));
   closeHistory();
 }
 function exportCurrentProject(){
@@ -1255,7 +1528,7 @@ async function importProjectJSON(inputEl){
     applyProjectState(obj.data);
     _lastSavedHash='';
     await saveProject();
-    setStatus('saved','✓ Imported');
+    setStatus('saved',t('imported'));
     renderHistory();
   }catch(err){
     alert('Import failed: '+err.message);
@@ -2007,7 +2280,7 @@ function addManual(){
   var name=document.getElementById('pn').value.trim()||('PART_'+(parts.length+1));
   var mat=document.getElementById('pm').value;
   var l=parseInt(document.getElementById('pl').value),w=parseInt(document.getElementById('pw2').value),q=parseInt(document.getElementById('pq').value)||1;
-  if(!l||!w){alert('Enter length and width');document.getElementById('pl').focus();return;}
+  if(!l||!w){alert(t('enterLW'));document.getElementById('pl').focus();return;}
   if(!boards.find(function(b){return b.mat===mat;}))ensureBoard(mat);
   for(var i=0;i<q;i++)parts.push({id:Date.now()+i,name:name+'_'+(i+1),origName:name,l:l,w:w,mat:mat,thick:18,eb:{eb1:'',eb2:'',eb3:'',eb4:''},op1:'',op2:'',hasCNC:false});
   // flash the group that was just added
@@ -2024,7 +2297,7 @@ function addManual(){
 }
 function clearAllParts(){
   if(!parts.length)return;
-  if(!confirm('Remove all '+parts.length+' parts?'))return;
+  if(!confirm(t('confirmClearParts',{n:parts.length})))return;
   parts=[];pwSel&&pwSel.clear&&pwSel.clear();renderParts();
 }
 function pliRemoveGroup(key){
@@ -2200,9 +2473,9 @@ function pwEditField(id,field,val){
     p.origName=nm;p.name=nm;
   } else if(field==='l'||field==='w'||field==='thick'){
     var n=parseInt(val,10);
-    if(!n||n<1){alert('Enter a valid number');renderPartsWindow();return;}
+    if(!n||n<1){alert(t('enterValidNumber'));renderPartsWindow();return;}
     if((field==='l'||field==='w')&&p.shape){
-      alert('Length/width are locked for DXF-imported parts (they come from the shape). Re-import the DXF if dimensions need to change.');
+      alert(t('lwLocked'));
       renderPartsWindow();return;
     }
     p[field]=n;
@@ -2228,7 +2501,7 @@ function pwEditField(id,field,val){
 function pwDelete(id){var sid=String(id);parts=parts.filter(function(p){return String(p.id)!==sid;});pwSel.delete(sid);renderParts();renderPartsWindow();}
 function pwDeleteSelected(){
   if(!pwSel.size)return;
-  if(!confirm('Delete '+pwSel.size+' selected parts?'))return;
+  if(!confirm(t('confirmDeleteSelected',{n:pwSel.size})))return;
   parts=parts.filter(function(p){return!pwSel.has(String(p.id));});pwSel.clear();renderParts();renderPartsWindow();
 }
 function pwAssignToGroup(){
@@ -2344,7 +2617,7 @@ function renderGroups(){
 // OPTIMIZER
 // ═══════════════════════════════════════════════════════════════
 function optimize(){
-  if(!boards.length||!parts.length){alert('Add boards and parts first');return;}
+  if(!boards.length||!parts.length){alert(t('alertAddBoardsParts'));return;}
   var kerf=parseInt(document.getElementById('kerf').value)||0;
   var trim=parseInt(document.getElementById('trim').value)||0;
   layouts=[];selP=null;hovP=null;
@@ -2677,9 +2950,12 @@ function bindCanvas(lay){
     if(h&&!dragging){
       var grp=h.part.groupId?partGroups.find(function(g){return g.id===h.part.groupId;}):null;
       var grpTxt=grp?' · <span style="color:'+grp.color+';font-weight:600">Group: '+esc(grp.name)+'</span>':'';
-      tip.innerHTML='<strong>'+esc(h.part.origName)+'</strong>'+grpTxt+'<br>'+h.pw+'×'+h.ph+'×'+h.part.thick+'mm · '+esc(h.part.mat)+(h.part.op1?'<br>QR: '+esc(h.part.op1):'')+'<br><span style="opacity:.5;font-size:10px">drag · dbl-click → label</span>';
-      tip.style.display='block';tip.style.left=(e.offsetX+14)+'px';tip.style.top=Math.max(0,e.offsetY-10)+'px';cv.style.cursor='grab';
-    }else if(!dragging){tip.style.display='none';cv.style.cursor=h?'grab':'crosshair';}
+      if(tip){
+        tip.innerHTML='<strong>'+esc(h.part.origName)+'</strong>'+grpTxt+'<br>'+h.pw+'×'+h.ph+'×'+h.part.thick+'mm · '+esc(h.part.mat)+(h.part.op1?'<br>QR: '+esc(h.part.op1):'')+'<br><span style="opacity:.5;font-size:10px">drag · dbl-click → label</span>';
+        tip.style.display='block';tip.style.left=(e.offsetX+14)+'px';tip.style.top=Math.max(0,e.offsetY-10)+'px';
+      }
+      cv.style.cursor='grab';
+    }else if(!dragging){if(tip)tip.style.display='none';cv.style.cursor=h?'grab':'crosshair';}
   };
   cv.onmousedown=function(e){
     if(e.button!==0)return;
@@ -2688,12 +2964,16 @@ function bindCanvas(lay){
       selP=h;dragP=h;dragging=true;
       dragOX=pos.mx-(lay.trim*SC+h.x*SC);
       dragOY=pos.my-(lay.trim*SC+h.y*SC);
-      cv.style.cursor='grabbing';tip.style.display='none';
+      cv.style.cursor='grabbing';if(tip)tip.style.display='none';
       document.getElementById('rot-btn').style.display='inline-block';
+      document.getElementById('mv-btn').style.display='inline-block';
+      closeMovePopover();
       draw(lay);
     }else{
       selP=null;
       document.getElementById('rot-btn').style.display='none';
+      document.getElementById('mv-btn').style.display='none';
+      closeMovePopover();
       draw(lay);
     }
     e.preventDefault();
@@ -2703,13 +2983,13 @@ function bindCanvas(lay){
       // On release: resolve any remaining collision
       var resolved=resolveCollision(lay,dragP,dragP.x,dragP.y);
       dragP.x=resolved.x;dragP.y=resolved.y;
-      dragging=false;dragP=null;draw(lay);buildExport();scheduleSave();
+      dragging=false;dragP=null;draw(lay);scheduleExportRebuild();scheduleSave();
     }else{dragging=false;dragP=null;}
     cv.style.cursor='crosshair';
   };
   cv.onmouseleave=function(){
-    if(dragging&&dragP){var r=resolveCollision(lay,dragP,dragP.x,dragP.y);dragP.x=r.x;dragP.y=r.y;dragging=false;dragP=null;draw(lay);buildExport();scheduleSave();}
-    hovP=null;tip.style.display='none';
+    if(dragging&&dragP){var r=resolveCollision(lay,dragP,dragP.x,dragP.y);dragP.x=r.x;dragP.y=r.y;dragging=false;dragP=null;draw(lay);scheduleExportRebuild();scheduleSave();}
+    hovP=null;if(tip)tip.style.display='none';
   };
   cv.ondblclick=function(e){var pos=gp(e),h=hit(pos.mx,pos.my);if(h)openModal(h,lay);};
 }
@@ -2729,7 +3009,7 @@ function rotateSel(){
   // Resolve collision after rotate
   var resolved=resolveCollision(lay,selP,selP.x,selP.y);
   selP.x=resolved.x;selP.y=resolved.y;
-  draw(lay);buildExport();scheduleSave();
+  draw(lay);scheduleExportRebuild();scheduleSave();
 }
 // Keyboard: R = rotate selected, Escape = deselect, Delete = remove
 document.addEventListener('keydown',function(e){
@@ -2739,13 +3019,287 @@ document.addEventListener('keydown',function(e){
   if((e.key==='Delete'||e.key==='Backspace')&&selP){
     var lay=layouts[curSheet];if(!lay)return;
     lay.placements=lay.placements.filter(function(p){return p!==selP;});
-    selP=null;hovP=null;draw(lay);buildExport();scheduleSave();
+    selP=null;hovP=null;draw(lay);scheduleExportRebuild();scheduleSave();
   }
 });
 
 // ═══════════════════════════════════════════════════════════════
+// MOVE PARTS BETWEEN SHEETS — manual rebalancing UI
+// ═══════════════════════════════════════════════════════════════
+function openMovePopover(ev){
+  if(!selP){return;}
+  ev&&ev.stopPropagation&&ev.stopPropagation();
+  var pop=document.getElementById('mv-pop');
+  var srcPart=selP.part;
+  var srcIdx=curSheet;
+  // Candidates: same material only (moving across materials is almost always a mistake)
+  var candidates=[];
+  layouts.forEach(function(l,i){
+    if(l.matName!==srcPart.mat)return;
+    var usedA=(l.placements||[]).reduce(function(n,p){return n+p.pw*p.ph;},0);
+    var totA=l.uw*l.uh;
+    var freePct=totA?Math.round((1-usedA/totA)*100):0;
+    var fitInfo=findFreeSpot(l,selP,i===srcIdx);
+    candidates.push({idx:i,layout:l,freePct:freePct,fit:fitInfo,isCurrent:i===srcIdx});
+  });
+  var html='<div class="mv-hdr">'+t('moveSel')+' '+esc(srcPart.origName)+' ('+selP.pw+'×'+selP.ph+' '+esc(srcPart.mat)+')</div>';
+  if(!candidates.length){
+    html+='<div style="padding:12px;font-size:11px;color:#A09888">'+t('noOtherSheets')+'</div>';
+  } else {
+    html+=candidates.map(function(c){
+      var cls='mv-row';
+      if(c.isCurrent)cls+=' current';
+      else if(!c.fit)cls+=' full';
+      var label=t('sheetN',{n:c.idx+1});
+      if(c.isCurrent)label+=' '+t('current');
+      var fitNote=c.fit?c.freePct+t('pctFree'):t('willNotFit');
+      var onclick=c.isCurrent||!c.fit?'':'onclick="moveToSheet('+c.idx+');closeMovePopover()"';
+      return '<div class="'+cls+'" '+onclick+'>'
+        +'<span class="mv-dot" style="background:'+c.layout.matColor+'"></span>'
+        +'<span class="mv-label">'+label+'</span>'
+        +'<span class="mv-free">'+fitNote+'</span>'
+        +'</div>';
+    }).join('');
+  }
+  html+='<div class="mv-new" onclick="moveToNewSheet();closeMovePopover()">'+t('newSheet')+' ('+esc(srcPart.mat)+')</div>';
+  pop.innerHTML=html;
+  pop.classList.add('open');
+  // Close on outside click
+  setTimeout(function(){
+    document.addEventListener('click',_mvOutside,true);
+  },0);
+}
+function _mvOutside(e){
+  var pop=document.getElementById('mv-pop');
+  if(!pop)return;
+  if(!pop.contains(e.target)&&e.target.id!=='mv-btn'){closeMovePopover();}
+}
+function closeMovePopover(){
+  var pop=document.getElementById('mv-pop');if(pop)pop.classList.remove('open');
+  document.removeEventListener('click',_mvOutside,true);
+}
+
+// Try to find a collision-free position for `placement` on layout `lay`.
+// If excludeSelf is true, ignore the placement itself (used when moving within same sheet).
+// Returns {x,y} or null if nothing fits.
+function findFreeSpot(lay,placement,excludeSelf){
+  var kerf=parseInt((document.getElementById('kerf')||{}).value||0)||0;
+  var K=kerf, pw=placement.pw, ph=placement.ph, UW=lay.uw, UH=lay.uh;
+  if(pw>UW||ph>UH)return null;
+  // Build hypothetical placements list that excludes self if needed
+  var othersBackup=null;
+  if(excludeSelf){
+    othersBackup=lay.placements;
+    lay.placements=lay.placements.filter(function(p){return p!==placement;});
+  }
+  try {
+    // Try: top-left of board, then each corner of each existing part + kerf, then a coarse grid scan
+    var tries=[[0,0]];
+    lay.placements.forEach(function(p){
+      tries.push([p.x+p.pw+K, p.y]);        // right of
+      tries.push([p.x, p.y+p.ph+K]);        // below
+      tries.push([p.x+p.pw+K, p.y+p.ph+K]); // diag
+      tries.push([Math.max(0,p.x-pw-K), p.y]); // left of
+      tries.push([p.x, Math.max(0,p.y-ph-K)]);  // above
+    });
+    for(var i=0;i<tries.length;i++){
+      var x=Math.max(0,Math.min(UW-pw,tries[i][0]));
+      var y=Math.max(0,Math.min(UH-ph,tries[i][1]));
+      if(!_collidesOnLayout(lay,placement,x,y,K))return{x:x,y:y};
+    }
+    // Coarse scan fallback — 20mm grid
+    for(var sy=0;sy<=UH-ph;sy+=20){
+      for(var sx=0;sx<=UW-pw;sx+=20){
+        if(!_collidesOnLayout(lay,placement,sx,sy,K))return{x:sx,y:sy};
+      }
+    }
+    return null;
+  } finally {
+    if(othersBackup)lay.placements=othersBackup;
+  }
+}
+function _collidesOnLayout(lay,movingP,nx,ny,K){
+  return (lay.placements||[]).some(function(p){
+    if(p===movingP)return false;
+    return !(nx+movingP.pw+K<=p.x||p.x+p.pw+K<=nx||ny+movingP.ph+K<=p.y||p.y+p.ph+K<=ny);
+  });
+}
+
+function moveToSheet(targetIdx){
+  if(!selP)return;
+  var srcLay=layouts[curSheet];
+  var dstLay=layouts[targetIdx];
+  if(!srcLay||!dstLay||srcLay===dstLay)return;
+  if(dstLay.matName!==selP.part.mat){alert(t('alertDiffMaterial'));return;}
+  var pos=findFreeSpot(dstLay,selP,false);
+  if(!pos){alert(t('alertNoFreeSpace',{n:targetIdx+1}));return;}
+  // Remove from source
+  srcLay.placements=srcLay.placements.filter(function(p){return p!==selP;});
+  // Move to target
+  selP.x=pos.x;selP.y=pos.y;
+  dstLay.placements.push(selP);
+  // If source sheet is now empty, offer to drop it
+  var removedSrc=false;
+  if(!srcLay.placements.length){
+    if(confirm(t('confirmEmptySheet',{n:curSheet+1}))){
+      layouts.splice(curSheet,1);
+      // Re-index layouts
+      layouts.forEach(function(l,i){l.idx=i;});
+      removedSrc=true;
+    }
+  }
+  // Jump to target sheet (adjust for possible source removal)
+  var newIdx=targetIdx;
+  if(removedSrc&&targetIdx>curSheet)newIdx=targetIdx-1;
+  selP=null;hovP=null;
+  buildTabs();activateTab(newIdx);
+  scheduleExportRebuild();scheduleSave();
+  // Update stats bar
+  _refreshStats();
+}
+function moveToNewSheet(){
+  if(!selP)return;
+  var srcLay=layouts[curSheet];
+  var bd=boards.find(function(b){return b.mat===selP.part.mat;});
+  if(!bd){alert(t('alertNoBoard',{mat:selP.part.mat}));return;}
+  var trim=parseInt((document.getElementById('trim')||{}).value||0)||0;
+  // Create a fresh layout mirroring the existing sheet geometry for this material
+  var newLay={
+    idx:layouts.length,
+    uw:bd.w-trim*2,uh:bd.h-trim*2,sw:bd.w,sh:bd.h,trim:trim,
+    matName:bd.mat,matColor:bd.color,
+    grainLocked:!!bd.grain,trimWarning:false,
+    placements:[]
+  };
+  // Check the part actually fits
+  if(selP.pw>newLay.uw||selP.ph>newLay.uh){
+    // Try no-trim fallback
+    if(selP.pw<=bd.w&&selP.ph<=bd.h){
+      newLay.uw=bd.w;newLay.uh=bd.h;newLay.trim=0;newLay.trimWarning=true;
+    } else {
+      alert(t('alertPartLargerBoard'));return;
+    }
+  }
+  // Remove from source
+  srcLay.placements=srcLay.placements.filter(function(p){return p!==selP;});
+  selP.x=0;selP.y=0;
+  newLay.placements.push(selP);
+  layouts.push(newLay);
+  var newTargetIdx=layouts.length-1;
+  var removedSrc=false;
+  if(!srcLay.placements.length){
+    if(confirm(t('confirmEmptySheet',{n:curSheet+1}))){
+      layouts.splice(curSheet,1);
+      layouts.forEach(function(l,i){l.idx=i;});
+      newTargetIdx--;
+      removedSrc=true;
+    }
+  }
+  selP=null;hovP=null;
+  buildTabs();activateTab(newTargetIdx);
+  scheduleExportRebuild();scheduleSave();
+  _refreshStats();
+}
+function _refreshStats(){
+  var totA=layouts.reduce(function(a,l){return a+l.uw*l.uh;},0);
+  var usedA=layouts.reduce(function(a,l){return a+(l.placements||[]).reduce(function(b,p){return b+p.pw*p.ph;},0);},0);
+  var eff=totA?Math.round(usedA/totA*100):0;
+  var e;
+  e=document.getElementById('sv1');if(e)e.textContent=layouts.length;
+  e=document.getElementById('sv2');if(e)e.textContent=layouts.reduce(function(a,l){return a+(l.placements||[]).length;},0);
+  e=document.getElementById('sv3');if(e)e.textContent=eff+'%';
+  e=document.getElementById('ef');if(e)e.style.width=eff+'%';
+  e=document.getElementById('sv4');if(e)e.textContent=((totA-usedA)/1e6).toFixed(2)+'m²';
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CONSOLIDATE — repack current placements to merge nearly-empty sheets
+// ═══════════════════════════════════════════════════════════════
+function consolidateSheets(){
+  if(!layouts.length){alert(t('noLayouts'));return;}
+  if(!confirm(t('confirmConsolidate')))return;
+  // Collect every currently-placed part (with its current rotation so flipped parts stay flipped)
+  var placed=[];
+  layouts.forEach(function(l){
+    (l.placements||[]).forEach(function(pl){
+      // Re-export part with rotation applied to l/w if rotated
+      var p=pl.part;
+      if(!p)return;
+      placed.push(p);
+    });
+  });
+  if(!placed.length){alert(t('noPartsConsolidate'));return;}
+  // Group by material
+  var byBoard={};
+  placed.forEach(function(p){
+    var bd=matchBoard(p.mat);if(!bd)bd=ensureBoard(p.mat);
+    if(!byBoard[bd.id])byBoard[bd.id]=[];
+    byBoard[bd.id].push(p);
+  });
+  var kerf=parseInt((document.getElementById('kerf')||{}).value||0)||0;
+  var trim=parseInt((document.getElementById('trim')||{}).value||0)||0;
+  var newLayouts=[];
+  var strategies=[
+    function(a,b){return(b.l*b.w)-(a.l*a.w);},
+    function(a,b){return Math.max(b.l,b.w)-Math.max(a.l,a.w);},
+    function(a,b){return b.l-a.l;},
+    function(a,b){return b.w-a.w;}
+  ];
+  boards.forEach(function(bd){
+    var bp=byBoard[bd.id];if(!bp||!bp.length)return;
+    var uw=bd.w-trim*2,uh=bd.h-trim*2,usedTrim=trim;
+    var maxL=Math.max.apply(null,bp.map(function(p){return Math.max(p.l,p.w);}));
+    if(maxL>Math.max(uw,uh)){uw=bd.w;uh=bd.h;usedTrim=0;}
+    var bestLays=null,bestEff=-1;
+    var grainLocked=!!bd.grain;
+    strategies.forEach(function(sfn){
+      var res=pack(uw,uh,bp.slice().sort(sfn),kerf,bd.color,bd.qty,usedTrim,grainLocked);
+      var used=res.reduce(function(a,l){return a+l.placements.reduce(function(b,p){return b+p.pw*p.ph;},0);},0);
+      var tot=res.reduce(function(a,l){return a+l.uw*l.uh;},0);
+      var e=tot>0?used/tot:0;
+      if(e>bestEff){bestEff=e;bestLays=res;}
+    });
+    if(bestLays&&bestLays.length){
+      bestLays.forEach(function(l){
+        l.idx=newLayouts.length;l.matName=bd.mat;l.matColor=bd.color;l.sw=bd.w;l.sh=bd.h;
+        l.trimWarning=(usedTrim===0&&trim>0);
+        newLayouts.push(l);
+      });
+    }
+  });
+  var before=layouts.length,after=newLayouts.length;
+  layouts=newLayouts;
+  curSheet=0;selP=null;hovP=null;
+  buildTabs();
+  if(layouts.length){activateTab(0);}
+  buildExport();_refreshStats();
+  scheduleSave();
+  if(after<before){
+    alert(t('consolidatedMsg',{before:before,after:after}));
+  } else if(after===before){
+    alert(t('alreadyOptimal',{n:after}));
+  } else {
+    alert(t('repackedMsg',{n:after}));
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
 // EXPORT
 // ═══════════════════════════════════════════════════════════════
+// Debounced export-list rebuild: regenerating all DXF files is expensive
+// (potentially thousands of polygon points serialized). During drag/rotate,
+// we only need to rebuild on idle so the UI stays snappy.
+var _exportRebuildTimer=null;
+function scheduleExportRebuild(){
+  clearTimeout(_exportRebuildTimer);
+  _exportRebuildTimer=setTimeout(function(){
+    if(typeof requestIdleCallback==='function'){
+      requestIdleCallback(buildExport,{timeout:2000});
+    } else {
+      buildExport();
+    }
+  },250);
+}
 function buildExport(){
   document.getElementById('ep').style.display='block';
   var rows=document.getElementById('erows');rows.innerHTML='';
@@ -2753,6 +3307,23 @@ function buildExport(){
   files.push({name:'cut_all_sheets.dxf',text:makeDXFAll(layouts)});
   layouts.forEach(function(l,i){files.push({name:'sheet_'+(i+1)+'_'+l.matName.replace(/[^a-z0-9]/gi,'_').substring(0,18)+'.dxf',text:makeDXF(l,i)});});
   files.push({name:'cut_report.csv',text:makeCSV()});
+
+  // "Download all as ZIP" row at the top
+  var allRow=document.createElement('div');allRow.className='er';
+  allRow.style.cssText='background:#EEF7EE;border:1px solid #3D6B4F33;border-radius:6px;padding:6px 8px;margin-bottom:4px';
+  var allNm=document.createElement('div');allNm.className='en';
+  allNm.innerHTML='<strong>📦 All files as ZIP</strong> <span style="color:#A09888;font-weight:normal">('+files.length+' files)</span>';
+  var allSz=document.createElement('div');allSz.className='ez';
+  allSz.textContent='';
+  var allBtn=document.createElement('button');allBtn.className='bdl';allBtn.style.background='#3D6B4F';allBtn.style.color='#fff';allBtn.style.borderColor='#3D6B4F';
+  allBtn.textContent='⬇ Download ZIP';
+  allBtn.onclick=function(){
+    var nm=(currentProjectName||'nesting').replace(/[^A-Za-z0-9_\-]/g,'_').substring(0,40)||'nesting';
+    var blob=makeZip(files);
+    downloadBlob(nm+'.zip',blob);
+  };
+  allRow.appendChild(allNm);allRow.appendChild(allSz);allRow.appendChild(allBtn);rows.appendChild(allRow);
+
   files.forEach(function(f){
     var row=document.createElement('div');row.className='er';
     var nm=document.createElement('div');nm.className='en';nm.textContent=f.name;
@@ -2761,6 +3332,109 @@ function buildExport(){
     btn.onclick=(function(ff){return function(){download(ff.name,ff.text);};})(f);
     row.appendChild(nm);row.appendChild(sz);row.appendChild(btn);rows.appendChild(row);
   });
+  // Total size shown in the ZIP row
+  var total=files.reduce(function(n,f){return n+f.text.length;},0);
+  allSz.textContent=Math.round(total/1024)+'kb';
+}
+
+// ── Tiny ZIP writer (STORE / no compression) ─────────────────────────────
+// Produces a valid .zip containing the given {name, text} entries.
+// Uses CRC32 + Local File Header + Central Directory + End-of-central-directory.
+function _crc32Table(){
+  if(_crc32Table._t)return _crc32Table._t;
+  var t=new Uint32Array(256);
+  for(var i=0;i<256;i++){
+    var c=i;
+    for(var j=0;j<8;j++)c=(c&1)?(0xEDB88320^(c>>>1)):(c>>>1);
+    t[i]=c>>>0;
+  }
+  _crc32Table._t=t;return t;
+}
+function _crc32(bytes){
+  var t=_crc32Table(),c=0xFFFFFFFF;
+  for(var i=0;i<bytes.length;i++)c=t[(c^bytes[i])&0xFF]^(c>>>8);
+  return (c^0xFFFFFFFF)>>>0;
+}
+function _strToU8(s){
+  // UTF-8 encode
+  if(typeof TextEncoder!=='undefined')return new TextEncoder().encode(s);
+  // Fallback
+  var out=[];for(var i=0;i<s.length;i++){var c=s.charCodeAt(i);if(c<128)out.push(c);else if(c<2048){out.push(192|(c>>6));out.push(128|(c&63));}else{out.push(224|(c>>12));out.push(128|((c>>6)&63));out.push(128|(c&63));}}return new Uint8Array(out);
+}
+function makeZip(entries){
+  // Each entry: {name, text}
+  var encoded=entries.map(function(e){
+    var data=_strToU8(e.text);
+    var name=_strToU8(e.name);
+    return {data:data,name:name,crc:_crc32(data)};
+  });
+  // DOS time/date from current moment
+  var now=new Date();
+  var dosTime=((now.getHours()&0x1F)<<11)|((now.getMinutes()&0x3F)<<5)|((now.getSeconds()>>>1)&0x1F);
+  var dosDate=(((now.getFullYear()-1980)&0x7F)<<9)|(((now.getMonth()+1)&0x0F)<<5)|(now.getDate()&0x1F);
+  var localParts=[],offsets=[],runningOffset=0;
+  encoded.forEach(function(e){
+    offsets.push(runningOffset);
+    // Local file header: 30 bytes + name + data
+    var buf=new Uint8Array(30);
+    var dv=new DataView(buf.buffer);
+    dv.setUint32(0,0x04034b50,true); // signature
+    dv.setUint16(4,20,true);         // version needed
+    dv.setUint16(6,0x0800,true);     // UTF-8 flag bit 11
+    dv.setUint16(8,0,true);          // method 0 = store
+    dv.setUint16(10,dosTime,true);
+    dv.setUint16(12,dosDate,true);
+    dv.setUint32(14,e.crc,true);
+    dv.setUint32(18,e.data.length,true);  // compressed
+    dv.setUint32(22,e.data.length,true);  // uncompressed
+    dv.setUint16(26,e.name.length,true);
+    dv.setUint16(28,0,true);              // extra length
+    localParts.push(buf,e.name,e.data);
+    runningOffset+=30+e.name.length+e.data.length;
+  });
+  // Central directory
+  var centralParts=[],centralOffset=runningOffset,centralSize=0;
+  encoded.forEach(function(e,i){
+    var buf=new Uint8Array(46);
+    var dv=new DataView(buf.buffer);
+    dv.setUint32(0,0x02014b50,true); // central sig
+    dv.setUint16(4,20,true);         // version made by
+    dv.setUint16(6,20,true);         // version needed
+    dv.setUint16(8,0x0800,true);     // UTF-8 flag
+    dv.setUint16(10,0,true);         // method
+    dv.setUint16(12,dosTime,true);
+    dv.setUint16(14,dosDate,true);
+    dv.setUint32(16,e.crc,true);
+    dv.setUint32(20,e.data.length,true);
+    dv.setUint32(24,e.data.length,true);
+    dv.setUint16(28,e.name.length,true);
+    dv.setUint16(30,0,true); // extra
+    dv.setUint16(32,0,true); // comment
+    dv.setUint16(34,0,true); // disk
+    dv.setUint16(36,0,true); // internal attrs
+    dv.setUint32(38,0,true); // external attrs
+    dv.setUint32(42,offsets[i],true);
+    centralParts.push(buf,e.name);
+    centralSize+=46+e.name.length;
+  });
+  // End of central directory
+  var eocd=new Uint8Array(22);
+  var dv=new DataView(eocd.buffer);
+  dv.setUint32(0,0x06054b50,true);
+  dv.setUint16(4,0,true); // disk
+  dv.setUint16(6,0,true); // disk w/ cd
+  dv.setUint16(8,encoded.length,true);
+  dv.setUint16(10,encoded.length,true);
+  dv.setUint32(12,centralSize,true);
+  dv.setUint32(16,centralOffset,true);
+  dv.setUint16(20,0,true); // comment length
+  var all=localParts.concat(centralParts,[eocd]);
+  return new Blob(all,{type:'application/zip'});
+}
+function downloadBlob(name,blob){
+  var u=URL.createObjectURL(blob),a=document.createElement('a');
+  a.href=u;a.download=name;document.body.appendChild(a);a.click();
+  setTimeout(function(){URL.revokeObjectURL(u);document.body.removeChild(a);},600);
 }
 function lwpoly(L,layer,pts){L.push('0','LWPOLYLINE','8',layer,'90',String(pts.length),'70','1');pts.forEach(function(p){L.push('10',p[0].toFixed(2),'20',p[1].toFixed(2));});}
 function dxfHeader(){
