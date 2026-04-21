@@ -3241,10 +3241,12 @@ function bindCanvas(lay){
   var cv=document.getElementById('cv'),tip=document.getElementById('tip');
   function gp(e){var r=cv.getBoundingClientRect();return{mx:(e.clientX-r.left)*cv.width/r.width,my:(e.clientY-r.top)*cv.height/r.height};}
   function hit(mx,my){var tx=lay.trim*SC,ty=lay.trim*SC,f=null;lay.placements.forEach(function(p){var x=tx+p.x*SC,y=ty+p.y*SC,w=p.pw*SC,h=p.ph*SC;if(mx>=x&&mx<=x+w&&my>=y&&my<=y+h)f=p;});return f;}
+  var _dragMoved=false;
   cv.onmousemove=function(e){
     var pos=gp(e),h=hit(pos.mx,pos.my);
     if(!dragging&&h!==hovP){hovP=h;draw(lay);}
     if(dragging&&dragP){
+      _dragMoved=true;
       // Convert mouse position to board-space mm
       var rawX=Math.round((pos.mx-dragOX-lay.trim*SC)/SC);
       var rawY=Math.round((pos.my-dragOY-lay.trim*SC)/SC);
@@ -3270,6 +3272,7 @@ function bindCanvas(lay){
   cv.onmousedown=function(e){
     if(e.button!==0)return;
     var pos=gp(e),h=hit(pos.mx,pos.my);
+    _dragMoved=false;
     if(h){
       selP=h;dragP=h;dragging=true;
       dragOX=pos.mx-(lay.trim*SC+h.x*SC);
@@ -3290,10 +3293,15 @@ function bindCanvas(lay){
   };
   cv.onmouseup=function(){
     if(dragging&&dragP){
-      // On release: resolve any remaining collision
-      var resolved=resolveCollision(lay,dragP,dragP.x,dragP.y);
-      dragP.x=resolved.x;dragP.y=resolved.y;
-      dragging=false;dragP=null;draw(lay);scheduleExportRebuild();scheduleSave();
+      if(_dragMoved){
+        // Real drag — resolve collision, persist and rebuild exports
+        var resolved=resolveCollision(lay,dragP,dragP.x,dragP.y);
+        dragP.x=resolved.x;dragP.y=resolved.y;
+        draw(lay);scheduleExportRebuild();scheduleSave();
+      }
+      // If _dragMoved is false, this was just a click (select) — no persistence needed,
+      // and keeping this path fast is critical for dblclick to fire reliably.
+      dragging=false;dragP=null;
     }else{dragging=false;dragP=null;}
     cv.style.cursor='crosshair';
   };
