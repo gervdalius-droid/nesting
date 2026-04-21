@@ -3270,6 +3270,7 @@ function bindCanvas(lay){
     }else if(!dragging){if(tip)tip.style.display='none';cv.style.cursor=h?'grab':'crosshair';}
   };
   cv.onmousedown=function(e){
+    console.log('[FF] mousedown button='+e.button);
     if(e.button!==0)return;
     var pos=gp(e),h=hit(pos.mx,pos.my);
     _dragMoved=false;
@@ -3291,28 +3292,34 @@ function bindCanvas(lay){
     }
     e.preventDefault();
   };
-  cv.onmouseup=function(){
+  cv.onmouseup=function(e){
+    console.log('[FF] mouseup button='+(e&&e.button)+' moved='+_dragMoved);
     if(dragging&&dragP){
       if(_dragMoved){
-        // Real drag — resolve collision, persist and rebuild exports
         var resolved=resolveCollision(lay,dragP,dragP.x,dragP.y);
         dragP.x=resolved.x;dragP.y=resolved.y;
         draw(lay);scheduleExportRebuild();scheduleSave();
       }
-      // If _dragMoved is false, this was just a click (select) — no persistence needed,
-      // and keeping this path fast is critical for dblclick to fire reliably.
       dragging=false;dragP=null;
     }else{dragging=false;dragP=null;}
     cv.style.cursor='crosshair';
+  };
+  cv.onclick=function(e){console.log('[FF] click button='+e.button);};
+  cv.ondblclick=function(e){
+    console.log('[FF] DBLCLICK FIRED');
+    var pos=gp(e),h=hit(pos.mx,pos.my);
+    console.log('[FF] dblclick hit='+(!!h));
+    if(h)openModal(h,lay);
+  };
+  cv.oncontextmenu=function(e){
+    console.log('[FF] CONTEXTMENU FIRED');
+    var pos=gp(e),h=hit(pos.mx,pos.my)||selP;
+    if(h){e.preventDefault();openModal(h,lay);return false;}
   };
   cv.onmouseleave=function(){
     if(dragging&&dragP){var r=resolveCollision(lay,dragP,dragP.x,dragP.y);dragP.x=r.x;dragP.y=r.y;dragging=false;dragP=null;draw(lay);scheduleExportRebuild();scheduleSave();}
     hovP=null;if(tip)tip.style.display='none';
   };
-  // Double-click or right-click on a part opens the label/print modal.
-  // Kept deliberately simple to match the working v6 behavior.
-  cv.ondblclick=function(e){var pos=gp(e),h=hit(pos.mx,pos.my);if(h)openModal(h,lay);};
-  cv.oncontextmenu=function(e){var pos=gp(e),h=hit(pos.mx,pos.my)||selP;if(h){e.preventDefault();openModal(h,lay);return false;}};
 }
 
 // ── Rotation ──
