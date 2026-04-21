@@ -3301,40 +3301,10 @@ function bindCanvas(lay){
     if(dragging&&dragP){var r=resolveCollision(lay,dragP,dragP.x,dragP.y);dragP.x=r.x;dragP.y=r.y;dragging=false;dragP=null;draw(lay);scheduleExportRebuild();scheduleSave();}
     hovP=null;if(tip)tip.style.display='none';
   };
-  // Right-click on a part opens the label/print modal.
-  console.log('[FabFlow] bindCanvas: attaching handlers (tab='+lay.idx+')');
-  cv.oncontextmenu=function(e){
-    console.log('[FabFlow] contextmenu event fired');
-    e.preventDefault();
-    var pos=gp(e), h=hit(pos.mx,pos.my)||selP;
-    console.log('[FabFlow] contextmenu: hit=',!!h,'selP=',!!selP,'at',Math.round(pos.mx),Math.round(pos.my));
-    if(h){
-      dragging=false; dragP=null;
-      openModal(h,lay);
-    }
-    return false;
-  };
-  // Also catch right-button mouseup as a secondary trigger
-  cv.addEventListener('mouseup',function(e){
-    if(e.button===2){
-      console.log('[FabFlow] right mouseup event fired');
-      e.preventDefault();
-      var pos=gp(e), h=hit(pos.mx,pos.my)||selP;
-      if(h){
-        dragging=false; dragP=null;
-        openModal(h,lay);
-      }
-    }
-  });
-  // Keep dblclick as a fallback/alternate trigger
-  cv.ondblclick=function(e){
-    console.log('[FabFlow] dblclick event fired');
-    var pos=gp(e), h=hit(pos.mx,pos.my)||selP||dragP;
-    if(h){
-      dragging=false; dragP=null;
-      openModal(h,lay);
-    }
-  };
+  // Double-click or right-click on a part opens the label/print modal.
+  // Kept deliberately simple to match the working v6 behavior.
+  cv.ondblclick=function(e){var pos=gp(e),h=hit(pos.mx,pos.my);if(h)openModal(h,lay);};
+  cv.oncontextmenu=function(e){var pos=gp(e),h=hit(pos.mx,pos.my)||selP;if(h){e.preventDefault();openModal(h,lay);return false;}};
 }
 
 // ── Rotation ──
@@ -3363,35 +3333,6 @@ document.addEventListener('keydown',function(e){
     var lay=layouts[curSheet];if(!lay)return;
     lay.placements=lay.placements.filter(function(p){return p!==selP;});
     selP=null;hovP=null;draw(lay);scheduleExportRebuild();scheduleSave();
-  }
-});
-
-// Document-level right-click handler — opens label modal for the part under the cursor
-// on the canvas. Bound once at page load, never needs rebinding. More robust than the
-// per-bindCanvas handlers because it doesn't depend on canvas reinitialization.
-document.addEventListener('contextmenu',function(e){
-  var cv=document.getElementById('cv');
-  if(!cv)return;
-  // Only handle right-clicks that landed on the canvas element itself
-  if(e.target!==cv)return;
-  var lay=layouts[curSheet];
-  if(!lay)return;
-  // Compute canvas coords (same logic as gp())
-  var r=cv.getBoundingClientRect();
-  var mx=(e.clientX-r.left)*cv.width/r.width;
-  var my=(e.clientY-r.top)*cv.height/r.height;
-  // Find the placement under the cursor (same logic as hit())
-  var tx=lay.trim*SC, ty=lay.trim*SC, found=null;
-  (lay.placements||[]).forEach(function(p){
-    var x=tx+p.x*SC, y=ty+p.y*SC, w=p.pw*SC, h=p.ph*SC;
-    if(mx>=x&&mx<=x+w&&my>=y&&my<=y+h)found=p;
-  });
-  var target=found||selP;
-  console.log('[FabFlow] document contextmenu; found=',!!found,'selP=',!!selP);
-  if(target){
-    e.preventDefault();
-    dragging=false; dragP=null;
-    openModal(target,lay);
   }
 });
 
