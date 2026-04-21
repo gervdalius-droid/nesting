@@ -3302,20 +3302,40 @@ function bindCanvas(lay){
     hovP=null;if(tip)tip.style.display='none';
   };
   // Right-click on a part opens the label/print modal.
-  // Using 'contextmenu' + preventDefault suppresses the browser's default menu.
-  cv.oncontextmenu=function(e){
+  // Bound via addEventListener so it survives any future onmousedown rewrites,
+  // and with stopPropagation to defeat any bubbling context-menu handlers.
+  var _ctxHandler=function(e){
     e.preventDefault();
+    e.stopPropagation();
     var pos=gp(e), h=hit(pos.mx,pos.my)||selP;
+    console.log('[FabFlow] contextmenu fired; button=',e.button,'hit=',!!h,'at',Math.round(pos.mx),Math.round(pos.my));
     if(h){
-      // Clear any lingering drag state so the modal opens cleanly
       dragging=false; dragP=null;
       openModal(h,lay);
     }
     return false;
   };
+  // Remove any old handler first to avoid duplicate firing on re-bind
+  cv.removeEventListener('contextmenu',_ctxHandler);
+  cv.addEventListener('contextmenu',_ctxHandler);
+  cv.oncontextmenu=_ctxHandler; // belt-and-suspenders
+  // Also catch right-button mouseup as a secondary trigger — some browsers
+  // suppress 'contextmenu' events in certain states but always fire mouseup.
+  cv.addEventListener('mouseup',function(e){
+    if(e.button===2){ // right button
+      e.preventDefault();
+      var pos=gp(e), h=hit(pos.mx,pos.my)||selP;
+      console.log('[FabFlow] right mouseup; hit=',!!h);
+      if(h){
+        dragging=false; dragP=null;
+        openModal(h,lay);
+      }
+    }
+  });
   // Keep dblclick as a fallback/alternate trigger
   cv.ondblclick=function(e){
     var pos=gp(e), h=hit(pos.mx,pos.my)||selP||dragP;
+    console.log('[FabFlow] dblclick; hit=',!!h);
     if(h){
       dragging=false; dragP=null;
       openModal(h,lay);
