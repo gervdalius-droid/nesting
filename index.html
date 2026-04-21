@@ -270,6 +270,7 @@ body.print-mode{background:#fff}
     <label data-i18n="project" style="font-size:10px;color:#A09888;font-family:monospace">PROJECT</label>
     <input id="projName" data-i18n-ph="untitled" placeholder="Untitled" onchange="onProjectNameChange()" oninput="scheduleSave()" style="width:190px;font-size:12px;font-weight:500;padding:4px 8px;border:1px solid #D4CFC2;background:#FDFCF9;border-radius:6px;outline:none">
     <span id="saveStatus" class="save-status" title="Save status"></span>
+    <button class="btn bs" onclick="newProjectPrompt()" data-i18n-title="newProjTip" title="Start a new project (current one is preserved)" style="padding:4px 10px;color:#3D6B4F;border-color:#3D6B4F"><span data-i18n="newProj">🆕 New</span></button>
     <button class="btn bs" onclick="openHistory()" data-i18n-title="openHistory" title="Open project history" style="padding:4px 10px"><span data-i18n="history">🗂 History</span></button>
   </div>
   <span id="albl" style="font-size:10px;color:#A09888;font-family:monospace"></span>
@@ -936,6 +937,10 @@ var I18N={
     untitled:'Untitled',
     history:'🗂 History',
     openHistory:'Open project history',
+    newProj:'🆕 New',
+    newProjTip:'Start a new project (current one is preserved)',
+    newProjectPrompt:'Name for the new project:',
+    newProjectExistsConfirm:'A project named "{name}" already exists. Open that one instead of creating new?',
     // sidebar sections
     materialBoards:'Material Boards',
     addBtn:'+ Add',
@@ -1061,6 +1066,10 @@ var I18N={
     untitled:'Be pavadinimo',
     history:'🗂 Istorija',
     openHistory:'Atidaryti projektų istoriją',
+    newProj:'🆕 Naujas',
+    newProjTip:'Pradėti naują projektą (esamas bus išsaugotas)',
+    newProjectPrompt:'Naujo projekto pavadinimas:',
+    newProjectExistsConfirm:'Projektas „{name}“ jau yra. Atidaryti jį vietoj naujo?',
     materialBoards:'Medžiagos plokštės',
     addBtn:'+ Pridėti',
     importHint:'Importuokite detales → plokštės sukurtos automatiškai',
@@ -1622,6 +1631,65 @@ function newProject(){
   setStatus('',t('newProject'));
   closeHistory();
 }
+// Header button — prompts the user for a name, then starts a fresh project
+// with that name (never overwrites the current one).
+async function newProjectPrompt(){
+  // Collect existing project names (both cloud and local) for collision check
+  var existing={};
+  try{
+    for(var i=0;i<localStorage.length;i++){
+      var k=localStorage.key(i);
+      if(k&&k.indexOf(LS_PROJECT_PREFIX)===0){
+        var nm=k.substring(LS_PROJECT_PREFIX.length);
+        existing[nm]=1;
+      }
+    }
+  }catch(e){}
+  // Also check cloud so the picker suggests a truly unique default
+  try{
+    var cloudList=await listProjects();
+    cloudList.forEach(function(p){existing[p.name]=1;});
+  }catch(e){}
+  // Suggest an unused default name
+  var base='Untitled',n=1,suggested=base;
+  while(existing[suggested]){n++;suggested=base+' '+n;}
+  // Ask the user
+  var name=(prompt(t('newProjectPrompt'),suggested)||'').trim();
+  if(!name)return; // user cancelled
+  while(existing[name]){
+    if(!confirm(t('newProjectExistsConfirm',{name:name}))){
+      name=(prompt(t('newProjectPrompt'),suggested)||'').trim();
+      if(!name)return;
+    } else {
+      // User confirmed they want to load the existing one instead
+      await loadProjectByName(name);
+      return;
+    }
+  }
+  // Make sure current project is fully saved before we wipe state
+  if(currentProjectName&&hashProjectState()!==_lastSavedHash){
+    await saveProject();
+  }
+  // Clear state and use the chosen name
+  currentProjectName=name;
+  document.getElementById('projName').value=name;
+  _suppressSave=true;
+  try{
+    parts=[];layouts=[];boards=[];partGroups=[];opIdMap={};curSheet=0;selP=null;hovP=null;bId=1;gId=1;
+    renderBoards();refreshSel();renderParts();renderGroups();
+    document.getElementById('stats').style.display='none';
+    document.getElementById('ep').style.display='none';
+    document.getElementById('tabs').innerHTML='';
+    var cvc=document.getElementById('cvc');if(cvc)cvc.style.display='none';
+    var cv=document.getElementById('cv');
+    if(cv){var ctx=cv.getContext('2d');ctx.clearRect(0,0,cv.width,cv.height);}
+  } finally {
+    _suppressSave=false;
+  }
+  _lastSavedHash=''; // force a save on next state change
+  scheduleSave(); // save the empty new project immediately so it shows in history
+  setStatus('',t('newProject'));
+}
 function exportCurrentProject(){
   var data=collectProjectState();
   var payload={name:currentProjectName||'Untitled',data:data,exported_at:new Date().toISOString()};
@@ -1990,13 +2058,18 @@ function parseDXFText(text){
   }
   return entities;
 }
+// DXF arc/bulge tessellation tolerance in mm. Smaller value = more polygon segments,
+// higher fidelity to the true arc. 0.01 mm keeps dimension errors well under CNC
+// tolerance while keeping segment counts sane for typical cabinet parts.
+var DXF_TESS_TOL=0.01;
+var DXF_TESS_MAX_SEGS=512; // per arc, safety cap
 function _tessBulge(p1,p2,b){
   if(!b||Math.abs(b)<1e-9)return [p1,p2];
   var dx=p2.x-p1.x,dy=p2.y-p1.y,ch=Math.hypot(dx,dy);
   if(ch<1e-9)return [p1,p2];
   var th=4*Math.atan(Math.abs(b)),r=ch/(2*Math.sin(th/2));
-  var tol=0.4,n=Math.max(2,Math.ceil(th/(2*Math.acos(Math.max(0,1-tol/r)))));
-  if(!isFinite(n)||n<2)n=2;n=Math.min(n,64);
+  var tol=DXF_TESS_TOL,n=Math.max(2,Math.ceil(th/(2*Math.acos(Math.max(0,1-tol/r)))));
+  if(!isFinite(n)||n<2)n=2;n=Math.min(n,DXF_TESS_MAX_SEGS);
   var mx=(p1.x+p2.x)/2,my=(p1.y+p2.y)/2,nx=-dy/ch,ny=dx/ch;
   var d=r*Math.cos(th/2)*Math.sign(b),cx=mx-nx*d,cy=my-ny*d;
   var a1=Math.atan2(p1.y-cy,p1.x-cx),a2=Math.atan2(p2.y-cy,p2.x-cx);
@@ -2008,7 +2081,9 @@ function _tessBulge(p1,p2,b){
 function _tessArc(a){
   var a1=a.a1*Math.PI/180,a2=a.a2*Math.PI/180,sw=a2-a1;
   while(sw<=0)sw+=2*Math.PI;
-  var r=a.r,tol=0.4,n=Math.max(2,Math.ceil(sw/(2*Math.acos(Math.max(0,1-tol/r)))));
+  var r=a.r,tol=DXF_TESS_TOL;
+  var n=Math.max(2,Math.ceil(sw/(2*Math.acos(Math.max(0,1-tol/r)))));
+  if(!isFinite(n)||n<2)n=2;n=Math.min(n,DXF_TESS_MAX_SEGS);
   var out=[];for(var i=0;i<=n;i++){var ang=a1+sw*i/n;out.push({x:a.cx+r*Math.cos(ang),y:a.cy+r*Math.sin(ang)});}
   return out;
 }
@@ -2031,7 +2106,8 @@ function entitiesToPolygons(ents){
       }
       polys.push({pts:pts,closed:!!e.closed});
     } else if(e.type==='CIRCLE'){
-      var n=Math.max(16,Math.ceil((2*Math.PI)/(2*Math.acos(Math.max(0,1-0.4/e.r)))));
+      var n=Math.max(16,Math.ceil((2*Math.PI)/(2*Math.acos(Math.max(0,1-DXF_TESS_TOL/e.r)))));
+      if(n>DXF_TESS_MAX_SEGS)n=DXF_TESS_MAX_SEGS;
       var cp=[];for(var i=0;i<n;i++){var a=i*2*Math.PI/n;cp.push({x:e.cx+e.r*Math.cos(a),y:e.cy+e.r*Math.sin(a)});}
       polys.push({pts:cp,closed:true});
     } else if(e.type==='LINE'){
@@ -2096,6 +2172,109 @@ function _polyContains(outerPts,innerPts){
   return true;
 }
 
+// Classify entities into 'outline' (forming outer boundary) vs 'hole' vs 'ignored'.
+// For robust classification, we sample a point that actually lies ON the entity
+// (midpoint of a LINE, mid-arc point of an ARC, a point on the CIRCLE, or a vertex
+// of a POLYLINE). That on-entity point is then checked against the outline polygon.
+function _entityRepresentativePoint(e){
+  if(e.type==='LINE')return {x:(e.x1+e.x2)/2,y:(e.y1+e.y2)/2};
+  if(e.type==='CIRCLE'){
+    // A point on the circle itself (not the center)
+    return {x:e.cx+e.r,y:e.cy};
+  }
+  if(e.type==='ARC'){
+    // Midpoint of the arc (by angle). Arc sweeps CCW from a1 to a2.
+    var a1=e.a1*Math.PI/180, a2=e.a2*Math.PI/180;
+    var sw=a2-a1; while(sw<=0)sw+=2*Math.PI;
+    var am=a1+sw/2;
+    return {x:e.cx+e.r*Math.cos(am), y:e.cy+e.r*Math.sin(am)};
+  }
+  if(e.type==='LWPOLYLINE'||e.type==='POLYLINE'){
+    // Midpoint of the first edge — always ON the polyline
+    var vs=e.vertices;
+    if(!vs||!vs.length)return null;
+    if(vs.length>=2)return {x:(vs[0].x+vs[1].x)/2, y:(vs[0].y+vs[1].y)/2};
+    return {x:vs[0].x,y:vs[0].y};
+  }
+  return null;
+}
+function _classifyEntities(ents,outlinePts){
+  var outlineBB=_polyBBox(outlinePts);
+  var out={outline:[],innerEnts:[]};
+  // An on-entity point within ~0.5 mm of the outline polygon → outline entity.
+  // Otherwise, if it's inside the outline polygon → hole entity.
+  // Otherwise → ignored (annotation, stray geometry, etc.)
+  function onOutline(pt){
+    if(!pt)return false;
+    if(pt.x<outlineBB.minX-0.5||pt.x>outlineBB.maxX+0.5)return false;
+    if(pt.y<outlineBB.minY-0.5||pt.y>outlineBB.maxY+0.5)return false;
+    for(var i=0;i<outlinePts.length;i++){
+      var a=outlinePts[i],b=outlinePts[(i+1)%outlinePts.length];
+      var dx=b.x-a.x,dy=b.y-a.y,L2=dx*dx+dy*dy;
+      if(L2<1e-9)continue;
+      var tVal=Math.max(0,Math.min(1,((pt.x-a.x)*dx+(pt.y-a.y)*dy)/L2));
+      var px=a.x+tVal*dx,py=a.y+tVal*dy;
+      if(Math.hypot(pt.x-px,pt.y-py)<0.5)return true;
+    }
+    return false;
+  }
+  ents.forEach(function(e){
+    if(!(e.type==='LINE'||e.type==='ARC'||e.type==='CIRCLE'||e.type==='LWPOLYLINE'||e.type==='POLYLINE'))return;
+    var p=_entityRepresentativePoint(e);
+    if(!p)return;
+    if(onOutline(p)){
+      out.outline.push(e);
+    } else if(_pointInPoly(p.x,p.y,outlinePts)){
+      out.innerEnts.push(e);
+    }
+    // Else: outside the outline — ignored
+  });
+  return out;
+}
+// Given a flat list of inner entities and a list of hole polygons, group entities
+// by hole membership. Uses the on-entity sample point for consistency with classifier.
+function _groupInnerEntsByHole(innerEnts,holePolys){
+  var groups=holePolys.map(function(){return [];});
+  innerEnts.forEach(function(e){
+    var p=_entityRepresentativePoint(e);
+    if(!p)return;
+    var matched=-1;
+    for(var i=0;i<holePolys.length;i++){
+      // Check if on the hole polygon boundary (entity forms part of the hole)
+      for(var j=0;j<holePolys[i].length;j++){
+        var a=holePolys[i][j],b=holePolys[i][(j+1)%holePolys[i].length];
+        var dx=b.x-a.x,dy=b.y-a.y,L2=dx*dx+dy*dy;
+        if(L2<1e-9)continue;
+        var tVal=Math.max(0,Math.min(1,((p.x-a.x)*dx+(p.y-a.y)*dy)/L2));
+        var px=a.x+tVal*dx,py=a.y+tVal*dy;
+        if(Math.hypot(p.x-px,p.y-py)<0.5){matched=i;break;}
+      }
+      if(matched>=0)break;
+    }
+    // Fallback: if not on any hole boundary, check if *inside* a hole (entity fully
+    // contained within a hole region — rare, but possible for nested geometry).
+    if(matched<0){
+      for(var i=0;i<holePolys.length;i++){
+        if(_pointInPoly(p.x,p.y,holePolys[i])){matched=i;break;}
+      }
+    }
+    if(matched>=0)groups[matched].push(e);
+  });
+  return groups;
+}
+// Normalize an entity by shifting its coordinates by -(dx, dy).
+function _shiftEntity(e,dx,dy){
+  var c={type:e.type};
+  if(e.type==='LINE'){c.x1=e.x1-dx;c.y1=e.y1-dy;c.x2=e.x2-dx;c.y2=e.y2-dy;}
+  else if(e.type==='CIRCLE'){c.cx=e.cx-dx;c.cy=e.cy-dy;c.r=e.r;}
+  else if(e.type==='ARC'){c.cx=e.cx-dx;c.cy=e.cy-dy;c.r=e.r;c.a1=e.a1;c.a2=e.a2;}
+  else if(e.type==='LWPOLYLINE'||e.type==='POLYLINE'){
+    c.closed=!!e.closed;
+    c.vertices=(e.vertices||[]).map(function(v){return {x:v.x-dx,y:v.y-dy,bulge:v.bulge||0};});
+  }
+  return c;
+}
+
 // Dialog flow: user drops N DXFs → modal asks material + qty (per file), then imports all.
 var _dxfImportQueue=null;
 async function processDXFFiles(files){
@@ -2112,18 +2291,25 @@ async function processDXFFiles(files){
       polys.sort(function(a,b){return _polyArea(b.pts)-_polyArea(a.pts);});
       var outline=polys[0].pts;
       // Only polygons that lie *inside* the outline are treated as holes.
-      // (Stray shapes outside the outer contour get ignored.)
       var holes=[];
       for(var h=1;h<polys.length;h++){
         if(_polyContains(outline,polys[h].pts)){holes.push(polys[h].pts);}
       }
       var bb=_polyBBox(outline);
-      // Normalize all points so outline bbox min is at (0,0). Holes use same transform.
+      // Normalize all points so outline bbox min is at (0,0).
       function norm(pts){return pts.map(function(p){return {x:p.x-bb.minX,y:p.y-bb.minY};});}
       var normOutline=norm(outline);
       var normHoles=holes.map(norm);
+      // Categorize the original entities: which ones are outline, which belong to each hole.
+      // These are preserved verbatim for DXF export, so curves stay smooth (not tessellated).
+      var classified=_classifyEntities(ents,outline);
+      var holeEntGroups=_groupInnerEntsByHole(classified.innerEnts,holes);
+      // Shift all entities into the same local coordinate frame as the polygons
+      // (subtract bbox min). Do not mutate the originals.
+      var outlineEnts=classified.outline.map(function(e){return _shiftEntity(e,bb.minX,bb.minY);});
+      var holeEnts=holeEntGroups.map(function(grp){return grp.map(function(e){return _shiftEntity(e,bb.minX,bb.minY);});});
       var partName=files[i].name.replace(/\.[dD][xX][fF]$/,'').replace(/[^A-Za-z0-9_\-]/g,'_').substring(0,32)||'SHAPE';
-      parsed.push({file:files[i],name:partName,shape:normOutline,holes:normHoles,l:Math.round(bb.w),w:Math.round(bb.h)});
+      parsed.push({file:files[i],name:partName,shape:normOutline,holes:normHoles,l:Math.round(bb.w),w:Math.round(bb.h),outlineEnts:outlineEnts,holeEnts:holeEnts});
     }catch(err){console.error(err);st.style.color='#B84040';st.textContent='⚠ '+files[i].name+': '+err.message;}
   }
   if(!parsed.length){if(st.textContent==='Parsing DXF…')st.textContent='';return;}
@@ -2383,7 +2569,9 @@ function confirmDXFImport(){
         l:p.l,w:p.w,mat:mat,thick:thick,
         eb:{eb1:'',eb2:'',eb3:'',eb4:''},op1:'',op2:'',hasCNC:false,
         shape:p.shape, // closed outline polygon in local coords, bbox at (0,0)-(l,w)
-        holes:p.holes||[] // array of closed polygons, each a cutout inside the outline
+        holes:p.holes||[], // array of closed polygons, each a cutout inside the outline
+        outlineEnts:p.outlineEnts||null, // original DXF entities for smooth curve export
+        holeEnts:p.holeEnts||null // per-hole entity groups
       });
       added++;
     }
@@ -3902,7 +4090,23 @@ function downloadBlob(name,blob){
   a.href=u;a.download=name;document.body.appendChild(a);a.click();
   setTimeout(function(){URL.revokeObjectURL(u);document.body.removeChild(a);},600);
 }
-function lwpoly(L,layer,pts){L.push('0','LWPOLYLINE','8',layer,'90',String(pts.length),'70','1');pts.forEach(function(p){L.push('10',p[0].toFixed(2),'20',p[1].toFixed(2));});}
+function lwpoly(L,layer,pts){L.push('0','LWPOLYLINE','8',layer,'90',String(pts.length),'70','1');pts.forEach(function(p){L.push('10',p[0].toFixed(3),'20',p[1].toFixed(3));});}
+// LWPOLYLINE with per-vertex bulges (for arcs inside polylines, preserved losslessly)
+function lwpolyBulge(L,layer,verts,closed){
+  L.push('0','LWPOLYLINE','8',layer,'90',String(verts.length),'70',closed?'1':'0');
+  verts.forEach(function(v){
+    L.push('10',v.x.toFixed(3),'20',v.y.toFixed(3));
+    if(v.bulge)L.push('42',v.bulge.toFixed(6));
+  });
+}
+function dxfLine(L,layer,x1,y1,x2,y2){L.push('0','LINE','8',layer,'10',x1.toFixed(3),'20',y1.toFixed(3),'11',x2.toFixed(3),'21',y2.toFixed(3));}
+function dxfCircle(L,layer,cx,cy,r){L.push('0','CIRCLE','8',layer,'10',cx.toFixed(3),'20',cy.toFixed(3),'40',r.toFixed(3));}
+function dxfArc(L,layer,cx,cy,r,a1,a2){
+  // Normalize angles to [0, 360)
+  function norm(a){a=a%360;if(a<0)a+=360;return a;}
+  L.push('0','ARC','8',layer,'10',cx.toFixed(3),'20',cy.toFixed(3),'40',r.toFixed(3),'50',norm(a1).toFixed(4),'51',norm(a2).toFixed(4));
+}
+
 function dxfHeader(){
   return ['0','SECTION','2','HEADER','9','$INSUNITS','70','4','9','$MEASUREMENT','70','1','0','ENDSEC',
     '0','SECTION','2','TABLES','0','TABLE','2','LAYER','70','2',
@@ -3918,18 +4122,53 @@ function shapePtInBBox(part,rot,lx,ly){
   if(rot) return [ly, part.l-lx];
   return [lx, ly];
 }
+// Transform a part-local entity into placement coordinates and emit it natively.
+// Preserves curves exactly — CIRCLE stays CIRCLE, ARC stays ARC, bulges stay bulges.
+function emitEntity(L,layer,e,part,rot,offX,offY){
+  function pt(lx,ly){
+    var t=shapePtInBBox(part,rot,lx,ly);
+    return [offX+t[0], offY+t[1]];
+  }
+  if(e.type==='LINE'){
+    var p1=pt(e.x1,e.y1),p2=pt(e.x2,e.y2);
+    dxfLine(L,layer,p1[0],p1[1],p2[0],p2[1]);
+  } else if(e.type==='CIRCLE'){
+    var c=pt(e.cx,e.cy);
+    dxfCircle(L,layer,c[0],c[1],e.r);
+  } else if(e.type==='ARC'){
+    var c=pt(e.cx,e.cy);
+    // Under 90° CW rotation: both angles shift by -90°. DXF arcs always sweep CCW
+    // from a1 to a2, and rotation preserves sweep direction.
+    var a1=e.a1, a2=e.a2;
+    if(rot){a1-=90; a2-=90;}
+    dxfArc(L,layer,c[0],c[1],e.r,a1,a2);
+  } else if(e.type==='LWPOLYLINE'||e.type==='POLYLINE'){
+    // Transform each vertex; bulge values are rotation-invariant.
+    var verts=(e.vertices||[]).map(function(v){
+      var p=pt(v.x,v.y);
+      return {x:p[0],y:p[1],bulge:v.bulge||0};
+    });
+    lwpolyBulge(L,layer,verts,!!e.closed);
+  }
+}
 function pushLayoutEntities(L,lay,dx,dy){
   dx=dx||0;dy=dy||0;
   lay.placements.forEach(function(p){
     var x=dx+lay.trim+p.x, y=dy+lay.sh-(lay.trim+p.y)-p.ph;
-    if(p.part&&p.part.shape&&p.part.shape.length>=3){
-      // Outline on PARTS layer
+    if(p.part&&p.part.outlineEnts&&p.part.outlineEnts.length){
+      // Native entity export — curves stay smooth, fully faithful to source DXF.
+      p.part.outlineEnts.forEach(function(e){emitEntity(L,'PARTS',e,p.part,p.rot,x,y);});
+      // Holes: each hole's entities on HOLES layer
+      (p.part.holeEnts||[]).forEach(function(grp){
+        grp.forEach(function(e){emitEntity(L,'HOLES',e,p.part,p.rot,x,y);});
+      });
+    } else if(p.part&&p.part.shape&&p.part.shape.length>=3){
+      // Fallback — tessellated polygon (for parts without entity data, e.g. old projects)
       var outline=p.part.shape.map(function(pt){
         var t=shapePtInBBox(p.part,p.rot,pt.x,pt.y);
         return [x+t[0], y+t[1]];
       });
       lwpoly(L,'PARTS',outline);
-      // Each hole on HOLES layer (same transform as outline)
       var holes=p.part.holes||[];
       for(var h=0;h<holes.length;h++){
         var hp=holes[h].map(function(pt){
