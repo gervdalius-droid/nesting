@@ -4288,40 +4288,46 @@ function qrToSVG(text, sizePx){
   } catch(e){ return ''; }
 }
 
-// ── Helper: part diagram → SVG (rectangle with dimension labels, grain arrow, CNC dots) ──
-function partToSVG(pw, ph, hasCNC){
-  // SVG viewBox in part mm, with margin for dimension labels
-  var M = 60; // margin for dim labels in mm-equivalents
-  var vbW = pw + M*2, vbH = ph + M*2;
-  // Scale font so dims are readable regardless of part aspect
-  var fs = Math.max(28, Math.min(vbW, vbH) * 0.08);
-  var arrowHalf = Math.min(pw*0.25, 180); // grain arrow half-length
-  var ahSize = Math.max(16, fs*0.6);
+// ── Helper: part diagram → SVG (matches SWOOD-style reference) ──
+// Shows part outline sized to cell, with the nesting index number on the right,
+// and a bottom edge-bar indicating the part's bottom edge (like SWOOD does).
+// idx = nesting index (1-based position on sheet). pw/ph in mm. hasCNC = add CNC dots.
+function partToSVG(pw, ph, hasCNC, idx){
+  // Build viewBox in "label drawing units" (arbitrary, aspect-ratio-driven).
+  // Cell aspect ratio for the panel cell in our print grid is roughly 59mm wide × 12mm tall
+  // (4×1fr rows at ~3mm each = 12mm, center col ≈ 59mm). Actual ratio ≈ 4.9:1.
+  // But the SVG scales to fill the cell via preserveAspectRatio, so we pick
+  // a viewBox that nicely frames the part regardless.
+  // Use part's own proportions but with sensible padding.
+  var M = 40; // unit margin for the index number area and breathing room
+  var vbW = pw + M*3; // extra width on the right for the index number
+  var vbH = ph + M*2;
+  // Position part rectangle inside viewBox (left-padded by M)
+  var px = M, py = M;
+  // Double border (mimics SWOOD's slight shadow/double line)
+  var strokeOuter = Math.max(4, Math.min(pw, ph) * 0.015);
   var s = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 '+vbW+' '+vbH+'" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" style="display:block">';
-  // Part rectangle (double border like original canvas)
-  s += '<rect x="'+M+'" y="'+M+'" width="'+pw+'" height="'+ph+'" fill="none" stroke="#000" stroke-width="4"/>';
-  var inset = Math.max(6, Math.min(pw,ph)*0.04);
-  s += '<rect x="'+(M+inset)+'" y="'+(M+inset)+'" width="'+(pw-inset*2)+'" height="'+(ph-inset*2)+'" fill="none" stroke="#000" stroke-width="1.5"/>';
-  // Grain arrow ↔ in center
-  var cx = M + pw/2, cy = M + ph/2;
-  s += '<line x1="'+(cx-arrowHalf)+'" y1="'+cy+'" x2="'+(cx+arrowHalf)+'" y2="'+cy+'" stroke="#000" stroke-width="3"/>';
-  s += '<polygon points="'+(cx-arrowHalf)+','+cy+' '+(cx-arrowHalf+ahSize)+','+(cy-ahSize/2)+' '+(cx-arrowHalf+ahSize)+','+(cy+ahSize/2)+'" fill="#000"/>';
-  s += '<polygon points="'+(cx+arrowHalf)+','+cy+' '+(cx+arrowHalf-ahSize)+','+(cy-ahSize/2)+' '+(cx+arrowHalf-ahSize)+','+(cy+ahSize/2)+'" fill="#000"/>';
+  // Part outline
+  s += '<rect x="'+px+'" y="'+py+'" width="'+pw+'" height="'+ph+'" fill="none" stroke="#000" stroke-width="'+strokeOuter+'"/>';
+  // Bottom-edge bar (emphasises where the bottom edge is — matches SWOOD reference)
+  var barH = Math.max(8, ph*0.05);
+  s += '<rect x="'+px+'" y="'+(py+ph-barH)+'" width="'+pw+'" height="'+barH+'" fill="#000"/>';
   // CNC drill dots at corners if applicable
   if (hasCNC){
-    var dot = Math.max(5, Math.min(pw,ph)*0.025);
-    var din = Math.max(20, Math.min(pw,ph)*0.08);
-    var corners = [[M+din,M+din],[M+pw-din,M+din],[M+pw-din,M+ph-din],[M+din,M+ph-din]];
+    var dot = Math.max(6, Math.min(pw, ph)*0.03);
+    var din = Math.max(25, Math.min(pw, ph)*0.08);
+    var corners = [[px+din,py+din],[px+pw-din,py+din],[px+pw-din,py+ph-din-barH-din/2],[px+din,py+ph-din-barH-din/2]];
     corners.forEach(function(c){
       s += '<circle cx="'+c[0]+'" cy="'+c[1]+'" r="'+dot+'" fill="#000"/>';
     });
   }
-  // Dimension labels
-  // Top: width in mm
-  s += '<text x="'+cx+'" y="'+(M*0.6)+'" font-family="sans-serif" font-size="'+fs+'" font-weight="700" text-anchor="middle" fill="#000">'+Math.round(pw)+'</text>';
-  // Left: height in mm (rotated 90deg, reading top-to-bottom)
-  var leftX = M*0.45;
-  s += '<text x="'+leftX+'" y="'+cy+'" font-family="sans-serif" font-size="'+fs+'" font-weight="700" text-anchor="middle" fill="#000" transform="rotate(-90 '+leftX+' '+cy+')">'+Math.round(ph)+'</text>';
+  // Nesting index number on the right (big, bold, grey-ish like SWOOD)
+  if (idx){
+    var idxFs = Math.max(vbH*0.55, 80);
+    var idxX = px + pw + M*1.3;
+    var idxY = py + ph/2 + idxFs*0.35; // vertical-center-ish
+    s += '<text x="'+idxX+'" y="'+idxY+'" font-family="Arial,sans-serif" font-size="'+idxFs+'" font-weight="700" text-anchor="middle" fill="#888">'+idx+'</text>';
+  }
   s += '</svg>';
   return s;
 }
@@ -4336,9 +4342,16 @@ function buildLabel(p,lay){
   var hasCNC = part.hasCNC||op1.length>0;
   var eb1=eb.eb1?eb.eb1:'', eb2=eb.eb2?eb.eb2:'', eb3=eb.eb3?eb.eb3:'', eb4=eb.eb4?eb.eb4:'';
 
+  // Nesting index = 1-based position of this part in the current sheet's placements
+  var idx = 1;
+  if (lay && lay.placements) {
+    var i = lay.placements.indexOf(p);
+    if (i >= 0) idx = i + 1;
+  }
+
   // Pre-render SVG for panel + QR codes so everything is vector and survives
   // being copied to a new window for printing.
-  var panelSVG = partToSVG(p.pw, p.ph, hasCNC);
+  var panelSVG = partToSVG(p.pw, p.ph, hasCNC, idx);
   var qr1SVG = op1 ? qrToSVG(op1, 120) : '';
   var qr2SVG = op2 ? qrToSVG(op2, 120) : '';
 
@@ -4485,69 +4498,92 @@ function saveZPL(){
   download('label.zpl', zpl, 'application/octet-stream');
 }
 // ═══════════════════════════════════════════════════════════════
-// doPrint — opens a new window with the label rendered at 99x50mm,
-// auto-triggers the browser print dialog. Operator picks Zebra printer.
-// No file downloads, no AV issues, works on any PC.
+// doPrint — opens a new window with the label rendered at exactly
+// 97x48mm inside a 99x50mm page (1mm printer margin on all sides).
+// Everything sized in mm so scaling is predictable. Auto-triggers
+// the browser print dialog.
 // ═══════════════════════════════════════════════════════════════
 function doPrint(){
   var pst = document.getElementById('pst');
-  var preview = document.getElementById('lprev'); // the rendered label preview
+  var preview = document.getElementById('lprev');
   if(!preview){pst.innerHTML='<b style="color:#B84040">Label preview not found</b>';return;}
   var part = _labelPart && _labelPart.part ? _labelPart.part : null;
   var labelHtml = preview.outerHTML;
-  // Collect the label's CSS rules from the current page so the print window
-  // renders identically. We inline them to keep the new window self-contained.
-  var css = '';
-  try {
-    for (var i=0; i<document.styleSheets.length; i++){
-      var sheet = document.styleSheets[i];
-      try {
-        var rules = sheet.cssRules || sheet.rules;
-        if (!rules) continue;
-        for (var j=0; j<rules.length; j++){
-          var r = rules[j].cssText;
-          if (/\.(lbl-outer|lc|lhdr|lqr|leb|lpanel|ldims|ldesc|lmat|lfull|lc-l)/.test(r)){
-            css += r + '\n';
-          }
-        }
-      } catch(e) { /* cross-origin sheet, skip */ }
-    }
-  } catch(e) { console.warn('CSS collection failed:', e); }
 
   var title = (part && part.origName ? part.origName : 'label').replace(/[<>&"']/g,'_');
 
-  // Build the print document.
-  // @page: size must be declared in both orientations for browser compatibility.
-  // The `size: 99mm 50mm` form explicitly sets width × height (landscape).
-  // Body is absolute-sized to match so browser doesn't add a second page.
-  // Everything uses `overflow:hidden` to prevent accidental page breaks from
-  // a 1px overflow that would otherwise render as a blank page.
+  // Print CSS uses MM UNITS EXPLICITLY so layout is exact at any DPI.
+  // Page: 99x50mm. Printable: 97x48mm (1mm margin). Grid totals:
+  //   Cols: 15mm QR1 | 4mm EBL | rest | 4mm EBR | 15mm QR2 = 38mm + center
+  //         (center = 97 - 38 = 59mm for panel strip)
+  //   Rows: 4 header | 4 ebTop | 7 panel1 | 7 panel2 | 7 panel3 | 7 panel4
+  //         | 4 ebBot | 4.5 dims | 3.5 matfull = 48mm
+  var printCSS = [
+    '@page { size: 99mm 50mm; margin: 0; }',
+    'html, body { margin:0; padding:0; background:#fff; width:99mm; height:50mm; overflow:hidden; }',
+    'body { font-family:Arial,Helvetica,sans-serif; -webkit-print-color-adjust:exact; print-color-adjust:exact; color:#000; }',
+    // Wrapper centers the label with 1mm printer-safe margin
+    '.print-wrap { width:97mm; height:48mm; margin:1mm; position:relative; }',
+    // Override the main label CSS with mm-based sizing
+    '.print-wrap .lbl-outer {',
+    '  width:97mm !important; height:48mm !important;',
+    '  border:0.2mm solid #000 !important;',
+    '  display:grid !important;',
+    '  grid-template-columns: 15mm 3.5mm 1fr 3.5mm 15mm !important;',
+    '  grid-template-rows: 4mm 3.5mm 1fr 1fr 1fr 1fr 3.5mm 5mm 4mm !important;',
+    '  font-size: 2.5mm !important;',
+    '  box-sizing: border-box !important;',
+    '  gap: 0 !important;',
+    '}',
+    '.print-wrap .lc {',
+    '  border:0.15mm solid #888 !important;',
+    '  padding:0.3mm !important;',
+    '  overflow:hidden !important;',
+    '  box-sizing:border-box !important;',
+    '  display:flex !important;',
+    '  align-items:center !important;',
+    '  justify-content:center !important;',
+    '  text-align:center !important;',
+    '  line-height:1.15 !important;',
+    '  word-break:break-word !important;',
+    '}',
+    '.print-wrap .lc-l { justify-content:flex-start !important; text-align:left !important; padding-left:1mm !important; }',
+    // Headers and readable cells — bigger text, bold
+    '.print-wrap .lhdr { font-size:2.8mm !important; font-weight:700 !important; border:0.2mm solid #000 !important; }',
+    // Edgebands — vertical text on sides
+    '.print-wrap .leb { font-size:2mm !important; font-weight:700 !important; writing-mode:vertical-lr !important; transform:rotate(180deg) !important; letter-spacing:0.2mm !important; text-decoration:underline !important; }',
+    '.print-wrap .leb-top, .print-wrap .leb-bot { font-size:2mm !important; font-weight:700 !important; text-decoration:underline !important; }',
+    // Panel + QR cells
+    '.print-wrap .lpanel { background:#fff !important; padding:0.5mm !important; }',
+    '.print-wrap .lpanel svg { width:100% !important; height:100% !important; display:block !important; }',
+    '.print-wrap .lqr { background:#fff !important; padding:0.5mm !important; position:relative !important; }',
+    '.print-wrap .lqr svg { width:100% !important; height:100% !important; display:block !important; }',
+    // Green corner triangle (QR cell decoration, matches SWOOD reference)
+    '.print-wrap .lqr::before { content:""; position:absolute; top:0; right:0; width:0; height:0; border-style:solid; border-width:0 2.5mm 2.5mm 0; border-color:transparent #2e7d32 transparent transparent; }',
+    // Bottom info rows — larger, readable
+    '.print-wrap .ldims { font-size:3mm !important; font-weight:700 !important; }',
+    '.print-wrap .ldesc { font-size:3mm !important; font-weight:700 !important; }',
+    '.print-wrap .lmat  { font-size:2.3mm !important; font-weight:700 !important; }',
+    '.print-wrap .lfull { font-size:2mm !important; font-weight:500 !important; }',
+    '@media screen { .no-print { display:flex !important; } }',
+    '@media print { .no-print { display:none !important; } }'
+  ].join('\n');
+
   var doc = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>'+esc(title)+'</title>' +
-    '<style>' +
-    '@page { size: 99mm 50mm; margin: 0; }' +
-    'html, body { margin:0; padding:0; background:#fff; width:99mm; height:50mm; overflow:hidden; }' +
-    'body { font-family:Arial,Helvetica,sans-serif; -webkit-print-color-adjust:exact; print-color-adjust:exact; }' +
-    // Lock label to exact label dimensions, killing any accidental overflow.
-    '.lbl-outer { width:99mm !important; height:50mm !important; border:none !important; box-sizing:border-box; }' +
-    // Ensure QR/part SVGs fit their cells cleanly.
-    '.lqr svg, .lpanel svg { width:100% !important; height:100% !important; display:block; }' +
-    '.lc { box-sizing:border-box; }' +
-    '@media print { .no-print { display:none !important; } }' +
-    css +
-    '</style></head><body>' +
+    '<style>'+printCSS+'</style>' +
+    '</head><body>' +
     '<div class="no-print" style="position:fixed;top:4px;right:4px;display:flex;gap:4px;font-family:sans-serif;z-index:999">' +
       '<button onclick="window.print()" style="padding:4px 10px;background:#3D6B4F;color:#fff;border:none;border-radius:3px;cursor:pointer;font-size:11px">🖨 Print</button>' +
       '<button onclick="window.close()" style="padding:4px 10px;background:#B84040;color:#fff;border:none;border-radius:3px;cursor:pointer;font-size:11px">Close</button>' +
     '</div>' +
-    labelHtml +
+    '<div class="print-wrap">' + labelHtml + '</div>' +
     '<script>' +
-      'window.addEventListener("load", function(){ setTimeout(function(){ window.print(); }, 300); });' +
+      'window.addEventListener("load", function(){ setTimeout(function(){ window.print(); }, 400); });' +
       'window.addEventListener("afterprint", function(){ setTimeout(function(){ window.close(); }, 300); });' +
     '<\/script>' +
     '</body></html>';
 
-  // Wider window so operator can see the landscape label before/after print dialog
-  var w = window.open('', '_blank', 'width=600,height=400');
+  var w = window.open('', '_blank', 'width=700,height=440');
   if (!w){
     pst.innerHTML = '<b style="color:#B84040">Popup blocked</b><br>' +
       '<span style="font-size:11px">Allow pop-ups for this page, then click Print again.</span>';
@@ -4558,7 +4594,7 @@ function doPrint(){
   w.document.close();
   pst.innerHTML = '<b style="color:#3D6B4F">✓ Print dialog opened</b><br>' +
     '<span style="font-size:11px;color:#6B6455">' +
-    'Pick <b>ZDesigner GK420d</b> → <b>Margins: None</b> → <b>Scale: 100%</b> → Print.' +
+    'Dialog: <b>ZDesigner GK420d</b> → Margins: <b>None</b> → Scale: <b>100</b> → Print.' +
     '</span>';
 }
 // ── Save raw ZPL as a file — handled by existing saveZPL() at line ~4508 ──
