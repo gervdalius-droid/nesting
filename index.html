@@ -128,6 +128,7 @@ input[type=color]{padding:2px 3px;height:27px;cursor:pointer}
 @keyframes pliFlash{0%{background:#fff6cc;border-color:#E8C547}100%{background:#FDFCF9;border-color:transparent}}
 .pli.flash{animation:pliFlash 1.2s ease-out}
 
+.ov2{display:none;position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:300;backdrop-filter:blur(2px);align-items:flex-start;justify-content:center;padding-top:40px}
 .ov2.open{display:flex}
 .mdl{background:#FDFCF9;border-radius:10px;padding:18px;width:460px;border:1px solid #D4CFC2;max-height:90vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,.15)}
 .mdl h3{font-size:14px;font-weight:600;margin-bottom:12px}
@@ -357,8 +358,9 @@ body.print-mode{background:#fff}
         <label><input type="checkbox" id="ssnap" checked> <span data-i18n="snap1mm">Snap 1mm</span></label>
         <button class="rot-btn" id="rot-btn" onclick="rotateSel()" data-i18n-title="rotateTip" title="Rotate selected part 90° (R key)" style="display:none"><span data-i18n="rotateBtn">↻ Rotate (R)</span></button>
         <button class="rot-btn" id="mv-btn" onclick="openMovePopover(event)" data-i18n-title="moveTip" title="Move selected part to a different sheet" style="display:none;color:#3D6B4F;border-color:#3D6B4F"><span data-i18n="moveBtn">📋 Move…</span></button>
+        <button class="rot-btn" id="pr-btn" onclick="printSel()" data-i18n-title="printTip" title="Print label for selected part (P key)" style="display:none;color:#3D6B4F;border-color:#3D6B4F"><span data-i18n="printBtn">🏷 Print (P)</span></button>
         <button class="btn bs" onclick="consolidateSheets()" data-i18n-title="consolidateTip" title="Repack current placements — merge nearly-empty sheets" style="margin-left:auto;font-size:10px;padding:3px 8px"><span data-i18n="consolidateBtn">✨ Consolidate sheets</span></button>
-        <span data-i18n="canvasHint" style="font-size:10px;color:#A09888">Drag · R = rotate · Right-click → label</span>
+        <span data-i18n="canvasHint" style="font-size:10px;color:#A09888">Drag · R = rotate · P = print label</span>
       </div>
       <canvas id="cv"></canvas>
       <div class="tip" id="tip"></div>
@@ -980,9 +982,11 @@ var I18N={
     rotateTip:'Rotate selected part 90° (R key)',
     moveBtn:'📋 Move…',
     moveTip:'Move selected part to a different sheet',
+    printBtn:'🏷 Print (P)',
+    printTip:'Print label for selected part (P key)',
     consolidateBtn:'✨ Consolidate sheets',
     consolidateTip:'Repack current placements — merge nearly-empty sheets',
-    canvasHint:'Drag · R = rotate · Right-click → label',
+    canvasHint:'Drag · R = rotate · P = print label',
     // save status
     saving:'Saving…',
     saved:'✓ Saved',
@@ -1106,9 +1110,11 @@ var I18N={
     rotateTip:'Pasukti pasirinktą detalę 90° (R klavišas)',
     moveBtn:'📋 Perkelti…',
     moveTip:'Perkelti pasirinktą detalę į kitą plokštę',
+    printBtn:'🏷 Spausdinti (P)',
+    printTip:'Spausdinti pasirinktos detalės etiketę (P klavišas)',
     consolidateBtn:'✨ Sujungti plokštes',
     consolidateTip:'Perdėlioti esamas detales — sujungti beveik tuščias plokštes',
-    canvasHint:'Tempkite · R = pasukti · Dešinysis pelės klavišas → etiketė',
+    canvasHint:'Tempkite · R = pasukti · P = spausdinti etiketę',
     saving:'Saugoma…',
     saved:'✓ Išsaugota',
     savedLocal:'✓ Išsaugota (vietoje)',
@@ -3281,12 +3287,14 @@ function bindCanvas(lay){
       cv.style.cursor='grabbing';if(tip)tip.style.display='none';
       document.getElementById('rot-btn').style.display='inline-block';
       document.getElementById('mv-btn').style.display='inline-block';
+      document.getElementById('pr-btn').style.display='inline-block';
       closeMovePopover();
       draw(lay);
     }else{
       selP=null;
       document.getElementById('rot-btn').style.display='none';
       document.getElementById('mv-btn').style.display='none';
+      document.getElementById('pr-btn').style.display='none';
       closeMovePopover();
       draw(lay);
     }
@@ -3339,10 +3347,17 @@ function rotateSel(){
   selP.x=resolved.x;selP.y=resolved.y;
   draw(lay);scheduleExportRebuild();scheduleSave();
 }
-// Keyboard: R = rotate selected, Escape = deselect, Delete = remove
+// ── Print selected part's label ──
+function printSel(){
+  if(!selP)return;
+  var lay=layouts[curSheet];if(!lay)return;
+  openModal(selP,lay);
+}
+// Keyboard: R = rotate, P = print label, Escape = deselect, Delete = remove
 document.addEventListener('keydown',function(e){
   if(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA')return;
   if(e.key==='r'||e.key==='R'){e.preventDefault();rotateSel();}
+  if(e.key==='p'||e.key==='P'){e.preventDefault();printSel();}
   if(e.key==='Escape'){selP=null;var lay=layouts[curSheet];if(lay)draw(lay);}
   if((e.key==='Delete'||e.key==='Backspace')&&selP){
     var lay=layouts[curSheet];if(!lay)return;
