@@ -523,18 +523,19 @@ body.print-mode{background:#fff}
 <div class="mdl">
   <h3>🏷 <span id="mname"></span></h3>
   <div class="lw">
-    <div style="font-size:9px;color:#888;margin-bottom:5px">Zebra (ZPL) · 99×50mm · 203dpi</div>
+    <div style="font-size:9px;color:#888;margin-bottom:5px">99×50mm label · printed via browser</div>
     <div class="lbl-outer" id="lprev"></div>
   </div>
-  <div class="zp" id="zpl"></div>
-  <div style="margin-bottom:10px"><label class="fl">Printer name (as shown in Windows Devices & Printers)</label><input id="prn" value="ZDesigner GK420d"></div>
   <div style="display:flex;gap:6px;margin-bottom:6px">
     <button class="btn bp" onclick="doPrint()" style="flex:1">🖨 Print</button>
-    <button class="btn bs" onclick="saveZPL()" title="Save the ZPL as a file">💾 .zpl</button>
-    <button class="btn bs" onclick="openPrinterSetup()" title="First-time setup for this PC">⚙ Setup</button>
+    <button class="btn bs" onclick="saveZPL()" title="Save ZPL for advanced users">💾 .zpl</button>
     <button class="btn bs" onclick="closeModal()">✕</button>
   </div>
   <div id="pst" style="font-size:11px;color:#6B6455;margin-top:4px;min-height:32px;line-height:1.6"></div>
+  <!-- ZPL text kept hidden — still used by saveZPL -->
+  <div class="zp" id="zpl" style="display:none"></div>
+  <!-- Printer name kept as hidden input for backwards compat in case code references it -->
+  <input type="hidden" id="prn" value="ZDesigner GK420d">
 </div>
 </div>
 
@@ -4510,206 +4511,78 @@ function saveZPL(){
   download('label.zpl', zpl, 'application/octet-stream');
 }
 // ═══════════════════════════════════════════════════════════════
-// PRINTING — downloads a .zpl file. When the shop PC has the one-time
-// FabFlow label-print setup installed (see openPrinterSetup below), double-
-// clicking the downloaded file sends it straight to the Zebra. If not,
-// the user gets clear instructions to either install the setup or open
-// the file manually.
+// doPrint — opens a new window with the label rendered at 99x50mm,
+// auto-triggers the browser print dialog. Operator picks Zebra printer.
+// No file downloads, no AV issues, works on any PC.
 // ═══════════════════════════════════════════════════════════════
 function doPrint(){
-  var zpl = document.getElementById('zpl').textContent;
   var pst = document.getElementById('pst');
+  var preview = document.getElementById('lprev'); // the rendered label preview
+  if(!preview){pst.innerHTML='<b style="color:#B84040">Label preview not found</b>';return;}
   var part = _labelPart && _labelPart.part ? _labelPart.part : null;
-  // Short, filesystem-safe filename based on the part name
-  var base = part && part.origName ? part.origName : 'label';
-  base = base.replace(/[^A-Za-z0-9_\-]/g,'_').substring(0,40)||'label';
-  var filename = base + '.zpl';
-  // Force binary download with a .zpl extension so Windows' file association
-  // (see setup script) can handle the print natively.
-  download(filename, zpl, 'application/octet-stream');
-  pst.innerHTML =
-    '<b style="color:#3D6B4F">↓ '+esc(filename)+' downloaded</b><br>' +
-    '<span style="font-size:11px;color:#6B6455">' +
-    'If setup is installed on this PC, the label prints automatically.<br>' +
-    'First time on this PC? ' +
-    '<a href="#" onclick="openPrinterSetup();return false" style="color:#3D6B4F;font-weight:600">Run one-time setup →</a></span>';
-}
-// ── One-time Windows setup generator ─────────────────────────────────────
-// Generates a self-contained Windows installer (.cmd) the operator runs once
-// on their shop PC. The installer sets up a BACKGROUND WATCHER:
-//  1. Shares the local Zebra printer so raw bytes can be sent to it.
-//  2. Writes C:\FabFlow\watcher.ps1 — a PowerShell script that watches the
-//     user's Downloads folder for new .zpl files and sends them to the
-//     shared printer automatically, then deletes the file.
-//  3. Registers the watcher as a scheduled task that runs on user login,
-//     hidden, so it's always on.
-//  4. Starts the watcher immediately so the user doesn't need to reboot.
-// After running once, every downloaded .zpl prints automatically — no clicks.
-//
-// To avoid cmd.exe quote-escaping hell, the watcher PS1 is base64-encoded
-// and decoded inside a PowerShell one-liner.
-function buildPrinterSetupScript(printerFriendlyName,shareName){
-  var p=(printerFriendlyName||'ZDesigner GK420d').replace(/"/g,'');
-  var s=(shareName||'ZebraGK420d').replace(/[^A-Za-z0-9_\-]/g,'');
-
-  // PowerShell watcher body — clean, no escaping needed here.
-  var ps = [
-    '# FabFlow auto-print watcher',
-    '$ErrorActionPreference = "SilentlyContinue"',
-    '$share = "\\\\localhost\\' + s + '"',
-    '$dl    = [Environment]::GetFolderPath("UserProfile") + "\\Downloads"',
-    '$log   = "C:\\FabFlow\\watcher.log"',
-    '',
-    'function Write-Log($msg) {',
-    '  $ts = Get-Date -Format "yyyy-MM-dd HH:mm:ss"',
-    '  Add-Content -Path $log -Value "$ts  $msg"',
-    '}',
-    '',
-    'function Send-ToPrinter($file) {',
-    '  # Retry up to 8 times over ~4 sec in case the browser is still writing.',
-    '  for ($i=0; $i -lt 8; $i++) {',
-    '    Start-Sleep -Milliseconds 500',
-    '    if (-not (Test-Path $file)) { return }',
-    '    try {',
-    '      # Raw binary copy to the shared printer — preserves ZPL bytes',
-    '      $res = cmd /c "copy /B `"$file`" `"$share`" 2>&1"',
-    '      if ($LASTEXITCODE -eq 0) {',
-    '        Write-Log "PRINTED: $file"',
-    '        Remove-Item -Path $file -Force -ErrorAction SilentlyContinue',
-    '        return',
-    '      }',
-    '    } catch { }',
-    '  }',
-    '  Write-Log "FAILED: $file (share $share unreachable or file locked)"',
-    '}',
-    '',
-    'Write-Log "Watcher started. Watching: $dl  Printer share: $share"',
-    '',
-    '# Process any .zpl files already sitting in Downloads at startup',
-    'Get-ChildItem -Path $dl -Filter "*.zpl" -File -ErrorAction SilentlyContinue | ForEach-Object {',
-    '  Send-ToPrinter $_.FullName',
-    '}',
-    '',
-    '$fsw = New-Object System.IO.FileSystemWatcher $dl, "*.zpl"',
-    '$fsw.IncludeSubdirectories = $false',
-    '$fsw.EnableRaisingEvents = $true',
-    '',
-    'Register-ObjectEvent -InputObject $fsw -EventName "Created" -Action {',
-    '  Send-ToPrinter $Event.SourceEventArgs.FullPath',
-    '} | Out-Null',
-    '',
-    '# Browsers sometimes download as .zpl.crdownload then rename — catch the rename too',
-    'Register-ObjectEvent -InputObject $fsw -EventName "Renamed" -Action {',
-    '  Send-ToPrinter $Event.SourceEventArgs.FullPath',
-    '} | Out-Null',
-    '',
-    'while ($true) { Start-Sleep -Seconds 60 }'
-  ].join('\n');
-
-  // PowerShell's -EncodedCommand expects UTF-16 LE base64.
-  // We build a UTF-16 LE byte array in JS then base64 it.
-  function toUtf16LeBase64(str){
-    var bytes = [];
-    for (var i=0; i<str.length; i++){
-      var c = str.charCodeAt(i);
-      bytes.push(c & 0xff, (c >> 8) & 0xff);
+  var labelHtml = preview.outerHTML;
+  // Collect the label's CSS rules from the current page so the print window
+  // renders identically. We inline them to keep the new window self-contained.
+  var css = '';
+  try {
+    for (var i=0; i<document.styleSheets.length; i++){
+      var sheet = document.styleSheets[i];
+      try {
+        var rules = sheet.cssRules || sheet.rules;
+        if (!rules) continue;
+        for (var j=0; j<rules.length; j++){
+          var r = rules[j].cssText;
+          // Only pull label-related rules to keep the new window clean
+          if (/\.(lbl-outer|lc|lhdr|lqr|leb|lpanel|ldims|ldesc|lmat|lfull|lc-l)/.test(r)){
+            css += r + '\n';
+          }
+        }
+      } catch(e) { /* cross-origin sheet, skip */ }
     }
-    // btoa needs a binary string
-    var bin = '';
-    for (var j=0; j<bytes.length; j++) bin += String.fromCharCode(bytes[j]);
-    return btoa(bin);
-  }
-  var psB64 = toUtf16LeBase64(ps);
+  } catch(e) { console.warn('CSS collection failed:', e); }
 
-  // The .cmd file. It:
-  //  - self-elevates to admin
-  //  - shares the printer
-  //  - writes watcher.ps1 by decoding our base64 inside PS
-  //  - registers a scheduled task to run watcher.ps1 on login
-  //  - launches the watcher immediately
-  var lines=[
-    '@echo off',
-    'setlocal',
-    'title FabFlow auto-print setup',
-    'echo.',
-    'echo ====================================================================',
-    'echo  FabFlow  ^|  Zebra auto-print setup',
-    'echo ====================================================================',
-    'echo.',
-    'echo This installs a background watcher that auto-prints .zpl labels',
-    'echo from your Downloads folder. Runs once per PC.',
-    'echo.',
-    'echo Administrator rights required. Click Yes if prompted.',
-    'echo.',
-    'net session >nul 2>&1',
-    'if %errorLevel% neq 0 (',
-    '  echo Re-launching as administrator...',
-    '  powershell -Command "Start-Process \'%~f0\' -Verb RunAs"',
-    '  exit /b',
-    ')',
-    '',
-    'echo Step 1/5 - Creating C:\\FabFlow folder...',
-    'if not exist "C:\\FabFlow" mkdir "C:\\FabFlow"',
-    'echo   OK',
-    '',
-    'echo Step 2/5 - Sharing Zebra printer as "'+s+'"...',
-    'rundll32 printui.dll,PrintUIEntry /Xs /n "'+p+'" attributes +shared sharename "'+s+'"',
-    'timeout /t 2 >nul',
-    'echo   OK (if printer name matches Windows exactly)',
-    '',
-    'echo Step 3/5 - Writing watcher script...',
-    // Decode base64 → UTF-16 string → save to watcher.ps1
-    'powershell -NoProfile -Command "[IO.File]::WriteAllText(\'C:\\FabFlow\\watcher.ps1\', [Text.Encoding]::Unicode.GetString([Convert]::FromBase64String(\''+psB64+'\')))"',
-    'if exist "C:\\FabFlow\\watcher.ps1" (echo   OK) else (echo   FAILED to write watcher.ps1 & pause & exit /b 1)',
-    '',
-    'echo Step 4/5 - Registering auto-start task (runs on login)...',
-    // Stop any existing watcher first so we don't have duplicates
-    'taskkill /F /FI "WINDOWTITLE eq FabFlow-Watcher*" >nul 2>&1',
-    'schtasks /Delete /TN "FabFlow-AutoPrint" /F >nul 2>&1',
-    'schtasks /Create /TN "FabFlow-AutoPrint" /TR "powershell.exe -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File C:\\FabFlow\\watcher.ps1" /SC ONLOGON /RL LIMITED /F',
-    'echo   OK',
-    '',
-    'echo Step 5/5 - Launching watcher now...',
-    // Launch detached so the cmd window can close
-    'start "FabFlow-Watcher" /B powershell.exe -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File C:\\FabFlow\\watcher.ps1',
-    'timeout /t 2 >nul',
-    'echo   OK',
-    '',
-    'echo.',
-    'echo ====================================================================',
-    'echo  Setup complete.',
-    'echo ====================================================================',
-    'echo.',
-    'echo  The watcher is now running in the background.',
-    'echo  From now on:',
-    'echo    - Click Print in FabFlow',
-    'echo    - Label prints within 1-2 seconds',
-    'echo    - The .zpl file is deleted after printing',
-    'echo.',
-    'echo  Log file:   C:\\FabFlow\\watcher.log',
-    'echo  Disable:    schtasks /Delete /TN "FabFlow-AutoPrint" /F',
-    'echo.',
-    'pause'
-  ];
-  return lines.join('\r\n');
+  var title = (part && part.origName ? part.origName : 'label').replace(/[<>&"']/g,'_');
+
+  // Build the print document. @page sets paper to exactly 99x50mm so the
+  // Zebra driver knows the label size. body margin:0 so nothing shifts.
+  var doc = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>'+esc(title)+'</title>' +
+    '<style>' +
+    '@page { size: 99mm 50mm; margin: 0; }' +
+    'html,body { margin:0; padding:0; background:#fff; }' +
+    'body { width:99mm; height:50mm; font-family:Arial,Helvetica,sans-serif; }' +
+    '.lbl-outer { width:99mm !important; height:50mm !important; border:none !important; }' +
+    '@media print { .no-print { display:none !important; } }' +
+    css +
+    '</style></head><body>' +
+    '<div class="no-print" style="position:fixed;top:8px;right:8px;display:flex;gap:6px;font-family:sans-serif">' +
+      '<button onclick="window.print()" style="padding:6px 14px;background:#3D6B4F;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:12px">🖨 Print</button>' +
+      '<button onclick="window.close()" style="padding:6px 14px;background:#B84040;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:12px">Close</button>' +
+    '</div>' +
+    labelHtml +
+    '<script>' +
+      // Give the browser a moment to lay out, then fire the print dialog
+      'window.addEventListener("load", function(){ setTimeout(function(){ window.print(); }, 250); });' +
+      // Close the window after the user dismisses the print dialog (print OR cancel)
+      'window.addEventListener("afterprint", function(){ setTimeout(function(){ window.close(); }, 300); });' +
+    '<\/script>' +
+    '</body></html>';
+
+  var w = window.open('', '_blank', 'width=520,height=320');
+  if (!w){
+    pst.innerHTML = '<b style="color:#B84040">Popup blocked</b><br>' +
+      '<span style="font-size:11px">Allow pop-ups for this page, then click Print again.</span>';
+    return;
+  }
+  w.document.open();
+  w.document.write(doc);
+  w.document.close();
+  pst.innerHTML = '<b style="color:#3D6B4F">✓ Print dialog opened</b><br>' +
+    '<span style="font-size:11px;color:#6B6455">' +
+    'Pick <b>ZDesigner GK420d</b> in the dialog, then click Print.<br>' +
+    'Tip: in the print dialog, set <i>Margins: None</i> and <i>Scale: 100%</i> for best results.' +
+    '</span>';
 }
-function openPrinterSetup(){
-  var pst=document.getElementById('pst');
-  var p=(document.getElementById('prn').value||'ZDesigner GK420d').trim();
-  // Derive a safe share name from the printer name
-  var share=p.replace(/[^A-Za-z0-9_\-]/g,'').substring(0,16)||'ZebraLabel';
-  var cmd=buildPrinterSetupScript(p,share);
-  download('FabFlow-autoprint-setup.cmd',cmd,'application/octet-stream');
-  pst.innerHTML=
-    '<b style="color:#3D6B4F">✓ FabFlow-autoprint-setup.cmd downloaded</b>'+
-    '<div style="font-size:11px;color:#6B6455;margin-top:4px;line-height:1.6">'+
-    '<b>One-time setup for auto-printing:</b><br>'+
-    '1. Open your Downloads folder<br>'+
-    '2. Right-click <b>FabFlow-autoprint-setup.cmd</b> → <b>Run as administrator</b><br>'+
-    '3. Click Yes on the UAC prompt, wait for "Setup complete", press any key<br>'+
-    '4. From now on, clicking Print auto-prints (label prints in ~1 sec)'+
-    '</div>';
-}
+// ── Save raw ZPL as a file — handled by existing saveZPL() at line ~4508 ──
 </script>
 </body>
 </html>
