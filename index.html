@@ -159,7 +159,9 @@ input[type=color]{padding:2px 3px;height:27px;cursor:pointer}
 .leb{font-size:9px;font-weight:700;writing-mode:vertical-lr;transform:rotate(180deg);letter-spacing:.5px;text-decoration:underline;border:.5px solid #aaa}
 .leb-top,.leb-bot{font-size:9px;font-weight:700;text-decoration:underline;border:.5px solid #aaa}
 /* Panel image cell */
-.lpanel{background:#fff;border:.5px solid #aaa;display:flex;align-items:center;justify-content:center}
+.lpanel{background:#fff;border:.5px solid #aaa;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.lpanel svg{width:100%;height:100%;display:block}
+.lqr svg{width:100%;height:100%;display:block;padding:4px;box-sizing:border-box}
 /* Bottom rows */
 .ldims{font-size:11px;font-weight:700;border:.5px solid #aaa}
 .ldesc{font-size:11px;font-weight:700;border:.5px solid #aaa}
@@ -4267,6 +4269,63 @@ function closeModal(){
 }
 function restoreModalUI(){} // no longer needed
 
+// ── Helper: QR matrix → SVG string (print-safe, vector, no canvas) ──
+function qrToSVG(text, sizePx){
+  try {
+    var m = QR.encode(text);
+    if(!m) return '';
+    var qsize = m.length;
+    var scale = sizePx / qsize;
+    var s = '<svg xmlns="http://www.w3.org/2000/svg" width="'+sizePx+'" height="'+sizePx+'" viewBox="0 0 '+qsize+' '+qsize+'" shape-rendering="crispEdges" style="display:block">';
+    s += '<rect width="'+qsize+'" height="'+qsize+'" fill="#fff"/>';
+    for (var r=0; r<qsize; r++){
+      for (var c=0; c<qsize; c++){
+        if (m[r][c]) s += '<rect x="'+c+'" y="'+r+'" width="1" height="1" fill="#000"/>';
+      }
+    }
+    s += '</svg>';
+    return s;
+  } catch(e){ return ''; }
+}
+
+// ── Helper: part diagram → SVG (rectangle with dimension labels, grain arrow, CNC dots) ──
+function partToSVG(pw, ph, hasCNC){
+  // SVG viewBox in part mm, with margin for dimension labels
+  var M = 60; // margin for dim labels in mm-equivalents
+  var vbW = pw + M*2, vbH = ph + M*2;
+  // Scale font so dims are readable regardless of part aspect
+  var fs = Math.max(28, Math.min(vbW, vbH) * 0.08);
+  var arrowHalf = Math.min(pw*0.25, 180); // grain arrow half-length
+  var ahSize = Math.max(16, fs*0.6);
+  var s = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 '+vbW+' '+vbH+'" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" style="display:block">';
+  // Part rectangle (double border like original canvas)
+  s += '<rect x="'+M+'" y="'+M+'" width="'+pw+'" height="'+ph+'" fill="none" stroke="#000" stroke-width="4"/>';
+  var inset = Math.max(6, Math.min(pw,ph)*0.04);
+  s += '<rect x="'+(M+inset)+'" y="'+(M+inset)+'" width="'+(pw-inset*2)+'" height="'+(ph-inset*2)+'" fill="none" stroke="#000" stroke-width="1.5"/>';
+  // Grain arrow ↔ in center
+  var cx = M + pw/2, cy = M + ph/2;
+  s += '<line x1="'+(cx-arrowHalf)+'" y1="'+cy+'" x2="'+(cx+arrowHalf)+'" y2="'+cy+'" stroke="#000" stroke-width="3"/>';
+  s += '<polygon points="'+(cx-arrowHalf)+','+cy+' '+(cx-arrowHalf+ahSize)+','+(cy-ahSize/2)+' '+(cx-arrowHalf+ahSize)+','+(cy+ahSize/2)+'" fill="#000"/>';
+  s += '<polygon points="'+(cx+arrowHalf)+','+cy+' '+(cx+arrowHalf-ahSize)+','+(cy-ahSize/2)+' '+(cx+arrowHalf-ahSize)+','+(cy+ahSize/2)+'" fill="#000"/>';
+  // CNC drill dots at corners if applicable
+  if (hasCNC){
+    var dot = Math.max(5, Math.min(pw,ph)*0.025);
+    var din = Math.max(20, Math.min(pw,ph)*0.08);
+    var corners = [[M+din,M+din],[M+pw-din,M+din],[M+pw-din,M+ph-din],[M+din,M+ph-din]];
+    corners.forEach(function(c){
+      s += '<circle cx="'+c[0]+'" cy="'+c[1]+'" r="'+dot+'" fill="#000"/>';
+    });
+  }
+  // Dimension labels
+  // Top: width in mm
+  s += '<text x="'+cx+'" y="'+(M*0.6)+'" font-family="sans-serif" font-size="'+fs+'" font-weight="700" text-anchor="middle" fill="#000">'+Math.round(pw)+'</text>';
+  // Left: height in mm (rotated 90deg, reading top-to-bottom)
+  var leftX = M*0.45;
+  s += '<text x="'+leftX+'" y="'+cy+'" font-family="sans-serif" font-size="'+fs+'" font-weight="700" text-anchor="middle" fill="#000" transform="rotate(-90 '+leftX+' '+cy+')">'+Math.round(ph)+'</text>';
+  s += '</svg>';
+  return s;
+}
+
 function buildLabel(p,lay){
   var part=p.part, eb=part.eb||{};
   var dims = p.pw+'.0x'+p.ph+'.0x'+part.thick+'.0';
@@ -4275,130 +4334,45 @@ function buildLabel(p,lay){
   var op1  = part.op1||'';
   var op2  = part.op2||'';
   var hasCNC = part.hasCNC||op1.length>0;
-  // Edgeband text — LAMINUOJASI if has edge, empty if not
   var eb1=eb.eb1?eb.eb1:'', eb2=eb.eb2?eb.eb2:'', eb3=eb.eb3?eb.eb3:'', eb4=eb.eb4?eb.eb4:'';
 
-  // ── Exact SWOOD label layout ─────────────────────────────────────────
-  // Grid 5 cols x 9 rows:
-  // Row 1: [1OP] [op_id, colspan=3] [2OP]
-  // Rows 2-7: [QR1, rowspan=6] [EBL, rowspan=6] [eb-top] [EBR, rowspan=6] [QR2, rowspan=6]
-  //            (row2=eb-top, rows3-6=panel, row7=eb-bot in center col)
-  // Row 8: [dims, colspan=2] [desc, colspan=3]
-  // Row 9: [mat, colspan=2] [fullname, colspan=3]
+  // Pre-render SVG for panel + QR codes so everything is vector and survives
+  // being copied to a new window for printing.
+  var panelSVG = partToSVG(p.pw, p.ph, hasCNC);
+  var qr1SVG = op1 ? qrToSVG(op1, 120) : '';
+  var qr2SVG = op2 ? qrToSVG(op2, 120) : '';
 
   var h='';
-
-  // Row 1 — header
+  // Row 1 — header (1OP | op_id | 2OP)
   h+='<div class="lc lhdr">1OP</div>';
   h+='<div class="lc lhdr" style="grid-column:span 3;justify-content:flex-start;padding-left:6px;font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(op1||'–')+'</div>';
   h+='<div class="lc lhdr">2OP</div>';
-
-  // QR1 spans rows 2-7 (rowspan=6)
-  h+='<div class="lc lqr" id="lqr1" style="grid-row:span 6"></div>';
-
-  // EBL spans rows 2-7
+  // QR1 (rowspan=6)
+  h+='<div class="lc lqr" style="grid-row:span 6">';
+  if (qr1SVG) h+=qr1SVG;
+  else h+='<div style="font-size:9px;color:#bbb;text-align:center;line-height:1.4">NO<br>CNC</div>';
+  h+='</div>';
+  // EBL (rowspan=6)
   h+='<div class="lc leb" style="grid-row:span 6">'+esc(eb1||'')+'</div>';
-
-  // Center col rows 2-7:
-  // row2 = EBB (top edge)
+  // Center col: row2=eb-top, rows3-6=panel, row7=eb-bot
   h+='<div class="lc leb-top">'+esc(eb2||'')+'</div>';
-  // rows 3-6 = panel image (rowspan=4)
-  h+='<div class="lc lpanel" id="panel-img" style="grid-row:span 4"><canvas id="panel-cv" style="max-width:98%;max-height:98%;image-rendering:pixelated"></canvas></div>';
-  // row7 = EBF (bottom edge)
+  h+='<div class="lc lpanel" style="grid-row:span 4">'+panelSVG+'</div>';
   h+='<div class="lc leb-bot">'+esc(eb3||'')+'</div>';
-
-  // EBR spans rows 2-7
+  // EBR (rowspan=6)
   h+='<div class="lc leb" style="grid-row:span 6">'+esc(eb4||'')+'</div>';
-
-  // QR2 spans rows 2-7
-  h+='<div class="lc lqr" id="lqr2" style="grid-row:span 6"></div>';
-
+  // QR2 (rowspan=6)
+  h+='<div class="lc lqr" style="grid-row:span 6">';
+  if (qr2SVG) h+=qr2SVG;
+  else h+='<div style="font-size:9px;color:#bbb;text-align:center;line-height:1.4">2OP<br>–</div>';
+  h+='</div>';
   // Row 8 — dims | short name
   h+='<div class="lc ldims lc-l" style="grid-column:span 2">'+esc(dims)+'</div>';
   h+='<div class="lc ldesc" style="grid-column:span 3">'+esc(sn)+'</div>';
-
   // Row 9 — material | full name
   h+='<div class="lc lmat lc-l" style="grid-column:span 2">'+esc('MAT: '+part.mat)+'</div>';
   h+='<div class="lc lfull lc-l" style="grid-column:span 3;font-size:7px">'+esc(part.origName)+'</div>';
 
   document.getElementById('lprev').innerHTML=h;
-
-  // ── Render QR + panel after DOM settles ──────────────────────────────
-  setTimeout(function(){
-
-    // Panel image — part rectangle + grain arrow (↔) + CNC dots if ops exist
-    var cv=document.getElementById('panel-cv');
-    var cell=document.getElementById('panel-img');
-    if(cv&&cell){
-      var W=cell.clientWidth-4||120, H=cell.clientHeight-4||100;
-      cv.width=W*2; cv.height=H*2;
-      cv.style.width=W+'px'; cv.style.height=H+'px';
-      var ctx=cv.getContext('2d');
-      ctx.clearRect(0,0,W*2,H*2);
-      // Scale part proportionally
-      var aspect=p.pw/p.ph;
-      var rw,rh,pad=14;
-      if(aspect>(W*2)/(H*2)){rw=W*2-pad*2;rh=Math.round(rw/aspect);}
-      else{rh=H*2-pad*2;rw=Math.round(rh*aspect);}
-      if(rw<20)rw=W*2-pad*2;
-      if(rh<20)rh=Math.round(rw/Math.max(aspect,0.1));
-      var rx=Math.round((W*2-rw)/2), ry=Math.round((H*2-rh)/2);
-      // Outer border (thick)
-      ctx.strokeStyle='#000';ctx.lineWidth=4;ctx.strokeRect(rx,ry,rw,rh);
-      // Inner border (thin, ~6px inset)
-      ctx.lineWidth=2;ctx.strokeRect(rx+8,ry+8,rw-16,rh-16);
-      // Grain direction arrow ↔ in center
-      var cx=rx+rw/2, cy=ry+rh/2;
-      var al=Math.min(rw*0.35,60); // arrow half-length
-      var ah=10; // arrowhead size
-      ctx.strokeStyle='#000';ctx.lineWidth=3;
-      // Shaft
-      ctx.beginPath();ctx.moveTo(cx-al,cy);ctx.lineTo(cx+al,cy);ctx.stroke();
-      // Left arrowhead
-      ctx.beginPath();ctx.moveTo(cx-al,cy);ctx.lineTo(cx-al+ah,cy-ah/2);ctx.lineTo(cx-al+ah,cy+ah/2);ctx.closePath();ctx.fillStyle='#000';ctx.fill();
-      // Right arrowhead
-      ctx.beginPath();ctx.moveTo(cx+al,cy);ctx.lineTo(cx+al-ah,cy-ah/2);ctx.lineTo(cx+al-ah,cy+ah/2);ctx.closePath();ctx.fill();
-      if(hasCNC){
-        // Small dots at all 4 corners inside inner border = drill marks
-        var dot=5, inset=20;
-        ctx.fillStyle='#000';
-        [[rx+inset,ry+inset],[rx+rw-inset,ry+inset],[rx+rw-inset,ry+rh-inset],[rx+inset,ry+rh-inset]].forEach(function(pt){
-          ctx.beginPath();ctx.arc(pt[0],pt[1],dot,0,Math.PI*2);ctx.fill();
-        });
-      }
-    }
-
-    // QR1 — 1OP QR code
-    var q1=document.getElementById('lqr1');
-    if(q1){
-      if(op1){
-        var c1=document.createElement('canvas');
-        q1.appendChild(c1);
-        var sz=Math.min(q1.clientWidth,q1.clientHeight)-8;
-        if(sz<20)sz=64;
-        try{QR.toCanvas(op1,c1,sz);c1.style.cssText='image-rendering:pixelated;display:block';}
-        catch(e){q1.insertAdjacentHTML('beforeend','<div style="font-size:8px;color:#999">QR ERR</div>');}
-      } else {
-        q1.insertAdjacentHTML('beforeend','<div style="font-size:9px;color:#bbb;text-align:center;line-height:1.4">NO<br>CNC</div>');
-      }
-    }
-
-    // QR2 — 2OP QR code
-    var q2=document.getElementById('lqr2');
-    if(q2){
-      if(op2){
-        var c2=document.createElement('canvas');
-        q2.appendChild(c2);
-        var sz2=Math.min(q2.clientWidth,q2.clientHeight)-8;
-        if(sz2<20)sz2=64;
-        try{QR.toCanvas(op2,c2,sz2);c2.style.cssText='image-rendering:pixelated;display:block';}
-        catch(e){}
-      } else {
-        q2.insertAdjacentHTML('beforeend','<div style="font-size:9px;color:#bbb;text-align:center;line-height:1.4">2OP<br>–</div>');
-      }
-    }
-
-  },60);
 }
 
 
@@ -4532,7 +4506,6 @@ function doPrint(){
         if (!rules) continue;
         for (var j=0; j<rules.length; j++){
           var r = rules[j].cssText;
-          // Only pull label-related rules to keep the new window clean
           if (/\.(lbl-outer|lc|lhdr|lqr|leb|lpanel|ldims|ldesc|lmat|lfull|lc-l)/.test(r)){
             css += r + '\n';
           }
@@ -4543,31 +4516,38 @@ function doPrint(){
 
   var title = (part && part.origName ? part.origName : 'label').replace(/[<>&"']/g,'_');
 
-  // Build the print document. @page sets paper to exactly 99x50mm so the
-  // Zebra driver knows the label size. body margin:0 so nothing shifts.
+  // Build the print document.
+  // @page: size must be declared in both orientations for browser compatibility.
+  // The `size: 99mm 50mm` form explicitly sets width × height (landscape).
+  // Body is absolute-sized to match so browser doesn't add a second page.
+  // Everything uses `overflow:hidden` to prevent accidental page breaks from
+  // a 1px overflow that would otherwise render as a blank page.
   var doc = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>'+esc(title)+'</title>' +
     '<style>' +
     '@page { size: 99mm 50mm; margin: 0; }' +
-    'html,body { margin:0; padding:0; background:#fff; }' +
-    'body { width:99mm; height:50mm; font-family:Arial,Helvetica,sans-serif; }' +
-    '.lbl-outer { width:99mm !important; height:50mm !important; border:none !important; }' +
+    'html, body { margin:0; padding:0; background:#fff; width:99mm; height:50mm; overflow:hidden; }' +
+    'body { font-family:Arial,Helvetica,sans-serif; -webkit-print-color-adjust:exact; print-color-adjust:exact; }' +
+    // Lock label to exact label dimensions, killing any accidental overflow.
+    '.lbl-outer { width:99mm !important; height:50mm !important; border:none !important; box-sizing:border-box; }' +
+    // Ensure QR/part SVGs fit their cells cleanly.
+    '.lqr svg, .lpanel svg { width:100% !important; height:100% !important; display:block; }' +
+    '.lc { box-sizing:border-box; }' +
     '@media print { .no-print { display:none !important; } }' +
     css +
     '</style></head><body>' +
-    '<div class="no-print" style="position:fixed;top:8px;right:8px;display:flex;gap:6px;font-family:sans-serif">' +
-      '<button onclick="window.print()" style="padding:6px 14px;background:#3D6B4F;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:12px">🖨 Print</button>' +
-      '<button onclick="window.close()" style="padding:6px 14px;background:#B84040;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:12px">Close</button>' +
+    '<div class="no-print" style="position:fixed;top:4px;right:4px;display:flex;gap:4px;font-family:sans-serif;z-index:999">' +
+      '<button onclick="window.print()" style="padding:4px 10px;background:#3D6B4F;color:#fff;border:none;border-radius:3px;cursor:pointer;font-size:11px">🖨 Print</button>' +
+      '<button onclick="window.close()" style="padding:4px 10px;background:#B84040;color:#fff;border:none;border-radius:3px;cursor:pointer;font-size:11px">Close</button>' +
     '</div>' +
     labelHtml +
     '<script>' +
-      // Give the browser a moment to lay out, then fire the print dialog
-      'window.addEventListener("load", function(){ setTimeout(function(){ window.print(); }, 250); });' +
-      // Close the window after the user dismisses the print dialog (print OR cancel)
+      'window.addEventListener("load", function(){ setTimeout(function(){ window.print(); }, 300); });' +
       'window.addEventListener("afterprint", function(){ setTimeout(function(){ window.close(); }, 300); });' +
     '<\/script>' +
     '</body></html>';
 
-  var w = window.open('', '_blank', 'width=520,height=320');
+  // Wider window so operator can see the landscape label before/after print dialog
+  var w = window.open('', '_blank', 'width=600,height=400');
   if (!w){
     pst.innerHTML = '<b style="color:#B84040">Popup blocked</b><br>' +
       '<span style="font-size:11px">Allow pop-ups for this page, then click Print again.</span>';
@@ -4578,8 +4558,7 @@ function doPrint(){
   w.document.close();
   pst.innerHTML = '<b style="color:#3D6B4F">✓ Print dialog opened</b><br>' +
     '<span style="font-size:11px;color:#6B6455">' +
-    'Pick <b>ZDesigner GK420d</b> in the dialog, then click Print.<br>' +
-    'Tip: in the print dialog, set <i>Margins: None</i> and <i>Scale: 100%</i> for best results.' +
+    'Pick <b>ZDesigner GK420d</b> → <b>Margins: None</b> → <b>Scale: 100%</b> → Print.' +
     '</span>';
 }
 // ── Save raw ZPL as a file — handled by existing saveZPL() at line ~4508 ──
