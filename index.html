@@ -4270,17 +4270,30 @@ function closeModal(){
 function restoreModalUI(){} // no longer needed
 
 // ── Helper: QR matrix → SVG string (print-safe, vector, no canvas) ──
+// Combines horizontal runs of black modules into a single <rect> to avoid
+// hairline gaps that appear between adjacent modules at low DPI.
 function qrToSVG(text, sizePx){
   try {
     var m = QR.encode(text);
     if(!m) return '';
     var qsize = m.length;
-    var scale = sizePx / qsize;
-    var s = '<svg xmlns="http://www.w3.org/2000/svg" width="'+sizePx+'" height="'+sizePx+'" viewBox="0 0 '+qsize+' '+qsize+'" shape-rendering="crispEdges" style="display:block">';
-    s += '<rect width="'+qsize+'" height="'+qsize+'" fill="#fff"/>';
+    // Quiet zone = 2 modules around the code (thermal printers need it)
+    var qz = 2;
+    var total = qsize + qz*2;
+    var s = '<svg xmlns="http://www.w3.org/2000/svg" width="'+sizePx+'" height="'+sizePx+'" viewBox="0 0 '+total+' '+total+'" shape-rendering="crispEdges" style="display:block">';
+    s += '<rect width="'+total+'" height="'+total+'" fill="#fff"/>';
+    // Scan each row, merge consecutive black modules into a single rect
     for (var r=0; r<qsize; r++){
-      for (var c=0; c<qsize; c++){
-        if (m[r][c]) s += '<rect x="'+c+'" y="'+r+'" width="1" height="1" fill="#000"/>';
+      var c = 0;
+      while (c < qsize){
+        if (m[r][c]){
+          var start = c;
+          while (c < qsize && m[r][c]) c++;
+          var run = c - start;
+          s += '<rect x="'+(start+qz)+'" y="'+(r+qz)+'" width="'+run+'" height="1" fill="#000"/>';
+        } else {
+          c++;
+        }
       }
     }
     s += '</svg>';
@@ -4498,92 +4511,172 @@ function saveZPL(){
   download('label.zpl', zpl, 'application/octet-stream');
 }
 // ═══════════════════════════════════════════════════════════════
-// doPrint — opens a new window with the label rendered at exactly
-// 97x48mm inside a 99x50mm page (1mm printer margin on all sides).
-// Everything sized in mm so scaling is predictable. Auto-triggers
-// the browser print dialog.
+// doPrint — opens a new window with the label built from scratch
+// using _labelPart data (NOT cloned from preview, because outerHTML
+// can mangle inline SVG namespaces). Uses several print-quality
+// tricks to minimize blur on thermal printers:
+//   1. Render SVGs fresh in the new window (not serialized via outerHTML)
+//   2. Use geometricPrecision text-rendering
+//   3. Force bold weights (thermal heads render thin weights poorly)
+//   4. Use shape-rendering:crispEdges on SVG strokes
+//   5. Encode QR at high module density
 // ═══════════════════════════════════════════════════════════════
 function doPrint(){
   var pst = document.getElementById('pst');
-  var preview = document.getElementById('lprev');
-  if(!preview){pst.innerHTML='<b style="color:#B84040">Label preview not found</b>';return;}
-  var part = _labelPart && _labelPart.part ? _labelPart.part : null;
-  var labelHtml = preview.outerHTML;
+  var p = _labelPart;
+  if (!p || !p.part){pst.innerHTML='<b style="color:#B84040">No part selected</b>';return;}
+  var part = p.part, eb = part.eb || {};
+  var lay = layouts[curSheet];
 
-  var title = (part && part.origName ? part.origName : 'label').replace(/[<>&"']/g,'_');
+  var dims = p.pw+'.0x'+p.ph+'.0x'+part.thick+'.0';
+  var sn   = part.origName.split('_').slice(0,3).join('_');
+  var op1  = part.op1||'';
+  var op2  = part.op2||'';
+  var hasCNC = part.hasCNC || op1.length>0;
+  var eb1=eb.eb1||'', eb2=eb.eb2||'', eb3=eb.eb3||'', eb4=eb.eb4||'';
 
-  // Print CSS uses MM UNITS EXPLICITLY so layout is exact at any DPI.
-  // Page: 99x50mm. Printable: 97x48mm (1mm margin). Grid totals:
-  //   Cols: 15mm QR1 | 4mm EBL | rest | 4mm EBR | 15mm QR2 = 38mm + center
-  //         (center = 97 - 38 = 59mm for panel strip)
-  //   Rows: 4 header | 4 ebTop | 7 panel1 | 7 panel2 | 7 panel3 | 7 panel4
-  //         | 4 ebBot | 4.5 dims | 3.5 matfull = 48mm
+  // Nesting index
+  var idx = 1;
+  if (lay && lay.placements) {
+    var i = lay.placements.indexOf(p);
+    if (i >= 0) idx = i + 1;
+  }
+
+  // Build SVGs fresh. They'll be inserted as HTML strings into the new doc,
+  // which ensures xmlns is preserved by the destination parser.
+  var panelSVG = partToSVG(p.pw, p.ph, hasCNC, idx);
+  var qr1SVG   = op1 ? qrToSVG(op1, 200) : '';
+  var qr2SVG   = op2 ? qrToSVG(op2, 200) : '';
+
+  var title = (part.origName || 'label').replace(/[<>&"']/g,'_');
+
+  // ── Label HTML built from scratch — independent of preview DOM ──
+  // Using explicit spans/divs so no data is lost in serialization.
+  var labelHtml =
+    '<div class="lbl-outer">' +
+      // Row 1: 1OP header | op1 ID | 2OP header
+      '<div class="lc lhdr">1OP</div>' +
+      '<div class="lc lhdr hdr-id">'+esc(op1||'–')+'</div>' +
+      '<div class="lc lhdr">2OP</div>' +
+      // QR1 (rowspan 6)
+      '<div class="lc lqr lqr-1">' +
+        (qr1SVG ? qr1SVG : '<div class="lqr-empty">NO<br>CNC</div>') +
+      '</div>' +
+      // EBL (rowspan 6)
+      '<div class="lc leb">'+esc(eb1)+'</div>' +
+      // EB-top
+      '<div class="lc leb-top">'+esc(eb2)+'</div>' +
+      // Panel (rowspan 4)
+      '<div class="lc lpanel">'+panelSVG+'</div>' +
+      // EB-bot
+      '<div class="lc leb-bot">'+esc(eb3)+'</div>' +
+      // EBR (rowspan 6)
+      '<div class="lc leb">'+esc(eb4)+'</div>' +
+      // QR2 (rowspan 6)
+      '<div class="lc lqr lqr-2">' +
+        (qr2SVG ? qr2SVG : '<div class="lqr-empty">2OP<br>–</div>') +
+      '</div>' +
+      // Row 8: dims | short name
+      '<div class="lc ldims lc-l">'+esc(dims)+'</div>' +
+      '<div class="lc ldesc">'+esc(sn)+'</div>' +
+      // Row 9: material | full name
+      '<div class="lc lmat lc-l">'+esc('MAT: '+(part.mat||''))+'</div>' +
+      '<div class="lc lfull lc-l">'+esc(part.origName||'')+'</div>' +
+    '</div>';
+
+  // Print CSS in mm units. High-quality hints applied throughout.
   var printCSS = [
     '@page { size: 99mm 50mm; margin: 0; }',
     'html, body { margin:0; padding:0; background:#fff; width:99mm; height:50mm; overflow:hidden; }',
-    'body { font-family:Arial,Helvetica,sans-serif; -webkit-print-color-adjust:exact; print-color-adjust:exact; color:#000; }',
-    // Wrapper centers the label with 1mm printer-safe margin
+    'body {',
+    '  font-family: Arial, "Helvetica Neue", Helvetica, sans-serif;',
+    '  color:#000;',
+    '  -webkit-print-color-adjust:exact;',
+    '  print-color-adjust:exact;',
+    '  text-rendering: geometricPrecision;',
+    '  -webkit-font-smoothing: none;',
+    '  font-smooth: never;',
+    '}',
+    // Wrapper = printable area (1mm printer-safe margin inside 99x50 page)
     '.print-wrap { width:97mm; height:48mm; margin:1mm; position:relative; }',
-    // Override the main label CSS with mm-based sizing
-    '.print-wrap .lbl-outer {',
-    '  width:97mm !important; height:48mm !important;',
-    '  border:0.2mm solid #000 !important;',
-    '  display:grid !important;',
-    '  grid-template-columns: 15mm 3.5mm 1fr 3.5mm 15mm !important;',
-    '  grid-template-rows: 4mm 3.5mm 1fr 1fr 1fr 1fr 3.5mm 5mm 4mm !important;',
-    '  font-size: 2.5mm !important;',
-    '  box-sizing: border-box !important;',
-    '  gap: 0 !important;',
+    // Grid: 5 cols × 9 rows, all mm
+    '.lbl-outer {',
+    '  width:97mm; height:48mm;',
+    '  border:0.3mm solid #000;',
+    '  display:grid;',
+    '  grid-template-columns: 16mm 3mm 1fr 3mm 16mm;',
+    '  grid-template-rows: 4mm 3mm 1fr 1fr 1fr 1fr 3mm 5mm 4mm;',
+    '  box-sizing:border-box;',
+    '  gap:0;',
+    '  background:#fff;',
     '}',
-    '.print-wrap .lc {',
-    '  border:0.15mm solid #888 !important;',
-    '  padding:0.3mm !important;',
-    '  overflow:hidden !important;',
-    '  box-sizing:border-box !important;',
-    '  display:flex !important;',
-    '  align-items:center !important;',
-    '  justify-content:center !important;',
-    '  text-align:center !important;',
-    '  line-height:1.15 !important;',
-    '  word-break:break-word !important;',
+    '.lc {',
+    '  border:0.25mm solid #000;',
+    '  padding:0.4mm;',
+    '  overflow:hidden;',
+    '  box-sizing:border-box;',
+    '  display:flex;',
+    '  align-items:center;',
+    '  justify-content:center;',
+    '  text-align:center;',
+    '  line-height:1.1;',
+    '  word-break:break-word;',
+    '  font-weight:700;', // force bold — thin weights blur on thermal
     '}',
-    '.print-wrap .lc-l { justify-content:flex-start !important; text-align:left !important; padding-left:1mm !important; }',
-    // Headers and readable cells — bigger text, bold
-    '.print-wrap .lhdr { font-size:2.8mm !important; font-weight:700 !important; border:0.2mm solid #000 !important; }',
-    // Edgebands — vertical text on sides
-    '.print-wrap .leb { font-size:2mm !important; font-weight:700 !important; writing-mode:vertical-lr !important; transform:rotate(180deg) !important; letter-spacing:0.2mm !important; text-decoration:underline !important; }',
-    '.print-wrap .leb-top, .print-wrap .leb-bot { font-size:2mm !important; font-weight:700 !important; text-decoration:underline !important; }',
-    // Panel + QR cells
-    '.print-wrap .lpanel { background:#fff !important; padding:0.5mm !important; }',
-    '.print-wrap .lpanel svg { width:100% !important; height:100% !important; display:block !important; }',
-    '.print-wrap .lqr { background:#fff !important; padding:0.5mm !important; position:relative !important; }',
-    '.print-wrap .lqr svg { width:100% !important; height:100% !important; display:block !important; }',
-    // Green corner triangle (QR cell decoration, matches SWOOD reference)
-    '.print-wrap .lqr::before { content:""; position:absolute; top:0; right:0; width:0; height:0; border-style:solid; border-width:0 2.5mm 2.5mm 0; border-color:transparent #2e7d32 transparent transparent; }',
-    // Bottom info rows — larger, readable
-    '.print-wrap .ldims { font-size:3mm !important; font-weight:700 !important; }',
-    '.print-wrap .ldesc { font-size:3mm !important; font-weight:700 !important; }',
-    '.print-wrap .lmat  { font-size:2.3mm !important; font-weight:700 !important; }',
-    '.print-wrap .lfull { font-size:2mm !important; font-weight:500 !important; }',
-    '@media screen { .no-print { display:flex !important; } }',
+    '.lc-l { justify-content:flex-start; text-align:left; padding-left:1mm; }',
+    // Header
+    '.lhdr { font-size:2.8mm; border:0.3mm solid #000; }',
+    '.hdr-id { grid-column: span 3; justify-content:flex-start; padding-left:1.2mm; font-size:2.6mm; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }',
+    // QR cells
+    '.lqr { grid-row: span 6; background:#fff; padding:0.8mm; position:relative; }',
+    '.lqr svg { width:100%; height:100%; display:block; }',
+    '.lqr-empty { font-size:2.2mm; color:#aaa; text-align:center; line-height:1.2; }',
+    '.lqr::before {',
+    '  content:"";',
+    '  position:absolute; top:0; right:0;',
+    '  width:0; height:0;',
+    '  border-style:solid;',
+    '  border-width:0 3mm 3mm 0;',
+    '  border-color:transparent #000 transparent transparent;', // black on thermal (no color)
+    '}',
+    // Edgebands (vertical sides)
+    '.leb {',
+    '  grid-row: span 6;',
+    '  font-size:2.2mm;',
+    '  writing-mode: vertical-lr;',
+    '  transform: rotate(180deg);',
+    '  letter-spacing:0.3mm;',
+    '  text-decoration:underline;',
+    '}',
+    '.leb-top, .leb-bot { font-size:2.2mm; text-decoration:underline; }',
+    // Panel (part image)
+    '.lpanel { grid-row: span 4; background:#fff; padding:0.5mm; }',
+    '.lpanel svg { width:100%; height:100%; display:block; }',
+    // Bottom rows
+    '.ldims { grid-column: span 2; font-size:3.2mm; }',
+    '.ldesc { grid-column: span 3; font-size:3mm; }',
+    '.lmat  { grid-column: span 2; font-size:2.4mm; }',
+    '.lfull { grid-column: span 3; font-size:2mm; font-weight:600; }',
+    // Screen-only UI
+    '@media screen { body { padding:8mm; background:#eee; } .print-wrap { box-shadow:0 4px 16px rgba(0,0,0,.2); background:#fff; } }',
     '@media print { .no-print { display:none !important; } }'
   ].join('\n');
 
   var doc = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>'+esc(title)+'</title>' +
     '<style>'+printCSS+'</style>' +
     '</head><body>' +
-    '<div class="no-print" style="position:fixed;top:4px;right:4px;display:flex;gap:4px;font-family:sans-serif;z-index:999">' +
-      '<button onclick="window.print()" style="padding:4px 10px;background:#3D6B4F;color:#fff;border:none;border-radius:3px;cursor:pointer;font-size:11px">🖨 Print</button>' +
-      '<button onclick="window.close()" style="padding:4px 10px;background:#B84040;color:#fff;border:none;border-radius:3px;cursor:pointer;font-size:11px">Close</button>' +
+    '<div class="no-print" style="position:fixed;top:6px;right:6px;display:flex;gap:5px;font-family:sans-serif;z-index:999">' +
+      '<button onclick="window.print()" style="padding:5px 12px;background:#3D6B4F;color:#fff;border:none;border-radius:3px;cursor:pointer;font-size:12px;font-weight:600">🖨 Print</button>' +
+      '<button onclick="window.close()" style="padding:5px 12px;background:#B84040;color:#fff;border:none;border-radius:3px;cursor:pointer;font-size:12px">Close</button>' +
     '</div>' +
     '<div class="print-wrap">' + labelHtml + '</div>' +
     '<script>' +
-      'window.addEventListener("load", function(){ setTimeout(function(){ window.print(); }, 400); });' +
-      'window.addEventListener("afterprint", function(){ setTimeout(function(){ window.close(); }, 300); });' +
+      'window.addEventListener("load", function(){ setTimeout(function(){ window.print(); }, 500); });' +
+      'window.addEventListener("afterprint", function(){ setTimeout(function(){ window.close(); }, 400); });' +
     '<\/script>' +
     '</body></html>';
 
-  var w = window.open('', '_blank', 'width=700,height=440');
+  var w = window.open('', '_blank', 'width=760,height=500');
   if (!w){
     pst.innerHTML = '<b style="color:#B84040">Popup blocked</b><br>' +
       '<span style="font-size:11px">Allow pop-ups for this page, then click Print again.</span>';
