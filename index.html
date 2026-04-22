@@ -523,11 +523,11 @@ body.print-mode{background:#fff}
 <div class="mdl">
   <h3>🏷 <span id="mname"></span></h3>
   <div class="lw">
-    <div style="font-size:9px;color:#888;margin-bottom:5px">Zebra LP2824 · 99×50mm</div>
+    <div style="font-size:9px;color:#888;margin-bottom:5px">Zebra (ZPL) · 99×50mm · 203dpi</div>
     <div class="lbl-outer" id="lprev"></div>
   </div>
   <div class="zp" id="zpl"></div>
-  <div style="margin-bottom:10px"><label class="fl">Printer name (as shown in Windows Devices & Printers)</label><input id="prn" value="ZDesigner LP 2824 (ZPL)"></div>
+  <div style="margin-bottom:10px"><label class="fl">Printer name (as shown in Windows Devices & Printers)</label><input id="prn" value="ZDesignerLP2824Z"></div>
   <div style="display:flex;gap:6px;margin-bottom:6px">
     <button class="btn bp" onclick="doPrint()" style="flex:1">🖨 Print</button>
     <button class="btn bs" onclick="saveZPL()" title="Save the ZPL as a file">💾 .zpl</button>
@@ -4544,8 +4544,8 @@ function doPrint(){
 //  3. Registers the .zpl file extension to open with the helper.
 // After running once, every downloaded .zpl prints on double-click.
 function buildPrinterSetupScript(printerFriendlyName,shareName){
-  var p=(printerFriendlyName||'ZDesigner LP 2824 (ZPL)').replace(/"/g,'');
-  var s=(shareName||'ZebraLP2824').replace(/[^A-Za-z0-9_\-]/g,'');
+  var p=(printerFriendlyName||'ZDesignerLP2824Z').replace(/"/g,'');
+  var s=(shareName||'ZebraLabel').replace(/[^A-Za-z0-9_\-]/g,'');
   var lines=[
     '@echo off',
     'setlocal',
@@ -4615,7 +4615,7 @@ function buildPrinterSetupScript(printerFriendlyName,shareName){
 }
 function openPrinterSetup(){
   var pst=document.getElementById('pst');
-  var p=(document.getElementById('prn').value||'ZDesigner LP 2824 (ZPL)').trim();
+  var p=(document.getElementById('prn').value||'ZDesignerLP2824Z').trim();
   // Derive a safe share name from the printer name
   var share=p.replace(/[^A-Za-z0-9_\-]/g,'').substring(0,16)||'ZebraLabel';
   var cmd=buildPrinterSetupScript(p,share);
