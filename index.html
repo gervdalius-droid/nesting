@@ -4536,66 +4536,143 @@ function doPrint(){
 }
 // ── One-time Windows setup generator ─────────────────────────────────────
 // Generates a self-contained Windows installer (.cmd) the operator runs once
-// on their shop PC. The installer:
-//  1. Creates C:\FabFlow\fabflow-print.cmd — a helper that raw-copies its
-//     argument to the shared Zebra printer.
-//  2. Shares the local Zebra printer (configurable name) so `copy /B ...`
-//     can address it via \\localhost\<share>.
-//  3. Registers the .zpl file extension to open with the helper.
-// After running once, every downloaded .zpl prints on double-click.
+// on their shop PC. The installer sets up a BACKGROUND WATCHER:
+//  1. Shares the local Zebra printer so raw bytes can be sent to it.
+//  2. Writes C:\FabFlow\watcher.ps1 — a PowerShell script that watches the
+//     user's Downloads folder for new .zpl files and sends them to the
+//     shared printer automatically, then deletes the file.
+//  3. Registers the watcher as a scheduled task that runs on user login,
+//     hidden, so it's always on.
+//  4. Starts the watcher immediately so the user doesn't need to reboot.
+// After running once, every downloaded .zpl prints automatically — no clicks.
+//
+// To avoid cmd.exe quote-escaping hell, the watcher PS1 is base64-encoded
+// and decoded inside a PowerShell one-liner.
 function buildPrinterSetupScript(printerFriendlyName,shareName){
   var p=(printerFriendlyName||'ZDesigner GK420d').replace(/"/g,'');
   var s=(shareName||'ZebraGK420d').replace(/[^A-Za-z0-9_\-]/g,'');
+
+  // PowerShell watcher body — clean, no escaping needed here.
+  var ps = [
+    '# FabFlow auto-print watcher',
+    '$ErrorActionPreference = "SilentlyContinue"',
+    '$share = "\\\\localhost\\' + s + '"',
+    '$dl    = [Environment]::GetFolderPath("UserProfile") + "\\Downloads"',
+    '$log   = "C:\\FabFlow\\watcher.log"',
+    '',
+    'function Write-Log($msg) {',
+    '  $ts = Get-Date -Format "yyyy-MM-dd HH:mm:ss"',
+    '  Add-Content -Path $log -Value "$ts  $msg"',
+    '}',
+    '',
+    'function Send-ToPrinter($file) {',
+    '  # Retry up to 8 times over ~4 sec in case the browser is still writing.',
+    '  for ($i=0; $i -lt 8; $i++) {',
+    '    Start-Sleep -Milliseconds 500',
+    '    if (-not (Test-Path $file)) { return }',
+    '    try {',
+    '      # Raw binary copy to the shared printer — preserves ZPL bytes',
+    '      $res = cmd /c "copy /B `"$file`" `"$share`" 2>&1"',
+    '      if ($LASTEXITCODE -eq 0) {',
+    '        Write-Log "PRINTED: $file"',
+    '        Remove-Item -Path $file -Force -ErrorAction SilentlyContinue',
+    '        return',
+    '      }',
+    '    } catch { }',
+    '  }',
+    '  Write-Log "FAILED: $file (share $share unreachable or file locked)"',
+    '}',
+    '',
+    'Write-Log "Watcher started. Watching: $dl  Printer share: $share"',
+    '',
+    '# Process any .zpl files already sitting in Downloads at startup',
+    'Get-ChildItem -Path $dl -Filter "*.zpl" -File -ErrorAction SilentlyContinue | ForEach-Object {',
+    '  Send-ToPrinter $_.FullName',
+    '}',
+    '',
+    '$fsw = New-Object System.IO.FileSystemWatcher $dl, "*.zpl"',
+    '$fsw.IncludeSubdirectories = $false',
+    '$fsw.EnableRaisingEvents = $true',
+    '',
+    'Register-ObjectEvent -InputObject $fsw -EventName "Created" -Action {',
+    '  Send-ToPrinter $Event.SourceEventArgs.FullPath',
+    '} | Out-Null',
+    '',
+    '# Browsers sometimes download as .zpl.crdownload then rename — catch the rename too',
+    'Register-ObjectEvent -InputObject $fsw -EventName "Renamed" -Action {',
+    '  Send-ToPrinter $Event.SourceEventArgs.FullPath',
+    '} | Out-Null',
+    '',
+    'while ($true) { Start-Sleep -Seconds 60 }'
+  ].join('\n');
+
+  // PowerShell's -EncodedCommand expects UTF-16 LE base64.
+  // We build a UTF-16 LE byte array in JS then base64 it.
+  function toUtf16LeBase64(str){
+    var bytes = [];
+    for (var i=0; i<str.length; i++){
+      var c = str.charCodeAt(i);
+      bytes.push(c & 0xff, (c >> 8) & 0xff);
+    }
+    // btoa needs a binary string
+    var bin = '';
+    for (var j=0; j<bytes.length; j++) bin += String.fromCharCode(bytes[j]);
+    return btoa(bin);
+  }
+  var psB64 = toUtf16LeBase64(ps);
+
+  // The .cmd file. It:
+  //  - self-elevates to admin
+  //  - shares the printer
+  //  - writes watcher.ps1 by decoding our base64 inside PS
+  //  - registers a scheduled task to run watcher.ps1 on login
+  //  - launches the watcher immediately
   var lines=[
     '@echo off',
     'setlocal',
-    'title FabFlow label-print setup',
+    'title FabFlow auto-print setup',
     'echo.',
     'echo ====================================================================',
-    'echo  FabFlow  ^|  Zebra label printer one-time setup',
+    'echo  FabFlow  ^|  Zebra auto-print setup',
     'echo ====================================================================',
     'echo.',
-    'echo This script needs administrator rights. If a prompt appears, click Yes.',
+    'echo This installs a background watcher that auto-prints .zpl labels',
+    'echo from your Downloads folder. Runs once per PC.',
     'echo.',
-    // Self-elevate if not admin
+    'echo Administrator rights required. Click Yes if prompted.',
+    'echo.',
     'net session >nul 2>&1',
     'if %errorLevel% neq 0 (',
     '  echo Re-launching as administrator...',
     '  powershell -Command "Start-Process \'%~f0\' -Verb RunAs"',
     '  exit /b',
     ')',
-    'echo.',
-    'echo Step 1/3 - Creating helper script...',
+    '',
+    'echo Step 1/5 - Creating C:\\FabFlow folder...',
     'if not exist "C:\\FabFlow" mkdir "C:\\FabFlow"',
-    // The helper: takes a .zpl path as %1 and raw-copies to the shared printer.
-    // "copy /B" sends bytes unmodified, which is what thermal printers need.
-    '> "C:\\FabFlow\\fabflow-print.cmd" (',
-    '  echo @echo off',
-    '  echo if "%%~1"=="" goto :eof',
-    '  echo copy /B "%%~1" "\\\\localhost\\'+s+'" ^>nul 2^>^&1',
-    '  echo if errorlevel 1 (',
-    '  echo   echo FabFlow: print failed. Printer share "\\\\localhost\\'+s+'" not reachable.',
-    '  echo   timeout /t 4 ^>nul',
-    '  echo   exit /b 1',
-    '  echo ^)',
-    '  echo exit /b 0',
-    ')',
     'echo   OK',
     '',
-    'echo Step 2/3 - Sharing Zebra printer as "'+s+'"...',
-    // Share the printer. If the printer name has spaces, we need quoting.
-    'rundll32 printui.dll,PrintUIEntry /Xs /n "'+p+'" attributes +shared sharename "'+s+'" >nul 2>&1',
-    'if errorlevel 1 (',
-    '  echo   WARNING: Could not share printer "'+p+'".',
-    '  echo   Check the exact printer name in Control Panel -^> Devices and Printers.',
-    '  echo   Edit this script at the top if needed.',
-    ') else (',
-    '  echo   OK',
-    ')',
+    'echo Step 2/5 - Sharing Zebra printer as "'+s+'"...',
+    'rundll32 printui.dll,PrintUIEntry /Xs /n "'+p+'" attributes +shared sharename "'+s+'"',
+    'timeout /t 2 >nul',
+    'echo   OK (if printer name matches Windows exactly)',
     '',
-    'echo Step 3/3 - Registering .zpl file type...',
-    'assoc .zpl=FabFlowLabel >nul',
-    'ftype FabFlowLabel="C:\\FabFlow\\fabflow-print.cmd" "%%1" >nul',
+    'echo Step 3/5 - Writing watcher script...',
+    // Decode base64 → UTF-16 string → save to watcher.ps1
+    'powershell -NoProfile -Command "[IO.File]::WriteAllText(\'C:\\FabFlow\\watcher.ps1\', [Text.Encoding]::Unicode.GetString([Convert]::FromBase64String(\''+psB64+'\')))"',
+    'if exist "C:\\FabFlow\\watcher.ps1" (echo   OK) else (echo   FAILED to write watcher.ps1 & pause & exit /b 1)',
+    '',
+    'echo Step 4/5 - Registering auto-start task (runs on login)...',
+    // Stop any existing watcher first so we don't have duplicates
+    'taskkill /F /FI "WINDOWTITLE eq FabFlow-Watcher*" >nul 2>&1',
+    'schtasks /Delete /TN "FabFlow-AutoPrint" /F >nul 2>&1',
+    'schtasks /Create /TN "FabFlow-AutoPrint" /TR "powershell.exe -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File C:\\FabFlow\\watcher.ps1" /SC ONLOGON /RL LIMITED /F',
+    'echo   OK',
+    '',
+    'echo Step 5/5 - Launching watcher now...',
+    // Launch detached so the cmd window can close
+    'start "FabFlow-Watcher" /B powershell.exe -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File C:\\FabFlow\\watcher.ps1',
+    'timeout /t 2 >nul',
     'echo   OK',
     '',
     'echo.',
@@ -4603,11 +4680,14 @@ function buildPrinterSetupScript(printerFriendlyName,shareName){
     'echo  Setup complete.',
     'echo ====================================================================',
     'echo.',
+    'echo  The watcher is now running in the background.',
     'echo  From now on:',
-    'echo    - Downloaded .zpl files from FabFlow print automatically.',
-    'echo    - Make sure the Zebra is plugged in and powered on.',
+    'echo    - Click Print in FabFlow',
+    'echo    - Label prints within 1-2 seconds',
+    'echo    - The .zpl file is deleted after printing',
     'echo.',
-    'echo  Test: download a label from FabFlow and open it.',
+    'echo  Log file:   C:\\FabFlow\\watcher.log',
+    'echo  Disable:    schtasks /Delete /TN "FabFlow-AutoPrint" /F',
     'echo.',
     'pause'
   ];
@@ -4619,15 +4699,15 @@ function openPrinterSetup(){
   // Derive a safe share name from the printer name
   var share=p.replace(/[^A-Za-z0-9_\-]/g,'').substring(0,16)||'ZebraLabel';
   var cmd=buildPrinterSetupScript(p,share);
-  download('FabFlow-printer-setup.cmd',cmd,'application/octet-stream');
+  download('FabFlow-autoprint-setup.cmd',cmd,'application/octet-stream');
   pst.innerHTML=
-    '<b style="color:#3D6B4F">✓ FabFlow-printer-setup.cmd downloaded</b>'+
+    '<b style="color:#3D6B4F">✓ FabFlow-autoprint-setup.cmd downloaded</b>'+
     '<div style="font-size:11px;color:#6B6455;margin-top:4px;line-height:1.6">'+
-    '<b>Instructions (one time per shop PC):</b><br>'+
-    '1. Open the Downloads folder<br>'+
-    '2. Right-click <b>FabFlow-printer-setup.cmd</b> → <b>Run as administrator</b><br>'+
-    '3. Click Yes on the UAC prompt, press any key when it finishes<br>'+
-    '4. Come back here and click Print again — the label will print automatically.'+
+    '<b>One-time setup for auto-printing:</b><br>'+
+    '1. Open your Downloads folder<br>'+
+    '2. Right-click <b>FabFlow-autoprint-setup.cmd</b> → <b>Run as administrator</b><br>'+
+    '3. Click Yes on the UAC prompt, wait for "Setup complete", press any key<br>'+
+    '4. From now on, clicking Print auto-prints (label prints in ~1 sec)'+
     '</div>';
 }
 </script>
