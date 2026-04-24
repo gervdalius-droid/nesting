@@ -125,6 +125,18 @@ input[type=color]{padding:2px 3px;height:27px;cursor:pointer}
 .pli-qty{font-family:monospace;color:#3D6B4F;font-size:10px;font-weight:600;min-width:22px;text-align:right}
 .pli-x{border:none;background:transparent;color:#B84040;cursor:pointer;font-size:14px;padding:0 2px;line-height:1;opacity:.55}
 .pli-x:hover{opacity:1}
+/* Print-status indicator for each parts-list row */
+.pli-print{font-family:monospace;font-size:10px;font-weight:700;min-width:26px;text-align:center;padding:0 3px;border-radius:3px;flex-shrink:0}
+.pli-print.done{color:#3D6B4F;background:#E4EDE3}
+.pli-print.pending{color:#C0BAA8;background:transparent}
+.pli-print.partial{color:#8a6d1a;background:#F5EEDC}
+/* Rotation lock indicator */
+.pli-rot{font-size:11px;flex-shrink:0;cursor:pointer;opacity:.6;padding:0 2px;user-select:none;line-height:1}
+.pli-rot:hover{opacity:1}
+.pli-rot.free{color:#3D6B4F}
+.pli-rot.lock{color:#8a6d1a}
+.pli.pli-done{opacity:.7}
+.pli.pli-done .pli-name{text-decoration:line-through;text-decoration-color:#3D6B4F80}
 @keyframes pliFlash{0%{background:#fff6cc;border-color:#E8C547}100%{background:#FDFCF9;border-color:transparent}}
 .pli.flash{animation:pliFlash 1.2s ease-out}
 
@@ -146,6 +158,20 @@ input[type=color]{padding:2px 3px;height:27px;cursor:pointer}
   grid-template-rows:24px 22px 30px 30px 30px 30px 22px 26px 22px;
   width:100%;font-size:9px;
   border-collapse:collapse;
+}
+/* Simple label preview (non-xlsm parts) — fills width, keeps 99:50 aspect */
+.lbl-outer.simple{
+  display:block;
+  grid-template-columns:none;
+  grid-template-rows:none;
+  aspect-ratio:99 / 50;
+  padding:0;
+  overflow:hidden;
+}
+.lbl-outer.simple svg{
+  width:100%;
+  height:100%;
+  display:block;
 }
 .lc{border:.5px solid #aaa;display:flex;align-items:center;justify-content:center;overflow:hidden;padding:1px 3px;line-height:1.3;text-align:center;word-break:break-all}
 .lc-l{justify-content:flex-start;text-align:left;padding-left:4px}
@@ -193,6 +219,9 @@ input[type=color]{padding:2px 3px;height:27px;cursor:pointer}
 .pw-edit{width:100%;padding:2px 4px;font-size:11px;border:1px solid transparent;background:transparent;border-radius:3px;outline:none;font-family:inherit;color:inherit}
 .pw-edit:hover{border-color:#D4CFC2;background:#fff}
 .pw-edit:focus{border-color:#3D6B4F;background:#fff;box-shadow:0 0 0 2px #3D6B4F22}
+.pw-swap-btn{border:1px solid #C0BAA8;background:#FDFCF9;color:#3D6B4F;font-size:13px;font-weight:600;padding:1px 5px;border-radius:3px;cursor:pointer;line-height:1}
+.pw-swap-btn:hover{background:#3D6B4F;color:#fff;border-color:#3D6B4F}
+.pw-edit-qty{font-weight:600;text-align:center}
 .pw-edit-num{font-family:monospace;color:#3D6B4F;font-weight:600;max-width:72px;text-align:right}
 .pw-edit-t{max-width:56px;color:#6B6455;font-weight:400}
 .pw-edit-name{font-weight:500}
@@ -223,9 +252,11 @@ body.print-mode .pw-overlay,body.print-mode .ga-panel,body.print-mode .dxf-overl
 body.print-mode .hist-overlay{display:none!important}
 body.print-mode .print-root{display:block}
 body.print-mode{background:#fff}
-.pp{page-break-after:always;padding:14mm 12mm;min-height:270mm;box-sizing:border-box;position:relative}
+.pp{page-break-after:always;page-break-inside:avoid;break-inside:avoid;padding:12mm 10mm;
+    width:210mm;height:297mm;box-sizing:border-box;position:relative;overflow:hidden;
+    display:flex;flex-direction:column}
 .pp:last-child{page-break-after:auto}
-.pp-head{display:flex;align-items:center;gap:10px;border-bottom:2px solid #1C1A14;padding-bottom:8px;margin-bottom:10px}
+.pp-head{display:flex;align-items:center;gap:10px;border-bottom:2px solid #1C1A14;padding-bottom:8px;margin-bottom:10px;flex-shrink:0}
 .pp-head img{width:34px;height:34px;object-fit:contain}
 .pp-head .pp-brand{font-weight:700;font-size:13px}
 .pp-head .pp-title{font-size:16px;font-weight:600;flex:1;text-align:center}
@@ -241,6 +272,31 @@ body.print-mode{background:#fff}
 .pp table.ppt td{padding:3px 6px;border:1px solid #D4CFC2;vertical-align:top}
 .pp table.ppt td.num{font-family:monospace;text-align:right}
 .pp table.ppt tr:nth-child(even) td{background:#FBFAF6}
+/* Sheet pages: flex layout so the SVG shrinks and the table takes what's left */
+.pp.sheet-page{display:flex;flex-direction:column}
+.pp.sheet-page > h1{flex-shrink:0}
+.pp.sheet-page .pp-sheet-svg{flex-shrink:1;text-align:center;margin:6px 0 4px;max-height:95mm;overflow:hidden}
+.pp.sheet-page .pp-sheet-svg svg{max-width:100%;max-height:95mm;width:auto;height:auto}
+.pp.sheet-page .sheet-specs{flex-shrink:0}
+.pp.sheet-page .pp-parts-wrap{flex:1 1 auto;min-height:0;overflow:hidden;position:relative}
+/* Density tiers — kick in based on how many parts are on the sheet.
+   The available vertical space for the table after header/SVG/specs is ~80mm.
+   Roughly: default ≈ 4mm/row, dense ≈ 3mm/row, ultra ≈ 2.3mm/row, nano ≈ 1.9mm/row. */
+.pp.sheet-page.dense table.ppt{font-size:8px}
+.pp.sheet-page.dense table.ppt th{padding:1px 4px;font-size:7.5px}
+.pp.sheet-page.dense table.ppt td{padding:0 4px}
+.pp.sheet-page.dense .pp-sheet-svg{max-height:85mm}
+.pp.sheet-page.dense .pp-sheet-svg svg{max-height:85mm}
+.pp.sheet-page.ultra-dense table.ppt{font-size:7px;line-height:1.1}
+.pp.sheet-page.ultra-dense table.ppt th{padding:1px 3px;font-size:7px}
+.pp.sheet-page.ultra-dense table.ppt td{padding:0 3px}
+.pp.sheet-page.ultra-dense .pp-sheet-svg{max-height:70mm}
+.pp.sheet-page.ultra-dense .pp-sheet-svg svg{max-height:70mm}
+.pp.sheet-page.nano-dense table.ppt{font-size:6px;line-height:1.05}
+.pp.sheet-page.nano-dense table.ppt th{padding:0 3px;font-size:6px}
+.pp.sheet-page.nano-dense table.ppt td{padding:0 3px}
+.pp.sheet-page.nano-dense .pp-sheet-svg{max-height:60mm}
+.pp.sheet-page.nano-dense .pp-sheet-svg svg{max-height:60mm}
 .pp .sheet-block{display:flex;gap:10px;margin-top:10px;align-items:flex-start}
 .pp .sheet-svg-wrap{flex:0 0 auto}
 .pp .sheet-side{flex:1;min-width:0;font-size:9px}
@@ -248,7 +304,7 @@ body.print-mode{background:#fff}
 .pp .sheet-specs .row{display:flex;justify-content:space-between;gap:8px}
 .pp .sheet-specs .row b{color:#3D6B4F}
 .pp .note{font-size:9px;color:#6B6455;margin-top:6px;font-style:italic}
-.pp .footer{position:absolute;bottom:6mm;left:12mm;right:12mm;display:flex;justify-content:space-between;font-size:8px;color:#A09888;border-top:1px solid #EAE6DC;padding-top:4px}
+.pp .footer{position:absolute;bottom:4mm;left:10mm;right:10mm;display:flex;justify-content:space-between;font-size:8px;color:#A09888;border-top:1px solid #EAE6DC;padding-top:3px;flex-shrink:0}
 .pp .scalebar{display:inline-block;font-size:8px;color:#6B6455;margin-top:4px}
 .pp .scalebar .bar{display:inline-block;height:3px;background:#1C1A14;vertical-align:middle;margin-right:4px}
 .pp svg.sheet-svg text{font-family:sans-serif}
@@ -329,7 +385,10 @@ body.print-mode{background:#fff}
   </div>
   <div style="flex:1;min-height:120px;display:flex;flex-direction:column">
     <div style="display:flex;align-items:center;gap:4px;margin-bottom:5px">
-      <div class="sec" style="margin:0;flex:1"><span data-i18n="parts">Parts</span> (<span id="pc">0</span>)</div>
+      <div class="sec" style="margin:0;flex:1;display:flex;align-items:center;gap:6px">
+        <span data-i18n="parts">Parts</span> (<span id="pc">0</span>)
+        <span id="pc-printed" style="display:none;font-size:11px;font-weight:600;padding:1px 6px;border-radius:8px;background:#F2EFE8;cursor:pointer" onclick="resetPrintStatus()" title="Click to reset all print status"></span>
+      </div>
       <button class="btn bs br" onclick="clearAllParts()" id="btn-clear-parts" data-i18n="clearBtn" style="display:none">Clear</button>
       <button class="btn bs" onclick="openPartsWindow()" data-i18n="manageBtn" style="color:#3D6B4F;border-color:#3D6B4F">📋 Manage</button>
     </div>
@@ -337,7 +396,20 @@ body.print-mode{background:#fff}
       <div id="pempty" data-i18n="noParts" style="font-size:11px;color:#A09888;text-align:center;padding:14px 8px">No parts yet — add one above<br>or import a file</div>
     </div>
   </div>
-  <button class="btn bp" onclick="optimize()" data-i18n="optimize" style="width:100%;padding:9px;font-size:13px;margin-top:auto">▶ Optimize &amp; Cut</button>
+  <!-- Version selector — appears when at least one layout snapshot exists.
+       Lets operator switch between saved layout versions and save new ones. -->
+  <div id="ver-bar" style="display:none;margin-top:6px;padding:6px 7px;background:#F2EFE8;border:1px solid #D4CFC2;border-radius:6px;font-size:11px">
+    <div style="display:flex;align-items:center;gap:5px;margin-bottom:4px">
+      <span style="color:#6B6455;font-weight:600">📚 Version:</span>
+      <select id="ver-sel" onchange="restoreVersion(this.value)" style="flex:1;min-width:0;font-size:11px;padding:2px 4px"></select>
+      <button class="btn bs" onclick="saveAsVersion()" title="Save current layout as a named version" style="padding:2px 6px;font-size:10px">💾 Save as…</button>
+    </div>
+    <div id="ver-hint" style="font-size:10px;color:#A09888;line-height:1.3"></div>
+  </div>
+  <div style="display:flex;gap:4px;margin-top:6px">
+    <button class="btn bp" onclick="optimize()" data-i18n="optimize" style="flex:1;padding:9px;font-size:13px">▶ Optimize &amp; Cut</button>
+    <button class="btn bs" onclick="exportForDeepnest()" title="Export all shapes as one SVG for nesting in Deepnest/SVGnest (true-shape nesting with rotation)" style="padding:9px 12px;font-size:12px;color:#3D6B4F;border-color:#3D6B4F;white-space:nowrap">🔗 Deepnest</button>
+  </div>
 </div>
 <div class="main">
   <div id="stats" class="stats" style="display:none">
@@ -384,6 +456,12 @@ body.print-mode{background:#fff}
     <span style="font-size:16px">📋</span>
     <h3>Parts Manager</h3>
     <span id="pw-count" style="font-size:11px;color:#A09888;font-family:monospace"></span>
+    <!-- Multiply-all: clones every part N-1 more times. 20 parts × 5 = 100. -->
+    <div style="display:flex;align-items:center;gap:4px;margin-left:16px;padding-left:16px;border-left:1px solid #D4CFC2">
+      <span style="font-size:11px;color:#6B6455">× Multiply all by</span>
+      <input id="pw-mult-n" type="number" min="2" max="99" value="5" style="width:48px;padding:2px 4px;font-size:11px;text-align:center">
+      <button class="btn bs bp" onclick="pwMultiplyAll()" style="font-size:11px;padding:3px 8px">Apply</button>
+    </div>
     <button class="btn bs br" onclick="closePartsWindow()" style="margin-left:auto">✕ Close</button>
   </div>
   <div class="pw-filters">
@@ -403,24 +481,29 @@ body.print-mode{background:#fff}
     <button class="btn bs" onclick="pwSelectAll()" style="margin-left:auto">Select all</button>
     <button class="btn bs" onclick="pwClearSel()">Clear</button>
   </div>
-  <table class="pw-tbl">
-    <thead><tr>
-      <th style="width:24px"><input type="checkbox" id="pw-chk-all" style="width:auto" onchange="pwToggleAll(this.checked)"></th>
-      <th onclick="pwSortBy('name')">Part name ↕</th>
-      <th onclick="pwSortBy('l')">L mm ↕</th>
-      <th onclick="pwSortBy('w')">W mm ↕</th>
-      <th onclick="pwSortBy('area')">Area m² ↕</th>
-      <th>Thickness</th>
-      <th onclick="pwSortBy('mat')">Material ↕</th>
-      <th>Edgebands</th>
-      <th>QR/CNC</th>
-      <th>Group</th>
-      <th style="width:28px"></th>
-    </tr></thead>
-  </table>
-  <div class="pw-body"><table class="pw-tbl" id="pw-tbody-wrap"><tbody id="pw-tbody"></tbody></table></div>
+  <div class="pw-body">
+    <table class="pw-tbl">
+      <thead><tr>
+        <th style="width:24px"><input type="checkbox" id="pw-chk-all" style="width:auto" onchange="pwToggleAll(this.checked)"></th>
+        <th onclick="pwSortBy('name')">Part name ↕</th>
+        <th onclick="pwSortBy('l')">L mm ↕</th>
+        <th onclick="pwSortBy('w')">W mm ↕</th>
+        <th style="width:30px" title="Swap L and W for this row"></th>
+        <th style="width:54px">Qty</th>
+        <th onclick="pwSortBy('area')">Area m² ↕</th>
+        <th>Thickness</th>
+        <th onclick="pwSortBy('mat')">Material ↕</th>
+        <th>Edgebands</th>
+        <th>QR/CNC</th>
+        <th>Group</th>
+        <th style="width:28px"></th>
+      </tr></thead>
+      <tbody id="pw-tbody"></tbody>
+    </table>
+  </div>
   <div class="pw-foot">
     <span id="pw-sel-count" style="font-size:11px;color:#6B6455;font-family:monospace"></span>
+    <button class="btn bs" onclick="pwSwapSelected()" title="Swap L and W for all selected parts (also rotates DXF shapes 90°)">⇆ Swap L/W</button>
     <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
       <span style="font-size:11px;color:#6B6455">Assign selected to group:</span>
       <select id="pw-grp-assign" style="font-size:11px;padding:3px 6px;width:auto"><option value="">— choose —</option></select>
@@ -525,14 +608,16 @@ body.print-mode{background:#fff}
 <div class="mdl">
   <h3>🏷 <span id="mname"></span></h3>
   <div class="lw">
-    <div style="font-size:9px;color:#888;margin-bottom:5px">99×50mm label · printed via browser</div>
+    <div style="font-size:9px;color:#888;margin-bottom:5px">99×50mm label · printed via Excel</div>
     <div class="lbl-outer" id="lprev"></div>
   </div>
-  <div style="display:flex;gap:6px;margin-bottom:6px">
+  <div style="display:flex;gap:6px;margin-bottom:6px;align-items:center">
     <button class="btn bp" onclick="doPrint()" style="flex:1">🖨 Print</button>
+    <button class="btn bs" onclick="pickXlsmFile()" title="Choose the SWOOD .xlsm to print labels from">📂 Choose .xlsm…</button>
     <button class="btn bs" onclick="saveZPL()" title="Save ZPL for advanced users">💾 .zpl</button>
     <button class="btn bs" onclick="closeModal()">✕</button>
   </div>
+  <div id="xlsmInfo" style="font-size:10px;color:#888;margin-bottom:4px;font-family:monospace;word-break:break-all"></div>
   <div id="pst" style="font-size:11px;color:#6B6455;margin-top:4px;min-height:32px;line-height:1.6"></div>
   <!-- ZPL text kept hidden — still used by saveZPL -->
   <div class="zp" id="zpl" style="display:none"></div>
@@ -540,6 +625,58 @@ body.print-mode{background:#fff}
   <input type="hidden" id="prn" value="ZDesigner GK420d">
 </div>
 </div>
+
+<!-- ═══ Zebra BrowserPrint SDK (inlined, v3.1.250) ═══ -->
+<!-- Sends ZPL directly to localhost:9101 Browser Print service for native thermal printing -->
+<script id="zebra-browserprint-core">
+var $jscomp=$jscomp||{};$jscomp.scope={};$jscomp.checkStringArgs=function(e,g,k){if(null==e)throw new TypeError("The 'this' value for String.prototype."+k+" must not be null or undefined");if(g instanceof RegExp)throw new TypeError("First argument to String.prototype."+k+" must not be a regular expression");return e+""};$jscomp.ASSUME_ES5=!1;$jscomp.ASSUME_NO_NATIVE_MAP=!1;$jscomp.ASSUME_NO_NATIVE_SET=!1;
+$jscomp.defineProperty=$jscomp.ASSUME_ES5||"function"==typeof Object.defineProperties?Object.defineProperty:function(e,g,k){e!=Array.prototype&&e!=Object.prototype&&(e[g]=k.value)};$jscomp.getGlobal=function(e){return"undefined"!=typeof window&&window===e?e:"undefined"!=typeof global&&null!=global?global:e};$jscomp.global=$jscomp.getGlobal(this);
+$jscomp.polyfill=function(e,g,k,h){if(g){k=$jscomp.global;e=e.split(".");for(h=0;h<e.length-1;h++){var f=e[h];f in k||(k[f]={});k=k[f]}e=e[e.length-1];h=k[e];g=g(h);g!=h&&null!=g&&$jscomp.defineProperty(k,e,{configurable:!0,writable:!0,value:g})}};
+$jscomp.polyfill("String.prototype.startsWith",function(e){return e?e:function(e,k){var h=$jscomp.checkStringArgs(this,e,"startsWith");e+="";var f=h.length,g=e.length;k=Math.max(0,Math.min(k|0,h.length));for(var q=0;q<g&&k<f;)if(h[k++]!=e[q++])return!1;return q>=g}},"es6","es3");
+var BrowserPrint=function(){function e(a,c){var b=new XMLHttpRequest;"withCredentials"in b?b.open(a,c,!0):"undefined"!=typeof XDomainRequest?(b=new XDomainRequest,b.open(a,c)):b=null;return b}function g(a,c,b,d){void 0!==a&&(void 0===b&&(b=a.sendFinishedCallback),void 0===d&&(d=a.sendErrorCallback));return h(c,b,d)}function k(a,c,b){void 0===c&&(c=f.defaultSuccessCallback);void 0===b&&(b=f.defaultErrorCallback);return h(a,c,b)}function h(a,c,b){a.onreadystatechange=function(){a.readyState===XMLHttpRequest.DONE&&
+200===a.status?""===a.responseType?c(a.responseText):c(a.response):a.readyState===XMLHttpRequest.DONE&&(b?b(a.response):console.log("error occurred with no errorCallback set."))};return a}var f={},p={},q=/^((?!chrome|android).)*safari/i.test(navigator.userAgent);navigator.userAgent.indexOf("Trident/7.0");var m="http://127.0.0.1:9100/";q&&"https:"===location.protocol&&(m="https://127.0.0.1:9101/");f.Device=function(a){var c=this;this.name=a.name;this.deviceType=a.deviceType;this.connection=a.connection;
+this.uid=a.uid;this.version=2;this.provider=a.provider;this.manufacturer=a.manufacturer;this.readRetries="bluetooth"===this.connection?1:0;this.sendErrorCallback=function(b){};this.sendFinishedCallback=function(b){};this.readErrorCallback=function(b){};this.readFinishedCallback=function(b){};this.send=function(b,a,l){var d=e("POST",m+"write");d&&(g(c,d,a,l),d.send(JSON.stringify({device:{name:this.name,uid:this.uid,connection:this.connection,deviceType:this.deviceType,version:this.version,provider:this.provider,
+manufacturer:this.manufacturer},data:b})))};this.sendUrl=function(b,a,l,r){var d=e("POST",m+"write");d&&(g(c,d,a,l),b={device:{name:this.name,uid:this.uid,connection:this.connection,deviceType:this.deviceType,version:this.version,provider:this.provider,manufacturer:this.manufacturer},url:b},null!=r&&void 0!=r&&(b.options=r),d.send(JSON.stringify(b)))};this.sendFile=function(b,a,l){if("string"===typeof b)f.loadFileFromUrl(b,function(b){c.sendFile(b,a,l)},l);else{var d=e("POST",m+"write");if(d){d.responseType=
+"text";k(d,a,l);var n=new FormData,g={};g.device=c;n.append("json",JSON.stringify(g));n.append("blob",b);d.send(n)}}};this.convertAndSendFile=function(b,a,l,c){c||(c={});c.action||(c.action="print");f.convert(b,this,c,a,l)};this.read=function(b,a){var d=e("POST",m+"read");d&&(void 0!==c&&(void 0===b&&(b=c.readFinishedCallback),void 0===a&&(a=c.readErrorCallback)),h(d,b,a),d.send(JSON.stringify({device:{name:this.name,uid:this.uid,connection:this.connection,deviceType:this.deviceType,version:this.version,
+provider:this.provider,manufacturer:this.manufacturer}})))};this.readUntilStringReceived=function(a,d,c,e,f){f||(f="");void 0===e&&(e=this.readRetries);d=function(b,d,c,l,e){return function(f){if(f&&0!==f.length)l=0;else if(0>=l){d(e);return}f=e+f;""!==a&&-1<f.indexOf(a)?d(f):b.readUntilStringReceived(a,d,c,l-1,f)}}(this,d,c,e,f);this.read(d,c)};this.readAllAvailable=function(a,d,c){this.readUntilStringReceived("",a,d,c)};this.sendThenRead=function(a,d,c){this.send(a,function(a){return function(){a.read(d,
+c)}}(this),c)};this.sendThenReadUntilStringReceived=function(a,d,c,e,f){this.send(a,function(a){return function(){a.readUntilStringReceived(d,c,e,f)}}(this),e)};this.sendThenReadAllAvailable=function(a,d,c,e){this.send(a,function(a){return function(){a.readUntilStringReceived("",d,c,e)}}(this),c)}};f.defaultSuccessCallback=function(){};f.defaultErrorCallback=function(){};f.ApplicationConfiguration=function(){this.application={version:"1.2.0.3",build_number:3,api_level:2,platform:"",supportedConversions:{}}};
+f.getLocalDevices=function(a,c,b){var d=e("GET",m+"available");d&&(finishedFunction=function(c){response=c;response=JSON.parse(response);for(var d in response)if(response.hasOwnProperty(d)&&response[d].constructor===Array)for(arr=response[d],c=0;c<arr.length;++c)arr[c]=new f.Device(arr[c]);void 0===b?a(response):(response.hasOwnProperty(b)||(response[b]=[]),a(response[b]))},k(d,finishedFunction,c),d.send())};f.getDefaultDevice=function(a,c,b){var d="default";void 0!==a&&null!=a&&(d=d+"?type="+a);
+if(a=e("GET",m+d))finishedFunction=function(a){response=a;""===response?c(null):(response=JSON.parse(response),a=new f.Device(response),c(a))},a=k(a,finishedFunction,b),a.send()};f.getApplicationConfiguration=function(a,c){var b=e("GET",m+"config");b&&(finishedFunction=function(b){response=b;""===response?a(null):(response=JSON.parse(response),a(response))},k(b,finishedFunction,c),b.send())};f.readOnInterval=function(a,c,b){if(void 0===b||0===b)b=1;readFunc=function(){a.read(function(d){c(d);p[a]=
+setTimeout(readFunc,b)},function(c){p[a]=setTimeout(readFunc,b)})};p[a]=setTimeout(readFunc,b)};f.stopReadOnInterval=function(a){p[a]&&clearTimeout(p[a])};f.bindFieldToReadData=function(a,c,b,d){f.readOnInterval(a,function(a){""!==a&&(c.value=a,void 0!==d&&null!=d&&d())},b)};f.loadFileFromUrl=function(a,c,b){request=e("get",a);console.log("ResponseType: "+request.responseType);request.responseType="blob";k(request,c,b);request.send()};f.convert=function(a,c,b,d,l){if(a)if("string"===typeof a)f.loadFileFromUrl(a,
+function(e){b.fromFormat||(b.fromFormat=a.substring(a.length-3));f.convert(e,c,b,d,l)},l);else{var g=e("POST",m+"convert");a.type&&(a.type.startsWith("image/")||a.type.startsWith("application/"))&&(b.fromFormat=a.type.toLowerCase().replace("image/","").replace("application/","").replace("x-ms-",""));if(g){g.responseType="text";var h=void 0;void 0!=d&&(h=function(a){d(JSON.parse(a))});k(g,h,l);h=new FormData;var t={};null!=b&&void 0!==b&&(t.options=b);c&&(t.device=c);h.append("json",JSON.stringify(t));
+h.append("blob",a);g.send(h)}}else l?l("Resource not specified"):f.defaultErrorCallback("Resource not specified")};f.scanImage=function(a,c,b,d){if(a)if("string"===typeof a)f.loadFileFromUrl(a,function(e){c.format||(c.format=a.substring(a.length-3));f.scanImage(e,c,b,d)},d);else{var g=e("POST",m+"convert/scan");a.type&&(a.type.startsWith("image/")||a.type.startsWith("application/"))&&(c.format=a.type.toLowerCase().replace("image/","").replace("application/","").replace("x-ms-",""));if(g){g.responseType=
+"text";var h=void 0;void 0!=b&&(h=function(a){b(JSON.parse(a))});k(g,h,d);h=new FormData;var n={};n.options=c;h.append("json",JSON.stringify(n));h.append("blob",a);g.send(h)}}else d?d("Resource not specified"):f.defaultErrorCallback("Resource not specified")};return f}();
+
+</script>
+<script id="zebra-browserprint-zebra">
+var $jscomp=$jscomp||{};$jscomp.scope={};$jscomp.ASSUME_ES5=!1;$jscomp.ASSUME_NO_NATIVE_MAP=!1;$jscomp.ASSUME_NO_NATIVE_SET=!1;$jscomp.defineProperty=$jscomp.ASSUME_ES5||"function"==typeof Object.defineProperties?Object.defineProperty:function(e,h,g){e!=Array.prototype&&e!=Object.prototype&&(e[h]=g.value)};$jscomp.getGlobal=function(e){return"undefined"!=typeof window&&window===e?e:"undefined"!=typeof global&&null!=global?global:e};$jscomp.global=$jscomp.getGlobal(this);$jscomp.SYMBOL_PREFIX="jscomp_symbol_";
+$jscomp.initSymbol=function(){$jscomp.initSymbol=function(){};$jscomp.global.Symbol||($jscomp.global.Symbol=$jscomp.Symbol)};$jscomp.Symbol=function(){var e=0;return function(h){return $jscomp.SYMBOL_PREFIX+(h||"")+e++}}();
+$jscomp.initSymbolIterator=function(){$jscomp.initSymbol();var e=$jscomp.global.Symbol.iterator;e||(e=$jscomp.global.Symbol.iterator=$jscomp.global.Symbol("iterator"));"function"!=typeof Array.prototype[e]&&$jscomp.defineProperty(Array.prototype,e,{configurable:!0,writable:!0,value:function(){return $jscomp.arrayIterator(this)}});$jscomp.initSymbolIterator=function(){}};$jscomp.arrayIterator=function(e){var h=0;return $jscomp.iteratorPrototype(function(){return h<e.length?{done:!1,value:e[h++]}:{done:!0}})};
+$jscomp.iteratorPrototype=function(e){$jscomp.initSymbolIterator();e={next:e};e[$jscomp.global.Symbol.iterator]=function(){return this};return e};$jscomp.makeIterator=function(e){$jscomp.initSymbolIterator();var h=e[Symbol.iterator];return h?h.call(e):$jscomp.arrayIterator(e)};
+$jscomp.polyfill=function(e,h,g,l){if(h){g=$jscomp.global;e=e.split(".");for(l=0;l<e.length-1;l++){var c=e[l];c in g||(g[c]={});g=g[c]}e=e[e.length-1];l=g[e];h=h(l);h!=l&&null!=h&&$jscomp.defineProperty(g,e,{configurable:!0,writable:!0,value:h})}};$jscomp.FORCE_POLYFILL_PROMISE=!1;
+$jscomp.polyfill("Promise",function(e){function h(){this.batch_=null}function g(b){return b instanceof c?b:new c(function(a,f){a(b)})}if(e&&!$jscomp.FORCE_POLYFILL_PROMISE)return e;h.prototype.asyncExecute=function(b){null==this.batch_&&(this.batch_=[],this.asyncExecuteBatch_());this.batch_.push(b);return this};h.prototype.asyncExecuteBatch_=function(){var b=this;this.asyncExecuteFunction(function(){b.executeBatch_()})};var l=$jscomp.global.setTimeout;h.prototype.asyncExecuteFunction=function(b){l(b,
+0)};h.prototype.executeBatch_=function(){for(;this.batch_&&this.batch_.length;){var b=this.batch_;this.batch_=[];for(var a=0;a<b.length;++a){var f=b[a];delete b[a];try{f()}catch(k){this.asyncThrow_(k)}}}this.batch_=null};h.prototype.asyncThrow_=function(b){this.asyncExecuteFunction(function(){throw b;})};var c=function(b){this.state_=0;this.result_=void 0;this.onSettledCallbacks_=[];var a=this.createResolveAndReject_();try{b(a.resolve,a.reject)}catch(f){a.reject(f)}};c.prototype.createResolveAndReject_=
+function(){function b(b){return function(k){f||(f=!0,b.call(a,k))}}var a=this,f=!1;return{resolve:b(this.resolveTo_),reject:b(this.reject_)}};c.prototype.resolveTo_=function(b){if(b===this)this.reject_(new TypeError("A Promise cannot resolve to itself"));else if(b instanceof c)this.settleSameAsPromise_(b);else{a:switch(typeof b){case "object":var a=null!=b;break a;case "function":a=!0;break a;default:a=!1}a?this.resolveToNonPromiseObj_(b):this.fulfill_(b)}};c.prototype.resolveToNonPromiseObj_=function(b){var a=
+void 0;try{a=b.then}catch(f){this.reject_(f);return}"function"==typeof a?this.settleSameAsThenable_(a,b):this.fulfill_(b)};c.prototype.reject_=function(b){this.settle_(2,b)};c.prototype.fulfill_=function(b){this.settle_(1,b)};c.prototype.settle_=function(b,a){if(0!=this.state_)throw Error("Cannot settle("+b+", "+a|"): Promise already settled in state"+this.state_);this.state_=b;this.result_=a;this.executeOnSettledCallbacks_()};c.prototype.executeOnSettledCallbacks_=function(){if(null!=this.onSettledCallbacks_){for(var b=
+this.onSettledCallbacks_,a=0;a<b.length;++a)b[a].call(),b[a]=null;this.onSettledCallbacks_=null}};var d=new h;c.prototype.settleSameAsPromise_=function(b){var a=this.createResolveAndReject_();b.callWhenSettled_(a.resolve,a.reject)};c.prototype.settleSameAsThenable_=function(b,a){var f=this.createResolveAndReject_();try{b.call(a,f.resolve,f.reject)}catch(k){f.reject(k)}};c.prototype.then=function(b,a){function f(a,f){return"function"==typeof a?function(f){try{k(a(f))}catch(n){d(n)}}:f}var k,d,e=new c(function(a,
+f){k=a;d=f});this.callWhenSettled_(f(b,k),f(a,d));return e};c.prototype.catch=function(b){return this.then(void 0,b)};c.prototype.callWhenSettled_=function(b,a){function f(){switch(k.state_){case 1:b(k.result_);break;case 2:a(k.result_);break;default:throw Error("Unexpected state: "+k.state_);}}var k=this;null==this.onSettledCallbacks_?d.asyncExecute(f):this.onSettledCallbacks_.push(function(){d.asyncExecute(f)})};c.resolve=g;c.reject=function(b){return new c(function(a,f){f(b)})};c.race=function(b){return new c(function(a,
+f){for(var k=$jscomp.makeIterator(b),d=k.next();!d.done;d=k.next())g(d.value).callWhenSettled_(a,f)})};c.all=function(b){var a=$jscomp.makeIterator(b),f=a.next();return f.done?g([]):new c(function(b,d){function k(a){return function(f){c[a]=f;e--;0==e&&b(c)}}var c=[],e=0;do c.push(void 0),e++,g(f.value).callWhenSettled_(k(c.length-1),d),f=a.next();while(!f.done)})};return c},"es6","es3");function dbg(e){}
+var Zebra=function(){function e(c,d){if(d instanceof g.Printer.Status&&l[c.device.uid]){if(d.offline){if(c.errors++,c.errors<c.errorsForOffline)return}else c.errors=0;var b=l[c.device.uid].status,a=JSON.stringify(b);c.status=d;statusStr=JSON.stringify(d);if(statusStr!==a)c.onchange(b,d)}}function h(c){return 2!==c.charCodeAt(0)||3!==c.charCodeAt(c.length-1)?(dbg("Response did not contain proper control characters"),!1):!0}var g={},l={};setInterval(function(){for(var c in l)l.hasOwnProperty(c)&&(c=
+l[c],function(d){d.device.getStatus(function(b){e(d,b)},function(b){e(d,new g.Printer.Status(""))})}(c))},2E3);g.Printer=function(c){BrowserPrint.Device.call(this,c);g.Printer.Status=function(a){this.raw=a;this.isFlagSet=function(a){return"1"===this.raw.charAt(a)};this.offline=!1;a||(a="");a=a.trim();h(a)?(this.offline=!1,this.paperOut=this.isFlagSet(5),this.paused=this.isFlagSet(7),this.headOpen=this.isFlagSet(43),this.ribbonOut=this.isFlagSet(45)):(this.offline=!0,this.ribbonOut=this.headOpen=this.paused=
+this.paperOut=!1);this.isPrinterReady=function(){return!(this.paperOut||this.paused||this.headOpen||this.ribbonOut||this.offline)};this.getMessage=function(){return this.isPrinterReady()?"Ready":this.offline?"Offline":this.paperOut?"Paper Out":this.headOpen?"Head Open":this.ribbonOut?"Ribbon Out":this.paused?"Paused":"Ready"}};g.Printer.Info=function(a){if(!a)throw"Invalid Response";this.raw=a;a=a.trim();if(!h(a))throw"Invalid Response";a=a.split(",");this.model=a[0].substring(1);this.firmware=a[1]};
+g.Printer.Configuration=function(a){if(!a)throw"Invalid Response";this.raw=a=a.trim();this.settings={};if(!h(a))throw"Invalid Response";a=a.replace(String.fromCharCode(2),"");a=a.replace(String.fromCharCode(3),"");a=a.split("\n");for(var f=0;f<a.length;++f){var b=a[f].trim(),d=b.substring(20);b=b.substring(0,20).trim();this.settings[d]=b}this.darkness=parseFloat(this.settings.DARKNESS);this.printSpeed=parseInt(this.settings["PRINT SPEED"].replace("IPS","").trim());this.printWidth=parseInt(this.settings["PRINT WIDTH"]);
+this.labelLength=parseInt(this.settings["LABEL LENGTH"]);this.firmwareVersion=this.settings.FIRMWARE.replace("<-","").trim();this.linkOSVersion=this.settings.hasOwnProperty("LINK-OS VERSION")?this.settings["LINK-OS VERSION"]:"0"};var d=this;this.configuration=void 0;this.device_request_queue=[];this.clearRequestQueue=function(){var a=this.device_request_queue[0];this.device_request_queue=[];a&&a.started&&(this.device_request_queue[0]=a)};this.Request=function(a,f,b,c,e){this.type=a;this.command=f;
+this.received=b;this.success=c;this.error=function(a){return function(f){a(f);d.executeNextRequest()}}(e);this.execute=function(){this.started=!0;"info"==this.type||"config"==this.type||"status"==this.type?d.sendThenReadUntilStringReceived(this.command,String.fromCharCode(3),this.received,this.error):d.sendThenReadAllAvailable(this.command,this.received,this.error)}};this.executeNextRequest=function(){d.device_request_queue.shift();d.executeRequest()};this.executeRequest=function(){dbg("Requests in queue: "+
+d.device_request_queue.length);0<d.device_request_queue.length&&(dbg("Executing next request..."),d.device_request_queue[0].execute())};this.queueRequest=function(a){dbg("Queueing request "+a.type+": "+d.device_request_queue.length);d.device_request_queue.push(a);1===d.device_request_queue.length&&a.execute()};this.onStatusResponse=function(a){dbg("received status response");var f=void 0;try{f=new g.Printer.Status(a)}catch(k){a=d.device_request_queue[0],a.error(k),d.executeNextRequest()}for(;0<d.device_request_queue.length;)if(a=
+d.device_request_queue[0],"status"===a.type)dbg("delivering status..."),a.success(f),d.device_request_queue.shift();else{dbg("delivered to all status requests.");break}d.executeRequest()};this.onResponse=function(a,f){dbg("received info response");var b=d.device_request_queue[0];if(void 0!=f)try{a=new f(a)}catch(m){b.error&&b.error(m);d.executeNextRequest();return}b.success&&b.success(a);d.executeNextRequest()};this.onSGDResponse=function(a){dbg("received sgd response");d.onResponse(a)};this.onInfoResponse=
+function(a){dbg("received info response");d.onResponse(a,g.Printer.Info)};this.onConfigurationResponse=function(a){dbg("received config response");try{d.configuration=new g.Printer.Configuration(a)}catch(f){}d.onResponse(a,g.Printer.Configuration)};this.setSGD=function(a,f,b,c){if(!b&&!c)return new Promise(function(b,c){d.setSGD(a,f,b,c)});d.send('! U1 setvar "'+a+'" "'+f+'"\r\n',b,c)};this.getSGD=function(a,b,c){if(!b&&!c)return new Promise(function(b,f){d.getSGD(a,b,f)});b=new this.Request("sgd",
+'! U1 getvar "'+a+'"\r\n',this.onSGDResponse,b,c);this.queueRequest(b)};this.setThenGetSGD=function(a,b,c,e){if(!c&&!e)return new Promise(function(f,c){d.setThenGetSGD(a,b,f,c)});this.setSGD(a,b,function(){d.getSGD(a,c,e)},e)};this.getInfo=function(a,b){if(!a&&!b)return new Promise(function(a,b){d.getInfo(a,b)});a=new this.Request("info","~hi\r\n",this.onInfoResponse,a,b);this.queueRequest(a)};this.getConfiguration=function(a,b){if(!a&&!b)return new Promise(function(a,b){d.getConfiguration(a,b)});
+a=new this.Request("config","^XA^HH^XZ",this.onConfigurationResponse,a,b);this.queueRequest(a)};this.getStatus=function(a,b){if(!a&&!b)return new Promise(function(a,b){d.getStatus(a,b)});a=new this.Request("status","~hs\r\n",this.onStatusResponse,a,b);d.queueRequest(a)};this.query=function(a,b,c){if(!b&&!c)return new Promise(function(b,c){d.query(a,b,c)});b=new this.Request("",a,this.onResponse,b,c);this.queueRequest(b)};this.isPrinterReady=function(a,b){if(!a&&!b)return new Promise(function(a,b){d.isPrinterReady(a,
+b)});this.getStatus().then(function(c){c.isPrinterReady()?a(c.getMessage()):b(c.getMessage())})};this.printImageAsLabel=function(a,c,e,g){if(!e&&!g)return new Promise(function(b,f){d.printImageAsLabel(a,c,b,f)});b().then(function(b){c.fitTo={width:b.printWidth,height:b.labelLength};c.action="print";BrowserPrint.convert(a,d,c,e,g)}).catch(g)};this.getConvertedResource=function(a,c,e,g){if(!e&&!g)return new Promise(function(b,f){d.getConvertedResource(a,c,b,f)});b().then(function(b){c.action="return";
+BrowserPrint.convert(a,d,c,e,g)}).catch(g)};this.storeConvertedResource=function(a,c,e,g){if(!e&&!g)return new Promise(function(b,e){d.storeConvertedResource(a,c,b,e)});b().then(function(b){c.action="store";BrowserPrint.convert(a,d,c,e,g)}).catch(g)};var b=function(){return new Promise(function(a,b){if(d.configuration)a(d.configuration);else return d.getConfiguration().then(function(a){d.configuration=a;return d.configuration}).catch(function(a){b(a)})})};this.configTimeout=function(){d.configuration||
+d.getConfiguration().then(function(a){return d.configuration=a}).catch(function(){setTimeout(d.configTimeout,1E3)})};this.configTimeout()};g.watch=function(c,d,b){b||(b=2);l[c.uid]={device:c,status:"",onchange:d,errors:0,errorsForOffline:b}};g.stopWatching=function(c){delete l[c.uid]};return g}();
+
+</script>
 
 <script>
 // ═══════════════════════════════════════════════════════════════
@@ -809,21 +946,29 @@ var XLSX = (function(){
   function colIdx(ref){var s=ref.replace(/[0-9]/g,''),n=0;for(var i=0;i<s.length;i++)n=n*26+s.charCodeAt(i)-64;return n-1;}
   function parseSheet(doc,ss){
     var rows=[];
+    var formulas=[]; // parallel array: formulas[r][c] = formula string if any
     doc.querySelectorAll('sheetData row').forEach(function(rowEl){
       var ri=parseInt(rowEl.getAttribute('r'))-1;
-      while(rows.length<=ri)rows.push([]);
-      var arr=[];
+      while(rows.length<=ri){rows.push([]);formulas.push([]);}
+      var arr=[],farr=[];
       rowEl.querySelectorAll('c').forEach(function(cell){
         var ci=colIdx(cell.getAttribute('r')||'A1');
-        while(arr.length<=ci)arr.push('');
-        var t=cell.getAttribute('t'),vEl=cell.querySelector('v');
-        if(!vEl){arr[ci]='';return;}
-        var v=vEl.textContent;
-        if(t==='s')arr[ci]=ss[parseInt(v)]||'';
-        else{var n=parseFloat(v);arr[ci]=isNaN(n)?v:n;}
+        while(arr.length<=ci){arr.push('');farr.push('');}
+        var t=cell.getAttribute('t'),vEl=cell.querySelector('v'),fEl=cell.querySelector('f');
+        if(vEl){
+          var v=vEl.textContent;
+          if(t==='s')arr[ci]=ss[parseInt(v)]||'';
+          else{var n=parseFloat(v);arr[ci]=isNaN(n)?v:n;}
+        } else {
+          arr[ci]='';
+        }
+        if(fEl) farr[ci]=fEl.textContent;
       });
       rows[ri]=arr;
+      formulas[ri]=farr;
     });
+    // Attach formulas as a hidden property so existing code is unaffected
+    rows._f = formulas;
     return rows;
   }
   return{
@@ -888,6 +1033,15 @@ var dragging=false,dragP=null,dragOX=0,dragOY=0,SC=1;
 var opIdMap={}; // partName -> {op1, op2}
 var partGroups=[]; // [{id, name, color, partKeys:[]}]  — groupId stored on each part
 var gId=1;
+// ── Version history for layouts ────────────────────────────────
+// Each entry: {id, name, createdAt, layouts:[snapshot], curSheet, isAuto}
+// "layouts" here is a deep-cloned snapshot at the moment of saving.
+var versions=[];
+var vId=1;
+var activeVersionId=null;   // which version was last restored / created
+// Fingerprint of layouts captured right after each auto-save, so we can detect
+// whether the operator has made manual changes since the last auto version.
+var _autoVersionFp=null;
 var COLORS=['#4A7FC1','#C1694A','#4A9E5C','#9E4A8F','#B8914A','#4A9EA8','#7A6AB8','#B0784A','#4A8E7A','#B84A6E','#6B8E4A'];
 var GROUP_COLORS=['#E8A838','#D44A9A','#3AB8B8','#A852D4','#C8542A','#4460C8','#38B060'];
 
@@ -1252,6 +1406,9 @@ function collectProjectState(){
         })
       };
     }),
+    versions:versions,          // layout version history (already plain data)
+    vId:vId,
+    activeVersionId:activeVersionId,
     curSheet:curSheet,
     settings:{
       kerf:parseInt((document.getElementById('kerf')||{}).value||3),
@@ -1286,9 +1443,35 @@ function applyProjectState(d){
     boards=(d.boards||[]).map(function(b){return Object.assign({},b);});
     bId=d.bId||(boards.reduce(function(m,b){return Math.max(m,b.id||0);},0)+1);
     parts=(d.parts||[]).map(function(p){return Object.assign({},p);});
+    // ── Backfill fix: merge boards whose material names differ only in whitespace.
+    // Older saves may have e.g. "X Y" and "X  Y" as separate boards because the
+    // xlsm contained inconsistent spacing. After this loop, only one canonical
+    // board remains per normalized material name, and parts are re-pointed to it.
+    (function normalizeBoardsAndParts(){
+      var seen={}; // normalizedMat -> surviving board
+      var mergedBoards=[];
+      boards.forEach(function(b){
+        var nm=normalizeMat(b.mat);
+        b.mat=nm;
+        if(seen[nm]){
+          // Skip duplicate — any parts referencing it will be remapped below
+        } else {
+          seen[nm]=b;
+          mergedBoards.push(b);
+        }
+      });
+      boards=mergedBoards;
+      // Normalize every part's mat field (so they all match the surviving board)
+      parts.forEach(function(p){ p.mat=normalizeMat(p.mat); });
+    })();
     partGroups=(d.partGroups||[]).map(function(g){return Object.assign({},g);});
     gId=d.gId||(partGroups.reduce(function(m,g){return Math.max(m,g.id||0);},0)+1);
     opIdMap=d.opIdMap||{};
+    // Restore layout version history
+    versions=(d.versions||[]).map(function(v){return Object.assign({},v);});
+    vId=d.vId||(versions.reduce(function(m,v){return Math.max(m,v.id||0);},0)+1);
+    activeVersionId=d.activeVersionId||null;
+    _autoVersionFp=null; // will be set when user triggers re-Optimize
     // Rebuild layouts and re-link placements to parts by id
     var partById={};parts.forEach(function(p){partById[String(p.id)]=p;});
     layouts=(d.layouts||[]).map(function(l){
@@ -1310,6 +1493,20 @@ function applyProjectState(d){
     // Rerender everything
     renderBoards();refreshSel();renderParts();renderGroups();
     if(layouts.length){
+      // Recompute stats from loaded layouts (so header cards show numbers)
+      var totA=layouts.reduce(function(a,l){return a+l.uw*l.uh;},0);
+      var usedA=layouts.reduce(function(a,l){return a+l.placements.reduce(function(b,p){return b+p.pw*p.ph;},0);},0);
+      var eff=totA?Math.round(usedA/totA*100):0;
+      var partsOnSheets=layouts.reduce(function(a,l){return a+l.placements.length;},0);
+      var sv1=document.getElementById('sv1'); if(sv1)sv1.textContent=layouts.length;
+      var sv2=document.getElementById('sv2'); if(sv2)sv2.textContent=partsOnSheets;
+      var sv3=document.getElementById('sv3'); if(sv3)sv3.textContent=eff+'%';
+      var sv4=document.getElementById('sv4'); if(sv4)sv4.textContent=((totA-usedA)/1e6).toFixed(2)+'m²';
+      var ef =document.getElementById('ef');  if(ef)ef.style.width=eff+'%';
+      var albl=document.getElementById('albl'); if(albl)albl.textContent='Loaded · '+layouts.length+' sheets';
+      document.getElementById('stats').style.display='grid';
+      var wlc=document.getElementById('wlc'); if(wlc)wlc.style.display='none';
+      var cvc=document.getElementById('cvc'); if(cvc)cvc.style.display='block';
       buildTabs();activateTab(curSheet);
       // Show export panel
       document.getElementById('ep').style.display='block';
@@ -1325,6 +1522,8 @@ function applyProjectState(d){
       var cv=document.getElementById('cv');
       if(cv){var ctx=cv.getContext('2d');ctx.clearRect(0,0,cv.width,cv.height);}
     }
+    // Refresh the version selector to reflect restored versions array
+    if(typeof renderVersionBar==='function') renderVersionBar();
   } finally {
     _suppressSave=false;
   }
@@ -1750,6 +1949,8 @@ setInterval(function(){drainPendingQueue();},30000);
 
 // On load: restore the most recently worked project.
 document.addEventListener('DOMContentLoaded',function(){
+  // Restore last imported xlsm filename for Excel-based label printing
+  try { window.activeXlsmName = localStorage.getItem('fabflow_xlsm_name') || ''; } catch(e) {}
   // URL override: ?project=NAME
   var urlName=null;
   try{var u=new URLSearchParams(location.search);urlName=u.get('project');}catch(e){}
@@ -1791,6 +1992,15 @@ function ensureBoard(mat){
   var ex=boards.find(function(b){return b.mat===mat;});if(ex)return ex;
   var b={id:bId++,mat:mat,w:2800,h:2070,qty:15,color:COLORS[boards.length%COLORS.length],grain:false};
   boards.push(b);renderBoards();refreshSel();return b;
+}
+
+// Normalize a material name so "PLOKŠTĖ  STALČIAMS" (2 spaces) and
+// "PLOKŠTĖ STALČIAMS" (1 space) are treated as identical — prevents
+// duplicate boards being auto-created during import/optimization.
+function normalizeMat(s){
+  if (s == null) return '';
+  // Collapse all whitespace runs (including non-breaking space, tabs) to single space, then trim
+  return String(s).replace(/\s+/g, ' ').trim();
 }
 function addBoard(){boards.push({id:bId++,mat:'New Material',w:2800,h:2070,qty:15,color:COLORS[boards.length%COLORS.length],grain:false});renderBoards();refreshSel();}
 function removeBoard(id){boards=boards.filter(function(b){return b.id!==id;});renderBoards();refreshSel();}
@@ -1857,28 +2067,67 @@ async function processFile(f){
     var wb=await XLSX.read(ab);
     if(!wb.SheetNames||!wb.SheetNames.length) throw new Error('No sheets found');
 
-    // ── LABEL sheet → opId map: fullPartName → {op1, op2, hasCNC} ──
-    // SA_GA_VIRT LABEL format (0-indexed array rows):
-    //   row[0]='1OP', row[1]=opId_left, ..., row[7]='1OP', row[8]=opId_right
-    //   row+8: row[3]=shortName_left, row[10]=shortName_right
-    //   row+9 (sometimes +8): row[3]=fullName_left, row[10]=fullName_right
-    // Block repeats every 10 rows starting from row 1 (0-indexed)
+    // Remember the xlsm filename for Excel-based label printing.
+    // The server resolves this name relative to the FabFlow folder.
+    if (/\.xlsm?$/i.test(f.name)) {
+      window.activeXlsmName = f.name;
+      try { localStorage.setItem('fabflow_xlsm_name', f.name); } catch(e) {}
+      // Reset printed status on existing parts (per user preference:
+      // re-importing the xlsm means a new cutting run)
+      parts.forEach(function(pt){ pt.printed = false; });
+    }
+
+    // ── LABEL sheet → opId map: fullPartName → {op1, op2, hasCNC, range} ──
+    // SWOOD LABEL sheet structure (1-based rows, A=col1):
+    //   row r:    A='1OP', B=op1_id_left, F='2OP', H='1OP', I=op1_id_right, M='2OP'
+    //   row r+1:  A=IMAGE(qr1_left), F=IMAGE(qr2_left), H=IMAGE(qr1_right), M=IMAGE(qr2_right)
+    //   ...
+    //   row r+8:  A=dims_left, D=shortName_left, H=dims_right, K=shortName_right
+    //   row r+9:  A=mat_left, D=fullName_left, H=mat_right, K=fullName_right
+    //
+    // Each label block spans 10 rows × 6 cols (LEFT label = A:F, RIGHT label = H:M).
+    //
+    // We also now record the EXACT Excel cell range for each part, so the
+    // server-side print-label endpoint can tell Excel "print this exact block".
+    function extractQRData(formulaText){
+      if (!formulaText) return '';
+      var m = formulaText.match(/&\s*"([^"]*)"\s*\)\s*$/);
+      if (m) return m[1];
+      m = formulaText.match(/text=([^"&)]+)/);
+      return m ? m[1] : '';
+    }
+    // Convert (col0, row0, col1, row1) — all 0-indexed — to "A1:F10" style range
+    function rangeStr(c0, r0, c1, r1){
+      function colLetter(c){ // 0-indexed → letter
+        var s='';
+        c++;
+        while(c>0){ var rem=(c-1)%26; s=String.fromCharCode(65+rem)+s; c=Math.floor((c-1)/26); }
+        return s;
+      }
+      return colLetter(c0)+(r0+1)+':'+colLetter(c1)+(r1+1);
+    }
     opIdMap={};
     if(wb.SheetNames.indexOf('LABEL')>=0){
-      var lblRows=XLSX.utils.sheet_to_json(wb.Sheets['LABEL']);
+      var lblSheet = wb.Sheets['LABEL'];
+      var lblRows = XLSX.utils.sheet_to_json(lblSheet);
+      var lblF = (lblSheet._r && lblSheet._r._f) || []; // formulas sidecar
       for(var i=0;i<lblRows.length;i++){
         var r0=lblRows[i]||[];
         if(String(r0[0]||'').trim()==='1OP'){
-          var op1L=String(r0[1]||'').trim();
-          var op1R=String(r0[8]||'').trim();
-          // Full name is at row+8, col 3 (left) and col 10 (right)
+          var f1 = lblF[i+1] || [];
+          var qr1L = extractQRData(f1[0]);
+          var qr2L = extractQRData(f1[5]);
+          var qr1R = extractQRData(f1[7]);
+          var qr2R = extractQRData(f1[12]);
           var r8=lblRows[i+8]||[];
           var r9=lblRows[i+9]||[];
-          // Try row+9 col3/10 first (full SOLIDNAME), fall back to row+8
           var fnL=String(r9[3]||r8[3]||'').trim();
           var fnR=String(r9[10]||r8[10]||'').trim();
-          if(fnL) opIdMap[fnL]={op1:op1L,op2:'',hasCNC:op1L.length>0};
-          if(fnR) opIdMap[fnR]={op1:op1R,op2:'',hasCNC:op1R.length>0};
+          // LEFT label spans rows i..i+9, cols A..F (0..5). Right: cols H..M (7..12).
+          var rangeL = 'LABEL!' + rangeStr(0, i, 5, i+9);
+          var rangeR = 'LABEL!' + rangeStr(7, i, 12, i+9);
+          if(fnL) opIdMap[fnL]={op1:qr1L,op2:qr2L,hasCNC:qr1L.length>0||qr2L.length>0,range:rangeL};
+          if(fnR) opIdMap[fnR]={op1:qr1R,op2:qr2R,hasCNC:qr1R.length>0||qr2R.length>0,range:rangeR};
         }
       }
     }
@@ -1931,7 +2180,7 @@ async function processFile(f){
         }
         // Data row: col5=material(string), col6=L(number), col7=W(number)
         if(!row[5]||typeof row[6]!=='number'||typeof row[7]!=='number') continue;
-        var mat=String(row[5]).trim();
+        var mat=normalizeMat(row[5]);
         if(!mat||mat==='PLOKŠTĖ'||mat.includes('NEPJAUTI')||mat.includes('MAKETAMS')) continue;
         var L=Math.round(row[6]),W=Math.round(row[7]);
         if(L<5||W<5) continue;
@@ -1946,7 +2195,8 @@ async function processFile(f){
         for(var j=0;j<qty;j++){
           parts.push({id:Date.now()+added,name:shortName,origName:solidName,
             l:L,w:W,mat:mat,thick:T,eb:eb,
-            op1:opIds.op1,op2:opIds.op2,hasCNC:opIds.hasCNC});
+            op1:opIds.op1,op2:opIds.op2,hasCNC:opIds.hasCNC,
+            labelRange:opIds.range||''});
           added++;
         }
       }
@@ -1960,7 +2210,7 @@ async function processFile(f){
       for(var i=3;i<scRows.length;i++){
         var row=scRows[i]||[];
         var name=String(row[2]||'').trim();
-        var mat=String(row[5]||'').trim();
+        var mat=normalizeMat(row[5]);
         var L=parseFloat(row[8]),W=parseFloat(row[9]),T=parseFloat(row[10])||18,qty=parseInt(row[11])||1;
         if(!name||!mat||!L||!W||L<5||W<5) continue;
         if(mat.includes('NEPJAUTI')||mat.includes('MAKETAMS')) continue;
@@ -1971,7 +2221,8 @@ async function processFile(f){
         for(var j=0;j<qty;j++){
           parts.push({id:Date.now()+added,name:shortName,origName:name,
             l:Math.round(L),w:Math.round(W),mat:mat,thick:T,eb:eb,
-            op1:opIds.op1,op2:opIds.op2,hasCNC:opIds.hasCNC});
+            op1:opIds.op1,op2:opIds.op2,hasCNC:opIds.hasCNC,
+            labelRange:opIds.range||''});
           added++;
         }
       }
@@ -2504,6 +2755,7 @@ function confirmCSVImport(){
   _csvImportQueue.rows.forEach(function(r){
     var mat=matMap[r.mat||'(none specified)']||r.mat||'UNKNOWN';
     if(mat==='(none specified)')mat='UNKNOWN';
+    mat=normalizeMat(mat);
     if(!boards.find(function(b){return b.mat===mat;}))ensureBoard(mat);
     for(var k=0;k<r.qty;k++){
       parts.push({
@@ -2564,6 +2816,7 @@ function confirmDXFImport(){
     mat=(prompt('New material name:','NEW MATERIAL')||'').trim();
     if(!mat){return;}
   }
+  mat=normalizeMat(mat);
   var thick=parseInt(document.getElementById('dxf-thick').value,10)||18;
   if(!boards.find(function(b){return b.mat===mat;}))ensureBoard(mat);
   var names=document.querySelectorAll('.dxf-name');
@@ -2597,7 +2850,7 @@ function confirmDXFImport(){
 var _flashAddKey=null;
 function addManual(){
   var name=document.getElementById('pn').value.trim()||('PART_'+(parts.length+1));
-  var mat=document.getElementById('pm').value;
+  var mat=normalizeMat(document.getElementById('pm').value);
   var l=parseInt(document.getElementById('pl').value),w=parseInt(document.getElementById('pw2').value),q=parseInt(document.getElementById('pq').value)||1;
   if(!l||!w){alert(t('enterLW'));document.getElementById('pl').focus();return;}
   if(!boards.find(function(b){return b.mat===mat;}))ensureBoard(mat);
@@ -2623,8 +2876,47 @@ function pliRemoveGroup(key){
   parts=parts.filter(function(p){return (p.origName+'|'+p.mat+'|'+p.l+'x'+p.w)!==key;});
   renderParts();
 }
+
+// ── Toggle rotation override for a parts group ────────────────────
+// State machine: inherit (null) → opposite-of-material → back to inherit.
+// Meaning: first click = override; second click = reset to material default.
+function togglePartRotation(key){
+  var groupParts = parts.filter(function(p){
+    return (p.origName+'|'+p.mat+'|'+p.l+'x'+p.w) === key;
+  });
+  if (!groupParts.length) return;
+  var bd = matchBoard(groupParts[0].mat);
+  var matHasGrain = !!(bd && bd.grain);
+  // Check current state of the first part
+  var cur = groupParts[0].allowRotate;
+  var newVal;
+  if (cur === null || cur === undefined) {
+    // Currently inheriting → override to opposite of what material provides
+    newVal = matHasGrain ? true : false;
+  } else {
+    // Currently overridden → reset to inherit
+    newVal = null;
+  }
+  groupParts.forEach(function(p){ p.allowRotate = newVal; });
+  renderParts();
+}
+
 function renderParts(){
   document.getElementById('pc').textContent=parts.length;
+  // Print counter in header
+  var stats = getPrintStats();
+  var pc2 = document.getElementById('pc-printed');
+  if (pc2) {
+    if (stats.total > 0) {
+      var allDone = stats.printed === stats.total;
+      pc2.style.display = 'inline';
+      pc2.style.color = allDone ? '#3D6B4F' : (stats.printed > 0 ? '#8a6d1a' : '#A09888');
+      pc2.textContent = '🖨 ' + stats.printed + '/' + stats.total;
+      pc2.title = stats.printed + ' printed of ' + stats.total + ' parts' + (stats.printed < stats.total ? ' — ' + (stats.total - stats.printed) + ' remaining' : ' — all done!');
+    } else {
+      pc2.style.display = 'none';
+    }
+  }
   var listEl=document.getElementById('plist');
   var clrBtn=document.getElementById('btn-clear-parts');
   if(!listEl)return;
@@ -2635,12 +2927,15 @@ function renderParts(){
     return;
   }
   if(clrBtn)clrBtn.style.display='';
-  // Group identical parts (same origName + mat + dims) and keep insertion order
+  // Group identical parts (same origName + mat + dims) and keep insertion order.
+  // Track printedCount per group for the checkmark column.
   var groups={},order=[];
   parts.forEach(function(p){
     var key=p.origName+'|'+p.mat+'|'+p.l+'x'+p.w;
-    if(!groups[key]){groups[key]={name:p.origName,mat:p.mat,l:p.l,w:p.w,qty:0,key:key,hasShape:!!p.shape};order.push(key);}
+    if(!groups[key]){groups[key]={name:p.origName,mat:p.mat,l:p.l,w:p.w,qty:0,printedCount:0,key:key,hasShape:!!p.shape,partIds:[]};order.push(key);}
     groups[key].qty++;
+    groups[key].partIds.push(p.id);
+    if(p.printed) groups[key].printedCount++;
   });
   // Most recently added groups appear first
   order.reverse();
@@ -2650,8 +2945,61 @@ function renderParts(){
     var color=bd?bd.color:'#C0BAA8';
     var flash=(k===_flashAddKey)?' flash':'';
     var shapeTag=g.hasShape?'<span title="DXF shape" style="font-size:9px;color:#3D6B4F;margin-right:1px">📐</span>':'';
-    return '<div class="pli'+flash+'" title="'+esc(g.name)+' · '+esc(g.mat)+(g.hasShape?' · DXF shape':'')+'">'
+    // Print-status checkmark column
+    var printTag;
+    var allDone = g.printedCount >= g.qty;
+    var noneDone = g.printedCount === 0;
+    if (allDone) {
+      printTag = '<span class="pli-print done" title="All '+g.qty+' printed">✓</span>';
+    } else if (noneDone) {
+      printTag = '<span class="pli-print pending" title="Not printed yet">○</span>';
+    } else {
+      printTag = '<span class="pli-print partial" title="'+g.printedCount+' of '+g.qty+' printed">'+g.printedCount+'/'+g.qty+'</span>';
+    }
+    // ── Rotation lock indicator ───────────────────────────────────
+    // State = effective rotation permission for this group.
+    // Priority:
+    //   part.allowRotate === true  → always rotatable (override)
+    //   part.allowRotate === false → locked (override)
+    //   null/undefined             → inherit from material's grain flag
+    // If all parts in group share one explicit override, show it as such;
+    // otherwise show inherited state (with material's grain setting).
+    var groupParts = parts.filter(function(pt){ return g.partIds.indexOf(pt.id) >= 0; });
+    var allowStates = groupParts.map(function(pt){
+      return pt.allowRotate === true ? true
+           : pt.allowRotate === false ? false
+           : null;
+    });
+    var firstState = allowStates[0];
+    var allSame = allowStates.every(function(s){ return s === firstState; });
+    var matHasGrain = !!(bd && bd.grain);
+    var effectiveRotatable;  // true = can rotate, false = locked
+    var rotIconTitle;
+    if (allSame && firstState === true) {
+      effectiveRotatable = true;
+      rotIconTitle = 'Override: rotation allowed (click to reset to material default)';
+    } else if (allSame && firstState === false) {
+      effectiveRotatable = false;
+      rotIconTitle = 'Override: rotation locked (click to reset to material default)';
+    } else if (allSame && firstState === null) {
+      effectiveRotatable = !matHasGrain;
+      rotIconTitle = matHasGrain
+        ? 'Inherits material grain lock (click to override — allow rotation)'
+        : 'Material allows rotation (click to override — lock)';
+    } else {
+      // Mixed overrides in group — just show a neutral icon
+      effectiveRotatable = true;
+      rotIconTitle = 'Mixed rotation settings (click to reset all to material default)';
+    }
+    var rotIcon = effectiveRotatable
+      ? '<span class="pli-rot free" title="'+esc(rotIconTitle)+'" onclick="event.stopPropagation();togglePartRotation(\''+k.replace(/'/g,"\\'")+'\')">🔄</span>'
+      : '<span class="pli-rot lock" title="'+esc(rotIconTitle)+'" onclick="event.stopPropagation();togglePartRotation(\''+k.replace(/'/g,"\\'")+'\')">🔒</span>';
+
+    var rowCls = 'pli' + flash + (allDone ? ' pli-done' : '');
+    return '<div class="'+rowCls+'" title="'+esc(g.name)+' · '+esc(g.mat)+(g.hasShape?' · DXF shape':'')+'">'
       +'<span class="pli-dot" style="background:'+color+'"></span>'
+      +printTag
+      +rotIcon
       +shapeTag
       +'<span class="pli-name">'+esc(g.name)+'</span>'
       +'<span class="pli-dim">'+g.l+'×'+g.w+'</span>'
@@ -2722,10 +3070,21 @@ function filteredPwParts(){
   return filtered;
 }
 function renderPartsWindow(){
-  var filtered=filteredPwParts();
+  var filteredAll=filteredPwParts();
+  // Deduplicate by group key so identical parts show as ONE row
+  // (Qty column reflects how many copies exist). Keep the first occurrence
+  // per key as the row representative.
+  var seen={};
+  var filtered=[];
+  filteredAll.forEach(function(p){
+    var k=partGroupKey(p);
+    if(!seen[k]){ seen[k]=true; filtered.push(p); }
+  });
   var tbody=document.getElementById('pw-tbody');
-  document.getElementById('pw-count').textContent=filtered.length+' / '+parts.length+' parts';
-  var selCount=0;filtered.forEach(function(p){if(pwSel.has(String(p.id)))selCount++;});
+  document.getElementById('pw-count').textContent=filtered.length+' unique / '+parts.length+' parts';
+  // Selection count tracks INDIVIDUAL parts (not rows)
+  var selCount=0;
+  parts.forEach(function(p){ if(pwSel.has(String(p.id))) selCount++; });
   document.getElementById('pw-sel-count').textContent=selCount+' selected';
   document.getElementById('pw-chk-all').checked=filtered.length>0&&filtered.every(function(p){return pwSel.has(String(p.id));});
   // Build material dropdown options (reused per row)
@@ -2753,6 +3112,8 @@ function renderPartsWindow(){
       +'<td style="max-width:220px"><div style="display:flex;align-items:center;gap:4px">'+(p.shape?'<span title="DXF shape — L/W locked" style="font-size:10px;color:#3D6B4F;flex-shrink:0">📐</span>':'')+'<input class="pw-edit pw-edit-name" data-id="'+sid+'" value="'+esc(p.origName)+'" title="'+esc(p.origName)+'" onchange="pwEditField(\''+sid+'\',\'name\',this.value)"></div></td>'
       +'<td><input class="pw-edit pw-edit-num pw-edit-l" data-id="'+sid+'" type="number" min="1" value="'+p.l+'" onchange="pwEditField(\''+sid+'\',\'l\',this.value)"></td>'
       +'<td><input class="pw-edit pw-edit-num pw-edit-w" data-id="'+sid+'" type="number" min="1" value="'+p.w+'" onchange="pwEditField(\''+sid+'\',\'w\',this.value)"></td>'
+      +'<td style="text-align:center;padding:0"><button class="pw-swap-btn" title="Swap L and W for this part (also rotates DXF shape 90°)" onclick="pwSwapRow(\''+sid+'\')">⇆</button></td>'
+      +'<td style="padding:0 2px"><input class="pw-edit pw-edit-num pw-edit-qty" data-id="'+sid+'" type="number" min="1" value="'+countGroupOf(p)+'" title="Total quantity of identical parts (same name + material + L×W + thickness). Editing clones or removes copies." onchange="pwSetQty(\''+sid+'\',this.value)"></td>'
       +'<td style="font-family:monospace;font-size:10px;color:#A09888" data-id="'+sid+'-area">'+((p.l*p.w)/1e6).toFixed(4)+'</td>'
       +'<td><input class="pw-edit pw-edit-num pw-edit-t" data-id="'+sid+'" type="number" min="1" value="'+p.thick+'" onchange="pwEditField(\''+sid+'\',\'thick\',this.value)"></td>'
       +'<td style="max-width:140px">'+dot+matSel+'</td>'
@@ -2780,16 +3141,29 @@ function renderPartsWindow(){
 }
 function pwToggleRow(id){
   id=String(id);
-  if(pwSel.has(id))pwSel.delete(id);else pwSel.add(id);
+  var p=parts.find(function(x){return String(x.id)===id;});
+  if(!p){ renderPartsWindow(); return; }
+  var k=partGroupKey(p);
+  var groupIds=parts.filter(function(x){return partGroupKey(x)===k;}).map(function(x){return String(x.id);});
+  // Toggle entire group based on representative's state
+  if(pwSel.has(id)){
+    groupIds.forEach(function(gid){ pwSel.delete(gid); });
+  } else {
+    groupIds.forEach(function(gid){ pwSel.add(gid); });
+  }
   renderPartsWindow();
 }
 function pwEditField(id,field,val){
   var sid=String(id);
   var p=parts.find(function(x){return String(x.id)===sid;});
   if(!p)return;
+  // Rows represent groups — any edit must update every identical part
+  // (otherwise the group splits and weird duplicates appear).
+  var k=partGroupKey(p);
+  var group=parts.filter(function(x){return partGroupKey(x)===k;});
   if(field==='name'){
     var nm=(val||'').trim();if(!nm)nm='PART';
-    p.origName=nm;p.name=nm;
+    group.forEach(function(pt){ pt.origName=nm; pt.name=nm; });
   } else if(field==='l'||field==='w'||field==='thick'){
     var n=parseInt(val,10);
     if(!n||n<1){alert(t('enterValidNumber'));renderPartsWindow();return;}
@@ -2797,32 +3171,151 @@ function pwEditField(id,field,val){
       alert(t('lwLocked'));
       renderPartsWindow();return;
     }
-    p[field]=n;
+    group.forEach(function(pt){ pt[field]=n; });
   } else if(field==='mat'){
+    val=normalizeMat(val);
     if(!boards.find(function(b){return b.mat===val;}))ensureBoard(val);
-    p.mat=val;
+    group.forEach(function(pt){ pt.mat=val; });
   }
-  // Lightweight update: refresh sidebar summary + area cell without full rerender
-  // (Full rerender would steal focus while user is typing / tabbing.)
-  var areaCell=document.querySelector('[data-id="'+sid+'-area"]');
-  if(areaCell)areaCell.textContent=((p.l*p.w)/1e6).toFixed(4);
-  // update material dot color if mat changed
-  if(field==='mat'){
-    var tr=document.querySelector('tr[data-id="'+sid+'"]');
-    if(tr){
-      var dot=tr.querySelector('td:nth-child(7) > span');
-      var bd=matchBoard(p.mat);
-      if(dot&&bd)dot.style.background=bd.color;
-    }
-  }
-  renderParts(); // sidebar list stays in sync
+  // Full rerender needed since editing may change group key (parts regroup)
+  renderParts();
+  renderPartsWindow();
 }
-function pwDelete(id){var sid=String(id);parts=parts.filter(function(p){return String(p.id)!==sid;});pwSel.delete(sid);renderParts();renderPartsWindow();}
+function pwDelete(id){
+  var sid=String(id);
+  var p=parts.find(function(x){return String(x.id)===sid;});
+  if(!p){ renderPartsWindow(); return; }
+  // Row represents a group — delete every identical part
+  var k=partGroupKey(p);
+  var removeIds={};
+  parts.filter(function(x){return partGroupKey(x)===k;}).forEach(function(x){removeIds[x.id]=true;});
+  parts=parts.filter(function(x){return !removeIds[x.id];});
+  Object.keys(removeIds).forEach(function(id){ pwSel.delete(String(id)); });
+  renderParts();
+  renderPartsWindow();
+}
+
+// ── Group key to detect identical parts (same name + mat + L×W + thickness)
+function partGroupKey(p){
+  return (p.origName||'')+'|'+(p.mat||'')+'|'+p.l+'x'+p.w+'|'+(p.thick||'');
+}
+// Count how many identical copies exist in the parts array
+function countGroupOf(p){
+  var k=partGroupKey(p);
+  var n=0;
+  for(var i=0;i<parts.length;i++) if(partGroupKey(parts[i])===k) n++;
+  return n;
+}
+
+// Swap L/W for every part in this row's group (row represents a group)
+function pwSwapRow(id){
+  var sid=String(id);
+  var p=parts.find(function(x){return String(x.id)===sid;});
+  if(!p) return;
+  var k=partGroupKey(p);
+  parts.filter(function(x){return partGroupKey(x)===k;}).forEach(swapPartDims);
+  renderParts();
+  renderPartsWindow();
+}
+
+// Set total quantity for the group this part belongs to.
+// If N > current: clone the part (N - current) times.
+// If N < current: remove (current - N) copies.
+function pwSetQty(id, val){
+  var sid=String(id);
+  var p=parts.find(function(x){return String(x.id)===sid;});
+  if(!p) return;
+  var n=parseInt(val,10);
+  if(!n||n<1){ alert('Quantity must be at least 1'); renderPartsWindow(); return; }
+  var k=partGroupKey(p);
+  var group=parts.filter(function(x){return partGroupKey(x)===k;});
+  var current=group.length;
+  if(n===current){ renderPartsWindow(); return; }
+  if(n>current){
+    // Clone (n - current) times
+    var toAdd=n-current;
+    var maxId=parts.reduce(function(m,x){return Math.max(m,x.id||0);},0);
+    for(var i=0;i<toAdd;i++){
+      var clone=Object.assign({}, p);
+      clone.eb=Object.assign({}, p.eb||{});
+      clone.id=(maxId + 1 + i);
+      clone.printed=false;
+      parts.push(clone);
+    }
+  } else {
+    // Remove (current - n) copies (prefer those not equal to p)
+    var toRemove=current-n;
+    var removeIds=group.filter(function(x){return x.id!==p.id;}).slice(0, toRemove).map(function(x){return x.id;});
+    if(removeIds.length<toRemove) removeIds.push(p.id);
+    var rmSet={};removeIds.forEach(function(id){rmSet[id]=true;});
+    parts=parts.filter(function(x){return !rmSet[x.id];});
+    removeIds.forEach(function(id){ pwSel.delete(String(id)); });
+  }
+  renderParts();
+  renderPartsWindow();
+}
+
 function pwDeleteSelected(){
   if(!pwSel.size)return;
   if(!confirm(t('confirmDeleteSelected',{n:pwSel.size})))return;
   parts=parts.filter(function(p){return!pwSel.has(String(p.id));});pwSel.clear();renderParts();renderPartsWindow();
 }
+
+// ── Multiply every part in the project by N (clones each part N-1 more times).
+// Used for "5 identical wardrobes from 1 imported project".
+function pwMultiplyAll(){
+  var n=parseInt((document.getElementById('pw-mult-n')||{}).value,10);
+  if(!n||n<2){ alert('Enter a multiplier of 2 or more'); return; }
+  if(!parts.length){ alert('No parts to multiply'); return; }
+  if(!confirm('Multiply all '+parts.length+' parts by '+n+'?\n\nThis will create '+(parts.length*(n-1))+' new parts for a total of '+(parts.length*n)+'.')) return;
+  var original=parts.slice();
+  var maxId=parts.reduce(function(m,x){return Math.max(m,x.id||0);},0);
+  var idCounter=maxId+1;
+  for(var k=1;k<n;k++){
+    original.forEach(function(p){
+      var clone=Object.assign({}, p);
+      clone.eb=Object.assign({}, p.eb||{});
+      // Shape/holes/DXF entities can be shared by reference (they're not mutated per-part)
+      clone.id=idCounter++;
+      clone.printed=false; // fresh copies aren't printed
+      parts.push(clone);
+    });
+  }
+  renderParts();
+  renderPartsWindow();
+}
+
+// Swap L and W of a single part. If the part has a DXF shape polygon,
+// the shape is rotated 90° CW so the outline matches the new L×W bounding box.
+function swapPartDims(p){
+  if(p.shape && p.shape.length){
+    // Rotate shape 90° CW: (x, y) → (y, l - x) so new bbox becomes (w, l)
+    var oldL=p.l;
+    p.shape=p.shape.map(function(pt){
+      return { x: pt.y, y: oldL - pt.x };
+    });
+    if(p.holes){
+      p.holes=p.holes.map(function(hole){
+        return hole.map(function(pt){
+          return { x: pt.y, y: oldL - pt.x };
+        });
+      });
+    }
+  }
+  var tmp=p.l; p.l=p.w; p.w=tmp;
+}
+
+// Swap L/W for all currently selected parts (applies to each selected part
+// individually — no deduplication of groups since the table shows every part).
+function pwSwapSelected(){
+  if(!pwSel.size){ alert('Select one or more parts first, then click Swap L/W'); return; }
+  parts.forEach(function(p){
+    if(pwSel.has(String(p.id))) swapPartDims(p);
+  });
+  renderParts();
+  renderPartsWindow();
+}
+
 function pwAssignToGroup(){
   var gid=parseInt(document.getElementById('pw-grp-assign').value);
   if(!gid||!pwSel.size)return;
@@ -2935,15 +3428,230 @@ function renderGroups(){
 // ═══════════════════════════════════════════════════════════════
 // OPTIMIZER
 // ═══════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════
+// LAYOUT VERSION HISTORY
+// ═══════════════════════════════════════════════════════════════
+// Snapshot/restore the full "layouts" array so operator can:
+//   • compare auto-nested vs manually-tuned arrangements
+//   • protect manual work from accidental re-Optimize
+//   • roll back to a known-good arrangement
+
+// Build a lightweight hash of the current layouts (position, rotation, sheet).
+// Used to detect "did the operator move anything since last auto snapshot?"
+function layoutsFingerprint(){
+  var fp=layouts.length+'/';
+  layouts.forEach(function(l,i){
+    fp+=i+':'+l.matName+'['+l.placements.length+']';
+    l.placements.forEach(function(p){
+      fp+=','+(p.part&&p.part.id)+'@'+p.x+','+p.y+(p.rot?'R':'');
+    });
+    fp+=';';
+  });
+  return fp;
+}
+
+// Deep-clone the current layouts array into a standalone snapshot.
+// Placements store partId rather than part reference so the snapshot is
+// JSON-safe (same shape as what save/load uses).
+function snapshotLayouts(){
+  return layouts.map(function(l){
+    return {
+      idx:l.idx, uw:l.uw, uh:l.uh, sw:l.sw, sh:l.sh, trim:l.trim,
+      matName:l.matName, matColor:l.matColor,
+      grainLocked:!!l.grainLocked, trimWarning:!!l.trimWarning,
+      placements:(l.placements||[]).map(function(pl){
+        return {
+          x:pl.x, y:pl.y, pw:pl.pw, ph:pl.ph,
+          rot:!!pl.rot, color:pl.color,
+          partId:pl.part && pl.part.id
+        };
+      })
+    };
+  });
+}
+
+// Restore a snapshot — reconnects placement partId → live part object.
+// Parts that no longer exist (deleted since snapshot) are silently dropped.
+function restoreSnapshot(snap, restoreCurSheet){
+  var partById={};
+  parts.forEach(function(p){ partById[String(p.id)]=p; });
+  layouts=(snap||[]).map(function(l){
+    return {
+      idx:l.idx, uw:l.uw, uh:l.uh, sw:l.sw, sh:l.sh, trim:l.trim,
+      matName:l.matName, matColor:l.matColor,
+      grainLocked:!!l.grainLocked, trimWarning:!!l.trimWarning,
+      placements:(l.placements||[]).map(function(pl){
+        var pt=partById[String(pl.partId)];
+        if(!pt) return null;
+        return {x:pl.x, y:pl.y, pw:pl.pw, ph:pl.ph, rot:!!pl.rot, color:pl.color, part:pt};
+      }).filter(Boolean)
+    };
+  });
+  if(typeof restoreCurSheet==='number'){
+    curSheet=Math.min(restoreCurSheet, Math.max(0, layouts.length-1));
+  }
+}
+
+// Add a version entry. isAuto=true means it was created by optimize().
+function addVersion(name, isAuto){
+  var v={
+    id: vId++,
+    name: name || ('Version ' + (versions.length+1)),
+    createdAt: new Date().toISOString(),
+    layouts: snapshotLayouts(),
+    curSheet: curSheet,
+    isAuto: !!isAuto
+  };
+  versions.push(v);
+  activeVersionId=v.id;
+  if(isAuto) _autoVersionFp=layoutsFingerprint();
+  renderVersionBar();
+  scheduleSave();
+  return v;
+}
+
+// Operator-triggered: "Save as version…" button
+function saveAsVersion(){
+  if(!layouts.length){ alert('Optimize first before saving a version.'); return; }
+  var defaultName='V'+(versions.length+1)+' — Manual';
+  var name=prompt('Name this version:', defaultName);
+  if(!name) return;
+  name=name.trim();
+  if(!name) return;
+  addVersion(name, false);
+}
+
+// Operator picks a version from the dropdown — restore its layouts.
+function restoreVersion(id){
+  id=parseInt(id,10);
+  if(!id) return;
+  var v=versions.find(function(x){return x.id===id;});
+  if(!v) return;
+  // If current state is dirty AND current version is a different one, warn
+  if(activeVersionId!==v.id && isCurrentDirty()){
+    if(!confirm('Your current layout has unsaved changes. Switching to "'+v.name+'" will discard them. Continue?')) {
+      // Revert dropdown to actual active version
+      renderVersionBar();
+      return;
+    }
+  }
+  restoreSnapshot(v.layouts, v.curSheet);
+  activeVersionId=v.id;
+  // Refresh UI to reflect restored layouts
+  _refreshStats && _refreshStats();
+  buildTabs(); activateTab(curSheet);
+  scheduleExportRebuild();
+  renderVersionBar();
+  scheduleSave();
+}
+
+// Delete a version (asks for confirmation). Can't delete the active one.
+function deleteVersion(id){
+  id=parseInt(id,10);
+  var v=versions.find(function(x){return x.id===id;});
+  if(!v) return;
+  if(id===activeVersionId){ alert('Cannot delete the version you are currently viewing. Switch to a different one first.'); return; }
+  if(!confirm('Delete version "'+v.name+'"? This cannot be undone.')) return;
+  versions=versions.filter(function(x){return x.id!==id;});
+  renderVersionBar();
+  scheduleSave();
+}
+
+// "Is the current layout different from the version it was loaded from?"
+// Used to disable the confirm-dialog when no changes exist.
+function isCurrentDirty(){
+  if(!activeVersionId) return layouts.length>0;
+  var v=versions.find(function(x){return x.id===activeVersionId;});
+  if(!v) return true;
+  // Compare fingerprints
+  var curFp=layoutsFingerprint();
+  // Temporarily restore snapshot to compute its fingerprint, then restore current
+  // (This is ugly but avoids maintaining two parallel codepaths.)
+  var savedLayouts=layouts, savedCur=curSheet;
+  restoreSnapshot(v.layouts, v.curSheet);
+  var verFp=layoutsFingerprint();
+  layouts=savedLayouts; curSheet=savedCur;
+  return curFp!==verFp;
+}
+
+// Repaint the version bar (dropdown + hint).
+function renderVersionBar(){
+  var bar=document.getElementById('ver-bar');
+  var sel=document.getElementById('ver-sel');
+  var hint=document.getElementById('ver-hint');
+  if(!bar||!sel) return;
+  if(!layouts.length && !versions.length){
+    bar.style.display='none';
+    return;
+  }
+  bar.style.display='block';
+  if(!versions.length){
+    sel.innerHTML='<option>— no versions yet —</option>';
+    sel.disabled=true;
+    hint.textContent='Click Optimize to create V1 automatically, or 💾 Save as… to snapshot the current layout.';
+    return;
+  }
+  sel.disabled=false;
+  sel.innerHTML=versions.map(function(v){
+    var sel=v.id===activeVersionId?' selected':'';
+    var marker=v.isAuto?'🤖':'✏️';
+    return '<option value="'+v.id+'"'+sel+'>'+marker+' '+esc(v.name)+'</option>';
+  }).join('');
+  var active=versions.find(function(v){return v.id===activeVersionId;});
+  var dirty=isCurrentDirty();
+  if(!active){
+    hint.innerHTML='<span style="color:#B84040">⚠ No active version</span> — your changes aren\'t saved to a version slot.';
+  } else if(dirty){
+    hint.innerHTML='<span style="color:#8a6d1a">● Modified since "'+esc(active.name)+'"</span> — click 💾 Save as… to keep these changes.';
+  } else {
+    hint.textContent='Viewing: '+active.name+' · '+active.layouts.reduce(function(a,l){return a+l.placements.length;},0)+' parts placed';
+  }
+  // Also attach a delete button for the current version (if it's not the only one)
+  if(versions.length>1){
+    var delBtn='<button onclick="deleteVersion('+activeVersionId+')" title="Delete this version" style="margin-left:6px;border:none;background:transparent;color:#B84040;cursor:pointer;font-size:11px">🗑</button>';
+    hint.innerHTML += ' '+delBtn;
+  }
+}
+
 function optimize(){
   if(!boards.length||!parts.length){alert(t('alertAddBoardsParts'));return;}
+  // ── Guard: warn if operator would lose manual changes by re-optimizing.
+  // Trigger only when layouts already exist AND they've drifted from the
+  // snapshot we took after the previous Optimize.
+  if(layouts.length && _autoVersionFp !== null){
+    var curFp=layoutsFingerprint();
+    if(curFp !== _autoVersionFp){
+      var msg='⚠ Your current layout has manual changes since the last Optimize.\n\n'
+            +'Re-optimizing will REPLACE the arrangement on every sheet.\n\n'
+            +'Tip: click Cancel, then 💾 Save as… to keep your current layout as a named version first.\n\n'
+            +'Continue with re-optimize?';
+      if(!confirm(msg)) return;
+    }
+  }
   var kerf=parseInt(document.getElementById('kerf').value)||0;
   var trim=parseInt(document.getElementById('trim').value)||0;
   layouts=[];selP=null;hovP=null;
   var warnings=[];
+  var unplacedByMat={}; // mat -> count of parts that didn't fit
   var byBoard={};
   parts.forEach(function(p){var bd=matchBoard(p.mat);if(!bd)bd=ensureBoard(p.mat);if(!byBoard[bd.id])byBoard[bd.id]=[];byBoard[bd.id].push(p);});
-  var strategies=[function(a,b){return(b.l*b.w)-(a.l*a.w);},function(a,b){return Math.max(b.l,b.w)-Math.max(a.l,a.w);},function(a,b){return b.l-a.l;},function(a,b){return b.w-a.w;}];
+  // Pack-ordering strategies. The algorithm tries each and keeps the best.
+  // More strategies = better chance of hitting an efficient packing at the
+  // cost of more CPU time (linear in number of strategies).
+  var strategies = [
+    // Area decreasing (classic First Fit Decreasing)
+    function(a, b){ return (b.l*b.w) - (a.l*a.w); },
+    // Longer side decreasing
+    function(a, b){ return Math.max(b.l, b.w) - Math.max(a.l, a.w); },
+    // Shorter side decreasing (sometimes packs tall parts better together)
+    function(a, b){ return Math.min(b.l, b.w) - Math.min(a.l, a.w); },
+    // Height decreasing (good for shelf-like packing)
+    function(a, b){ return b.w - a.w; },
+    // Width decreasing (dual of above)
+    function(a, b){ return b.l - a.l; },
+    // Perimeter decreasing (catches some edge cases)
+    function(a, b){ return (b.l + b.w) - (a.l + a.w); }
+  ];
   boards.forEach(function(bd){
     var bp=byBoard[bd.id];if(!bp||!bp.length)return;
     var uw=bd.w-(trim*2),uh=bd.h-(trim*2),usedTrim=trim;
@@ -2953,17 +3661,31 @@ function optimize(){
       warnings.push('⚠ "'+bd.mat+'" — trim reduced to 0 (parts up to '+maxL+'mm, max safe trim: '+ms+'mm)\n   Operator: cut edge-to-edge, factory edge is straight.');
       uw=bd.w;uh=bd.h;usedTrim=0;
     }
-    var bestLayouts=null,bestEff=-1;
+    var bestLayouts=null,bestEff=-1,bestPlacedIds=null;
     var grainLocked=!!bd.grain;
     strategies.forEach(function(sfn){
       var res=pack(uw,uh,bp.slice().sort(sfn),kerf,bd.color,bd.qty,usedTrim,grainLocked);
       var used=res.reduce(function(a,l){return a+l.placements.reduce(function(b,p){return b+p.pw*p.ph;},0);},0);
       var tot=res.reduce(function(a,l){return a+l.uw*l.uh;},0);
       var e=tot>0?used/tot:0;
-      if(e>bestEff){bestEff=e;bestLayouts=res;}
+      // Prefer strategies that PLACE MORE PARTS first; tie-break by efficiency
+      var placedCount=res.reduce(function(a,l){return a+l.placements.length;},0);
+      var bestPlacedCount=bestLayouts?bestLayouts.reduce(function(a,l){return a+l.placements.length;},0):-1;
+      var pick=(placedCount>bestPlacedCount)||(placedCount===bestPlacedCount&&e>bestEff);
+      if(pick){
+        bestEff=e; bestLayouts=res;
+        var ids={};
+        res.forEach(function(l){l.placements.forEach(function(pl){ids[pl.part.id]=true;});});
+        bestPlacedIds=ids;
+      }
     });
     if(bestLayouts&&bestLayouts.length){
       bestLayouts.forEach(function(l){l.idx=layouts.length;l.matName=bd.mat;l.matColor=bd.color;l.sw=bd.w;l.sh=bd.h;l.trimWarning=(usedTrim===0&&trim>0);layouts.push(l);});
+    }
+    // Count any unplaced parts from this material (exceeded board qty, or didn't fit)
+    var unplacedHere=bp.filter(function(p){ return !bestPlacedIds || !bestPlacedIds[p.id]; });
+    if(unplacedHere.length){
+      unplacedByMat[bd.mat]={count:unplacedHere.length, boardQty:bd.qty, parts:unplacedHere};
     }
   });
   var totA=layouts.reduce(function(a,l){return a+l.uw*l.uh;},0);
@@ -2979,57 +3701,289 @@ function optimize(){
   document.getElementById('wlc').style.display='none';
   document.getElementById('cvc').style.display='block';
   buildExport();buildTabs();curSheet=0;activateTab(0);
-  if(warnings.length)setTimeout(function(){alert(warnings.join('\n\n'));},200);
+  // ── Build unplaced-parts warning (parts that couldn't fit on ANY sheet) ──
+  var totUnplaced=0;
+  for(var m in unplacedByMat) totUnplaced += unplacedByMat[m].count;
+  if(totUnplaced>0){
+    var lines=['⚠ ' + totUnplaced + ' of ' + parts.length + ' parts could not be placed.'];
+    lines.push('');
+    for(var mat in unplacedByMat){
+      var info=unplacedByMat[mat];
+      lines.push('  "'+mat+'": '+info.count+' parts');
+    }
+    lines.push('');
+    lines.push('These parts are larger than the board, or larger than the usable area after trim.');
+    lines.push('Check part dimensions and material board size.');
+    warnings.unshift(lines.join('\n'));
+  }
+  // ── Create an auto version snapshot right after optimize.
+  // If the previous auto version exists, rename it to preserve history
+  // and add a new one with the next V-number.
+  if(layouts.length){
+    var nextV=1;
+    versions.forEach(function(v){
+      // Parse existing "V<n>" style names to find the highest
+      var m=(v.name||'').match(/^V(\d+)/i);
+      if(m) nextV=Math.max(nextV, parseInt(m[1],10)+1);
+    });
+    addVersion('V'+nextV+' — Auto nested', true);
+  }
+  renderVersionBar();
   scheduleSave();
+  if(warnings.length)setTimeout(function(){alert(warnings.join('\n\n'));},200);
 }
 
-function pack(UW,UH,partsIn,kerf,color,maxSheets,trim,grainLocked){
-  var out=[],unplaced=partsIn.slice();
-  // Pre-sort: keep grouped parts together (sort by groupId, then by size within group)
-  unplaced.sort(function(a,b){
-    var ga=a.groupId||'',gb=b.groupId||'';
-    if(ga&&gb&&ga===gb)return(b.l*b.w)-(a.l*a.w); // same group: largest first
-    if(ga&&!gb)return-1; // grouped parts first
-    if(!ga&&gb)return 1;
-    if(ga!==gb)return ga<gb?-1:1;  // different groups: keep groups together
-    return(b.l*b.w)-(a.l*a.w);
+// Maximal Rectangles + Best-Short-Side-Fit bin packing.
+// Reference: Jylänki, "A Thousand Ways to Pack the Bin" (2010).
+// Significantly outperforms guillotine/shelf heuristics on mixed-size parts.
+//
+// Key idea: after placing a part, re-compute the set of all non-overlapping
+// maximal free rectangles on the sheet. That gives the next placement many
+// candidate positions (not just 2 post-split), so small parts fit into
+// leftover pockets that would otherwise be wasted.
+//
+// Heuristic: Best-Short-Side-Fit — picks the free rectangle whose SHORTER
+// leftover side is smallest after insertion. Empirically best rectangle
+// packing score.
+function pack(UW, UH, partsIn, kerf, color, _ignoredMaxSheets, trim, grainLocked){
+  var out = [], unplaced = partsIn.slice();
+  // Pre-sort: keep grouped parts together. Don't re-sort non-grouped parts —
+  // the caller (`optimize()`) already sorted them using its chosen strategy,
+  // so we preserve that ordering here.
+  unplaced.sort(function(a, b){
+    var ga = a.groupId || '', gb = b.groupId || '';
+    if (ga && gb && ga === gb) return (b.l*b.w) - (a.l*a.w); // same group: largest first
+    if (ga && !gb) return -1;                                  // grouped before non-grouped
+    if (!ga && gb) return 1;
+    if (ga !== gb) return ga < gb ? -1 : 1;                    // different groups stay together
+    return 0;                                                  // non-grouped: preserve caller's order
   });
-  for(var si=0;si<maxSheets&&unplaced.length;si++){
-    var placements=[],free=[{x:0,y:0,w:UW,h:UH}],ci=0,placed=[];
+
+  // Safety cap against algorithmic bugs that would spin forever
+  var SAFETY_CAP = 10000;
+  var prevUnplacedLen = -1;
+  for (var si = 0; si < SAFETY_CAP && unplaced.length; si++){
+    if (si > 0 && unplaced.length === prevUnplacedLen) break;
+    prevUnplacedLen = unplaced.length;
+
+    // Start each sheet with one big free rectangle covering the usable area
+    var free = [{ x: 0, y: 0, w: UW, h: UH }];
+    var placements = [];
+    var placed = [];
+    var ci = 0;
+
+    // Place one part at a time using the current free-rectangle list.
+    // After each placement, recompute free rectangles as the Maximal Rectangles
+    // of (old free list) minus (newly placed rect).
     unplaced.forEach(function(p){
-      var best={score:Infinity,ri:-1,rot:false,x:0,y:0,pw:0,ph:0};
-      // Grouped parts: don't rotate unless all same-group parts have same dims (pattern matching)
-      var noRot=grainLocked||(p.groupId?true:false);
-      var tries=noRot?[[p.l,p.w]]:[[p.l,p.w],[p.w,p.l]];
-      tries.forEach(function(t,ti){
-        free.forEach(function(fr,ri){
-          var pw=t[0]+kerf,ph=t[1]+kerf;
-          if(pw<=fr.w&&ph<=fr.h){
-            // Prefer placing grouped parts adjacent to existing group members
-            var sc=fr.w*fr.h-pw*ph;
-            if(p.groupId){
-              // Bonus score for being adjacent to another group member already placed
-              var adj=placements.some(function(pl){return pl.part.groupId===p.groupId&&(Math.abs(pl.x-(fr.x+t[0]+kerf))<kerf+5||Math.abs(pl.y-(fr.y+t[1]+kerf))<kerf+5);});
-              if(adj)sc-=UW*UH*0.5; // strong preference to stay together
+      // Rotation rule (unchanged from original)
+      var noRot;
+      if (p.allowRotate === true)       noRot = false;
+      else if (p.allowRotate === false) noRot = true;
+      else                              noRot = grainLocked || (p.groupId ? true : false);
+      var tries = noRot ? [[p.l, p.w, false]]
+                        : [[p.l, p.w, false], [p.w, p.l, true]];
+
+      var best = { score1: Infinity, score2: Infinity, x: 0, y: 0, pw: 0, ph: 0, rot: false, found: false };
+      tries.forEach(function(t){
+        var pw = t[0] + kerf, ph = t[1] + kerf;
+        for (var fi = 0; fi < free.length; fi++){
+          var fr = free[fi];
+          if (pw <= fr.w && ph <= fr.h){
+            // Best-Short-Side-Fit: primary score is shorter leftover side;
+            // secondary is longer leftover side (tiebreak)
+            var leftW = fr.w - pw, leftH = fr.h - ph;
+            var shortSide = Math.min(leftW, leftH);
+            var longSide  = Math.max(leftW, leftH);
+            // Group bonus: parts in the same group prefer to stay adjacent
+            if (p.groupId){
+              var adj = placements.some(function(pl){
+                if (pl.part.groupId !== p.groupId) return false;
+                // Touching on any edge counts as adjacent
+                var plR = pl.x + pl.pw, plB = pl.y + pl.ph;
+                var frR = fr.x + pw,    frB = fr.y + ph;
+                var horizTouch = (Math.abs(plR - fr.x) < kerf + 2 || Math.abs(frR - pl.x) < kerf + 2)
+                                 && !(plB < fr.y || frB < pl.y);
+                var vertTouch  = (Math.abs(plB - fr.y) < kerf + 2 || Math.abs(frB - pl.y) < kerf + 2)
+                                 && !(plR < fr.x || frR < pl.x);
+                return horizTouch || vertTouch;
+              });
+              if (adj) shortSide -= 10000; // strong preference to stay together
             }
-            if(sc<best.score)best={score:sc,ri:ri,rot:ti===1,x:fr.x,y:fr.y,pw:t[0],ph:t[1]};
+            if (shortSide < best.score1 || (shortSide === best.score1 && longSide < best.score2)){
+              best = {
+                score1: shortSide, score2: longSide,
+                x: fr.x, y: fr.y,
+                pw: t[0], ph: t[1],
+                rot: t[2], found: true
+              };
+            }
           }
-        });
+        }
       });
-      if(best.ri<0)return;
-      placements.push({part:p,x:best.x,y:best.y,pw:best.pw,ph:best.ph,rot:best.rot,color:tint(color,ci++)});
+
+      if (!best.found) return; // doesn't fit on this sheet — will try again next sheet
+
+      // Record the placement
+      placements.push({
+        part: p, x: best.x, y: best.y,
+        pw: best.pw, ph: best.ph,
+        rot: best.rot, color: tint(color, ci++)
+      });
       placed.push(p);
-      var fr=free[best.ri],uw=best.pw+kerf,uh=best.ph+kerf;
-      free.splice(best.ri,1);
-      var r1a={x:fr.x+uw,y:fr.y,w:fr.w-uw,h:uh},r1b={x:fr.x,y:fr.y+uh,w:fr.w,h:fr.h-uh};
-      var r2a={x:fr.x+uw,y:fr.y,w:fr.w-uw,h:fr.h},r2b={x:fr.x,y:fr.y+uh,w:uw,h:fr.h-uh};
-      var s1=Math.min(r1a.w*r1a.h,r1b.w*r1b.h),s2=Math.min(r2a.w*r2a.h,r2b.w*r2b.h);
-      (s1>=s2?[r1a,r1b]:[r2a,r2b]).forEach(function(r){if(r.w>5&&r.h>5)free.push(r);});
-      free.sort(function(a,b){return a.w*a.h-b.w*b.h;});
+
+      // Subtract the placed rectangle (including kerf) from every free rect
+      // and recompute the Maximal Rectangles set.
+      var usedRect = { x: best.x, y: best.y, w: best.pw + kerf, h: best.ph + kerf };
+      free = subtractRectFromFreeList(free, usedRect);
     });
-    placed.forEach(function(p){unplaced=unplaced.filter(function(u){return u.id!==p.id;});});
-    if(placements.length)out.push({uw:UW,uh:UH,trim:trim,placements:placements,grainLocked:grainLocked});
+
+    placed.forEach(function(p){ unplaced = unplaced.filter(function(u){ return u.id !== p.id; }); });
+    if (placements.length){
+      // Gravity compaction: snap each part left, then up, against the closest
+      // existing part edge. Much faster than 1-pixel stepping. Up to 3 passes
+      // for convergence.
+      for (var gi = 0; gi < 3; gi++){
+        var movedAny = false;
+        // Process top-to-bottom, left-to-right so parts fall into settled neighbors
+        placements.sort(function(a, b){ return (a.y - b.y) || (a.x - b.x); });
+        placements.forEach(function(pl){
+          // Shift left: find the largest x' < pl.x such that pl at (x', pl.y) doesn't collide
+          var newX = findSnapLeft(pl, placements, kerf);
+          if (newX < pl.x){ pl.x = newX; movedAny = true; }
+          // Shift up
+          var newY = findSnapUp(pl, placements, kerf);
+          if (newY < pl.y){ pl.y = newY; movedAny = true; }
+        });
+        if (!movedAny) break;
+      }
+      out.push({ uw: UW, uh: UH, trim: trim, placements: placements, grainLocked: grainLocked });
+    }
   }
+  return out;
+}
+
+// Find the leftmost x >= 0 where `pl` can sit at (x, pl.y) without colliding
+// with any other placement. Candidate positions are 0 and the right edge of
+// every part that overlaps pl's y-band.
+function findSnapLeft(pl, all, kerf){
+  var candidates = [0];
+  for (var i = 0; i < all.length; i++){
+    var o = all[i];
+    if (o === pl) continue;
+    // Only parts whose y-band overlaps pl's y-band can block horizontal motion
+    if (o.y + o.ph + kerf > pl.y && o.y < pl.y + pl.ph + kerf){
+      candidates.push(o.x + o.pw + kerf); // right edge + kerf
+    }
+  }
+  // Sort descending, pick the largest that's ≤ pl.x and doesn't collide
+  candidates.sort(function(a, b){ return b - a; });
+  for (var k = 0; k < candidates.length; k++){
+    var cx = candidates[k];
+    if (cx > pl.x) continue;
+    // Try placing at (cx, pl.y) — check against all OTHER parts
+    if (!collidesAt(pl, cx, pl.y, all, kerf)) return cx;
+  }
+  return pl.x;
+}
+
+// Find the topmost y >= 0 where `pl` can sit at (pl.x, y) without colliding.
+function findSnapUp(pl, all, kerf){
+  var candidates = [0];
+  for (var i = 0; i < all.length; i++){
+    var o = all[i];
+    if (o === pl) continue;
+    if (o.x + o.pw + kerf > pl.x && o.x < pl.x + pl.pw + kerf){
+      candidates.push(o.y + o.ph + kerf);
+    }
+  }
+  candidates.sort(function(a, b){ return b - a; });
+  for (var k = 0; k < candidates.length; k++){
+    var cy = candidates[k];
+    if (cy > pl.y) continue;
+    if (!collidesAt(pl, pl.x, cy, all, kerf)) return cy;
+  }
+  return pl.y;
+}
+
+// Check if placement `pl` would collide with any other in `all` if moved to (x, y)
+function collidesAt(pl, x, y, all, kerf){
+  for (var i = 0; i < all.length; i++){
+    var o = all[i];
+    if (o === pl) continue;
+    if (x < o.x + o.pw + kerf &&
+        x + pl.pw + kerf > o.x &&
+        y < o.y + o.ph + kerf &&
+        y + pl.ph + kerf > o.y){
+      return true;
+    }
+  }
+  return false;
+}
+
+// Core Maximal Rectangles operation: remove `used` from every rectangle in
+// `free`, splitting each intersecting rect into up to 4 children, then
+// drop any rect that's fully contained in another (to keep only maximal ones).
+function subtractRectFromFreeList(free, used){
+  var result = [];
+  for (var i = 0; i < free.length; i++){
+    var fr = free[i];
+    if (!rectsOverlap(fr, used)){
+      // No intersection — rect survives as-is
+      result.push(fr);
+      continue;
+    }
+    // Split: for each side of `used` that cuts into `fr`, create a child rect
+    // covering the strip of `fr` outside that side.
+    //   Left strip:   fr.x .. used.x
+    if (used.x > fr.x && used.x < fr.x + fr.w){
+      result.push({ x: fr.x, y: fr.y, w: used.x - fr.x, h: fr.h });
+    }
+    //   Right strip:  (used.x + used.w) .. (fr.x + fr.w)
+    if (used.x + used.w > fr.x && used.x + used.w < fr.x + fr.w){
+      result.push({ x: used.x + used.w, y: fr.y, w: fr.x + fr.w - (used.x + used.w), h: fr.h });
+    }
+    //   Top strip:    fr.y .. used.y
+    if (used.y > fr.y && used.y < fr.y + fr.h){
+      result.push({ x: fr.x, y: fr.y, w: fr.w, h: used.y - fr.y });
+    }
+    //   Bottom strip: (used.y + used.h) .. (fr.y + fr.h)
+    if (used.y + used.h > fr.y && used.y + used.h < fr.y + fr.h){
+      result.push({ x: fr.x, y: used.y + used.h, w: fr.w, h: fr.y + fr.h - (used.y + used.h) });
+    }
+  }
+  // Discard tiny slivers that can't fit any real part (helps speed + cleanliness)
+  result = result.filter(function(r){ return r.w > 2 && r.h > 2; });
+  // Remove any rectangle fully contained in another — keeps only maximal ones
+  return pruneNonMaximal(result);
+}
+
+function rectsOverlap(a, b){
+  return !(a.x >= b.x + b.w || a.x + a.w <= b.x ||
+           a.y >= b.y + b.h || a.y + a.h <= b.y);
+}
+
+// Drop rectangles that are fully contained inside another rectangle in the list.
+// O(n²) but n stays small for typical sheets (< a few hundred even in worst case).
+function pruneNonMaximal(rects){
+  var n = rects.length;
+  var keep = new Array(n).fill(true);
+  for (var i = 0; i < n; i++){
+    if (!keep[i]) continue;
+    for (var j = 0; j < n; j++){
+      if (i === j || !keep[j]) continue;
+      // Is rects[i] contained in rects[j]?
+      var a = rects[i], b = rects[j];
+      if (a.x >= b.x && a.y >= b.y &&
+          a.x + a.w <= b.x + b.w &&
+          a.y + a.h <= b.y + b.h){
+        keep[i] = false;
+        break;
+      }
+    }
+  }
+  var out = [];
+  for (var k = 0; k < n; k++) if (keep[k]) out.push(rects[k]);
   return out;
 }
 
@@ -3116,6 +4070,7 @@ function draw(lay){
     var x=tx+p.x*SC,y=ty+p.y*SC,w=p.pw*SC,h=p.ph*SC;
     var isSel=p===selP,isHov=p===hovP&&!dragging;
     var isDragged=p===dragP&&dragging;
+    var isPrinted=!!(p.part&&p.part.printed);
     var hasShape=!!(p.part&&p.part.shape&&p.part.shape.length>=3);
     var holes=(p.part&&p.part.holes)||[];
     // Group color ring
@@ -3154,6 +4109,46 @@ function draw(lay){
       if(grp){ctx.strokeStyle=grp.color;ctx.lineWidth=isSel?3:2;ctx.strokeRect(x+1,y+1,w-2,h-2);}
       ctx.strokeStyle=isSel?'#1C1A14':isDragged?'#3D6B4F':'rgba(0,0,0,.3)';
       ctx.lineWidth=isSel?2.5:isDragged?2:1;ctx.strokeRect(x+.5,y+.5,w-1,h-1);
+    }
+    // ── PRINTED STATE: green tint overlay + corner checkmark badge ──
+    if(isPrinted){
+      if(hasShape){
+        // Tint inside the actual shape (respecting holes) with green
+        traceShapePathWithHoles(ctx,p,x,y,SC);
+        ctx.fillStyle='rgba(61,107,79,.28)';
+        ctx.fill('evenodd');
+      } else {
+        ctx.fillStyle='rgba(61,107,79,.28)';
+        ctx.fillRect(x,y,w,h);
+      }
+      // Diagonal stripe pattern for extra clarity (every ~12px)
+      ctx.save();
+      ctx.beginPath();
+      if(hasShape){traceShapePathWithHoles(ctx,p,x,y,SC);ctx.clip('evenodd');}
+      else {ctx.rect(x,y,w,h);ctx.clip();}
+      ctx.strokeStyle='rgba(61,107,79,.22)';
+      ctx.lineWidth=1;
+      var step=12;
+      for(var si=-h;si<w+h;si+=step){
+        ctx.beginPath();
+        ctx.moveTo(x+si, y);
+        ctx.lineTo(x+si+h, y+h);
+        ctx.stroke();
+      }
+      ctx.restore();
+      // Small green ✓ badge in the top-right corner of the bbox
+      if(w>18&&h>14){
+        var bSize=Math.min(14, Math.min(w,h)*0.35);
+        var bx=x+w-bSize-2, by=y+2;
+        ctx.fillStyle='#3D6B4F';
+        ctx.beginPath();
+        ctx.arc(bx+bSize/2, by+bSize/2, bSize/2, 0, Math.PI*2);
+        ctx.fill();
+        ctx.fillStyle='#fff';
+        ctx.font='bold '+Math.max(8,Math.round(bSize*0.8))+'px sans-serif';
+        ctx.textAlign='center'; ctx.textBaseline='middle';
+        ctx.fillText('✓', bx+bSize/2, by+bSize/2+0.5);
+      }
     }
     if(w>26&&h>15){
       var fs=Math.max(8,Math.min(11,w/11));
@@ -3309,9 +4304,11 @@ function bindCanvas(lay){
       if(_dragMoved){
         var resolved=resolveCollision(lay,dragP,dragP.x,dragP.y);
         dragP.x=resolved.x;dragP.y=resolved.y;
-        draw(lay);scheduleExportRebuild();scheduleSave();
+        dragging=false;dragP=null;  // clear drag state BEFORE save so scheduleSave doesn't skip
+        draw(lay);scheduleExportRebuild();scheduleSave();renderVersionBar();
+      } else {
+        dragging=false;dragP=null;
       }
-      dragging=false;dragP=null;
     }else{dragging=false;dragP=null;}
     cv.style.cursor='crosshair';
   };
@@ -3328,7 +4325,12 @@ function bindCanvas(lay){
     if(h){e.preventDefault();openModal(h,lay);return false;}
   };
   cv.onmouseleave=function(){
-    if(dragging&&dragP){var r=resolveCollision(lay,dragP,dragP.x,dragP.y);dragP.x=r.x;dragP.y=r.y;dragging=false;dragP=null;draw(lay);scheduleExportRebuild();scheduleSave();}
+    if(dragging&&dragP){
+      var r=resolveCollision(lay,dragP,dragP.x,dragP.y);
+      dragP.x=r.x;dragP.y=r.y;
+      dragging=false;dragP=null;  // clear drag state BEFORE save so scheduleSave doesn't skip
+      draw(lay);scheduleExportRebuild();scheduleSave();
+    }
     hovP=null;if(tip)tip.style.display='none';
   };
 }
@@ -3719,9 +4721,11 @@ function printSheetSVG(lay,widthMm){
       }
     }
     // Edge dimension callouts — bold monospace, larger than name, with a white pill
-    // behind them so they stay readable against any part color.
-    var dimFs=Math.max(12,Math.min(20,Math.min(pw,ph)/7));
-    var dimMargin=4;
+    // behind them so they stay readable against any part color. Font size is
+    // proportional to the smaller part dimension but with a higher floor/ceiling
+    // so dims stay legible when printed at A4 size.
+    var dimFs=Math.max(18,Math.min(32,Math.min(pw,ph)/5));
+    var dimMargin=5;
     var lDimText=pw+''; // length (horizontal dimension)
     var wDimText=ph+''; // width (vertical dimension)
     // Estimate each dim's text width (monospace bold ~0.62 × fontSize)
@@ -3732,14 +4736,14 @@ function printSheetSVG(lay,widthMm){
     if(pw>=40 && ph>=30){
       var ly=ay+dimFs+dimMargin;
       var lrX=cx-lDimW/2-3, lrY=ly-dimFs*0.75, lrW=lDimW+6, lrH=dimFs*1.1;
-      svg+='<rect x="'+lrX+'" y="'+lrY+'" width="'+lrW+'" height="'+lrH+'" fill="#FDFCF9" fill-opacity="0.75" rx="1.5"/>';
+      svg+='<rect x="'+lrX+'" y="'+lrY+'" width="'+lrW+'" height="'+lrH+'" fill="#FDFCF9" fill-opacity="0.92" stroke="#1C1A14" stroke-width="0.3" rx="1.5"/>';
       svg+='<text x="'+cx+'" y="'+ly+'" text-anchor="middle" dominant-baseline="middle" font-size="'+dimFs+'" font-family="monospace" font-weight="700" fill="#1C1A14">'+lDimText+'</text>';
     }
     // Vertical dimension (W) pill near left edge, rotated -90°
     if(ph>=40 && pw>=30){
       var wx=ax+dimFs+dimMargin;
       var wrX=wx-dimFs*0.55, wrY=cy-wDimW/2-3, wrW=dimFs*1.1, wrH=wDimW+6;
-      svg+='<rect x="'+wrX+'" y="'+wrY+'" width="'+wrW+'" height="'+wrH+'" fill="#FDFCF9" fill-opacity="0.75" rx="1.5"/>';
+      svg+='<rect x="'+wrX+'" y="'+wrY+'" width="'+wrW+'" height="'+wrH+'" fill="#FDFCF9" fill-opacity="0.92" stroke="#1C1A14" stroke-width="0.3" rx="1.5"/>';
       svg+='<text x="'+wx+'" y="'+cy+'" text-anchor="middle" dominant-baseline="middle" font-size="'+dimFs+'" font-family="monospace" font-weight="700" fill="#1C1A14" transform="rotate(-90 '+wx+' '+cy+')">'+wDimText+'</text>';
     }
     // Centered name — drawn AFTER the dimension pills so it overlaps cleanly if ever needed
@@ -3899,10 +4903,20 @@ function buildPrintView(){
     var usedA=placements.reduce(function(n,p){return n+p.pw*p.ph;},0);
     var eff=lay.uw*lay.uh?Math.round(usedA/(lay.uw*lay.uh)*100):0;
     var matLabel=esc(lay.matName||'?');
-    html+='<div class="pp">'+header(t('sheetPageTitle',{n:i+1,total:layouts.length}));
+    // Density tier based on row count. Thresholds tuned so the table
+    // always fits on one A4 alongside the SVG preview and specs.
+    //   ≤15 rows : default (font 10px, comfortable)
+    //   16-25    : .dense        (font 8px, SVG shrinks to 85mm)
+    //   26-40    : .ultra-dense  (font 7px, SVG shrinks to 70mm)
+    //   41+      : .nano-dense   (font 6px, SVG shrinks to 60mm)
+    var densityCls = placements.length <= 15 ? ''
+                   : placements.length <= 25 ? 'dense'
+                   : placements.length <= 40 ? 'ultra-dense'
+                   : 'nano-dense';
+    html+='<div class="pp sheet-page '+densityCls+'">'+header(t('sheetPageTitle',{n:i+1,total:layouts.length}));
     html+='<h1 style="margin-top:4px;font-size:18px"><span style="display:inline-block;width:12px;height:12px;background:'+lay.matColor+';border-radius:50%;vertical-align:middle;margin-right:6px"></span>'+matLabel+' — '+t('sheetLabel',{n:i+1})+'</h1>';
-    // SVG sheet at ~170mm width (fits A4 minus margins)
-    html+='<div style="text-align:center;margin:8px 0 4px">'+printSheetSVG(lay,170)+'</div>';
+    // SVG sheet — constrained by .pp-sheet-svg CSS to fit within page height.
+    html+='<div class="pp-sheet-svg">'+printSheetSVG(lay,170)+'</div>';
     // Specs & parts below
     html+='<div class="sheet-specs">'
       +'<div class="row"><span>'+t('boardSize')+'</span><b>'+lay.sw+' × '+lay.sh+' mm</b></div>'
@@ -3912,8 +4926,8 @@ function buildPrintView(){
       +(lay.grainLocked?'<div class="row"><span>'+t('grainLock')+'</span><b>'+t('locked')+' ↑</b></div>':'')
       +(lay.trimWarning?'<div class="row" style="color:#B84040"><span>⚠ '+t('trimWarn')+'</span></div>':'')
       +'</div>';
-    // Parts table
-    html+='<table class="ppt"><thead><tr>'
+    // Parts table wrapped so overflow is hidden (shouldn't happen with density tiers, but safe)
+    html+='<div class="pp-parts-wrap"><table class="ppt"><thead><tr>'
       +'<th class="num">#</th><th>'+t('name')+'</th>'
       +'<th class="num">'+t('lengthMm')+'</th><th class="num">'+t('widthMm')+'</th>'
       +'<th class="num">'+t('thickCol')+'</th><th class="num">'+t('posCol')+'</th>'
@@ -3933,7 +4947,7 @@ function buildPrintView(){
         +'<td style="font-size:9px">'+esc(ebStr)+'</td>'
         +'</tr>';
     });
-    html+='</tbody></table>';
+    html+='</tbody></table></div>';
     html+=footer(pageNo++,totalPages)+'</div>';
   });
   // ── SUMMARY / ALL-PARTS INDEX PAGE ──
@@ -4246,6 +5260,98 @@ function makeCSV(){
 }
 
 // ═══════════════════════════════════════════════════════════════
+// EXPORT FOR DEEPNEST / SVGNEST (true-shape nesting)
+// ═══════════════════════════════════════════════════════════════
+// Generates one SVG per material, each containing:
+//  - A bin rectangle sized from the board (Deepnest picks it as the bin)
+//  - One polygon per part. Parts with a DXF shape use that shape;
+//    parts without a shape become a rectangle of their L×W dims.
+//  - Identical parts are emitted multiple times (Deepnest nests them all).
+// The operator:
+//  1. opens https://deepnest.io (or https://svgnest.com)
+//  2. drags the .svg file in
+//  3. selects the bin rectangle as the "sheet"
+//  4. clicks Start Nest, waits, clicks Stop, exports SVG/DXF
+//  5. imports the nested file elsewhere (vCarve etc.)
+function exportForDeepnest(){
+  if(!parts.length){ alert('No parts to export. Import or add parts first.'); return; }
+  // Group parts by material (one SVG per material)
+  var byMat={};
+  parts.forEach(function(p){
+    var m=p.mat||'UNKNOWN';
+    if(!byMat[m])byMat[m]=[];
+    byMat[m].push(p);
+  });
+  var mats=Object.keys(byMat);
+  var files=[];
+  mats.forEach(function(mat){
+    var bd=matchBoard(mat);
+    // Board dimensions (fall back to 2800x2070 if no board defined)
+    var bw=bd?bd.w:2800, bh=bd?bd.h:2070;
+    var trim=parseInt((document.getElementById('trim')||{}).value||0)||0;
+    // Usable area accounting for trim (shrinks the bin on all sides)
+    var uw=bw-trim*2, uh=bh-trim*2;
+    var group=byMat[mat];
+    // SVG viewBox must be large enough to fit bin + all parts side-by-side to the right
+    // so Deepnest can see them as separate elements.
+    // Put bin at (0,0), parts start at x = bw + 50 and stack rightward.
+    var maxPartW=Math.max.apply(null, group.map(function(p){return Math.max(p.l,p.w);}));
+    var svgW = bw + 50 + (group.length * (maxPartW + 10));
+    var svgH = Math.max(bh, maxPartW) + 20;
+    var svg = [];
+    svg.push('<?xml version="1.0" encoding="UTF-8"?>');
+    svg.push('<svg xmlns="http://www.w3.org/2000/svg" version="1.1" width="'+svgW+'mm" height="'+svgH+'mm" viewBox="0 0 '+svgW+' '+svgH+'" units="mm">');
+    svg.push('<!-- FabFlow export for Deepnest / SVGnest -->');
+    svg.push('<!-- Material: '+mat+' | Board: '+bw+' × '+bh+' mm | Trim: '+trim+' mm | Parts: '+group.length+' -->');
+    // Bin rectangle (use usable area, not full board, so parts respect trim)
+    svg.push('<rect id="bin" x="0" y="0" width="'+uw+'" height="'+uh+'" fill="none" stroke="black" stroke-width="1"/>');
+    // Emit each part as a separate polygon
+    var px = bw + 50; // starting x for part-area
+    group.forEach(function(p, i){
+      var pathD;
+      if(p.shape && p.shape.length>=3){
+        // Use the real DXF outline. Shape points are in local (0,0)-(l,w) coords
+        pathD = p.shape.map(function(pt, k){
+          return (k===0?'M':'L') + (px + pt.x).toFixed(2) + ' ' + (pt.y).toFixed(2);
+        }).join(' ') + ' Z';
+        // Also include holes as sub-paths (even-odd fill handles them)
+        if(p.holes && p.holes.length){
+          p.holes.forEach(function(h){
+            pathD += ' ' + h.map(function(pt, k){
+              return (k===0?'M':'L') + (px + pt.x).toFixed(2) + ' ' + (pt.y).toFixed(2);
+            }).join(' ') + ' Z';
+          });
+        }
+      } else {
+        // No shape — use a rectangle of L×W
+        pathD = 'M'+px+' 0 L'+(px+p.l)+' 0 L'+(px+p.l)+' '+p.w+' L'+px+' '+p.w+' Z';
+      }
+      var safeName = (p.origName||'part').replace(/[^A-Za-z0-9_\-]/g,'_').substring(0,30);
+      svg.push('<path id="part_'+p.id+'_'+safeName+'" d="'+pathD+'" fill="none" stroke="black" stroke-width="0.5" fill-rule="evenodd"/>');
+      px += (Math.max(p.l,p.w) + 10);
+    });
+    svg.push('</svg>');
+    var safeMat = mat.replace(/[^A-Za-z0-9_\-]/g,'_').substring(0,30);
+    files.push({ name: 'fabflow_nest_'+safeMat+'.svg', text: svg.join('\n') });
+  });
+  // Download all files
+  files.forEach(function(f, i){
+    setTimeout(function(){ download(f.name, f.text); }, i*200); // stagger to avoid browser blocking multiple downloads
+  });
+  // Show instructions
+  var msg = '✓ Exported ' + files.length + ' SVG file' + (files.length>1?'s':'') + ' (one per material).\n\n';
+  msg += 'Next steps:\n';
+  msg += '1. Open https://deepnest.io (download) or https://svgnest.com (online)\n';
+  msg += '2. For each material, drag the SVG into the nester\n';
+  msg += '3. Select the rectangle with id="bin" as the sheet\n';
+  msg += '4. Click Start Nest, wait for a good result, click Stop\n';
+  msg += '5. Export the nested result as SVG or DXF\n\n';
+  msg += 'The nested DXF can then be sent to vCarve or your CNC.\n';
+  msg += '(Future FabFlow version will auto-import nested results.)';
+  setTimeout(function(){ alert(msg); }, 300 + files.length*200);
+}
+
+// ═══════════════════════════════════════════════════════════════
 // LABEL MODAL with QR code
 // ═══════════════════════════════════════════════════════════════
 var _labelPart=null;
@@ -4259,8 +5365,20 @@ function openModal(p,lay){
   if(!modal){console.warn('openModal: #modal element missing');return;}
   if(mname)mname.textContent=p.part.origName||'';
   try{buildLabel(p,lay);}catch(e){console.error('buildLabel failed:',e);}
-  try{if(zpl)zpl.textContent=buildZPL(p,lay);}catch(e){console.error('buildZPL failed:',e);}
+  // buildZPL is now async (returns a Promise). Resolve into hidden #zpl for saveZPL.
+  if (zpl) {
+    zpl.textContent = '';
+    try {
+      var prom = buildZPL(p, lay);
+      if (prom && typeof prom.then === 'function') {
+        prom.then(function(s){ zpl.textContent = s; }).catch(function(e){ console.error('buildZPL failed:', e); });
+      } else {
+        zpl.textContent = prom || '';
+      }
+    } catch(e){ console.error('buildZPL failed:', e); }
+  }
   if(pst)pst.textContent='';
+  try{refreshXlsmInfo();}catch(e){}
   modal.classList.add('open');
 }
 function closeModal(){
@@ -4346,7 +5464,16 @@ function partToSVG(pw, ph, hasCNC, idx){
 }
 
 function buildLabel(p,lay){
-  var part=p.part, eb=part.eb||{};
+  var part=p.part;
+  // Branch on whether this part came from a SWOOD .xlsm (labelRange) or is
+  // a standalone part (DXF import / manual add). Different preview layouts
+  // because they print via completely different paths (Excel vs ZPL).
+  if (!part.labelRange) {
+    buildSimpleLabel(p, lay);
+    return;
+  }
+
+  var eb=part.eb||{};
   var dims = p.pw+'.0x'+p.ph+'.0x'+part.thick+'.0';
   var sn   = part.origName.split('_').slice(0,3).join('_');
   var shNum= lay?lay.idx+1:1;
@@ -4398,109 +5525,327 @@ function buildLabel(p,lay){
   h+='<div class="lc lmat lc-l" style="grid-column:span 2">'+esc('MAT: '+part.mat)+'</div>';
   h+='<div class="lc lfull lc-l" style="grid-column:span 3;font-size:7px">'+esc(part.origName)+'</div>';
 
-  document.getElementById('lprev').innerHTML=h;
+  var lp = document.getElementById('lprev');
+  lp.classList.remove('simple');
+  lp.innerHTML = h;
+}
+
+// ── Simple preview for parts without xlsm data ──
+// Matches the SWOOD PDF summary style: part shape (actual DXF outline if
+// available) with edge dims + QR in bottom-right.
+function buildSimpleLabel(p, lay){
+  var part = p.part;
+  var pw = Math.round(p.pw || part.l || 100);
+  var ph = Math.round(p.ph || part.w || 100);
+  var thick = part.thick || 18;
+  var name = part.origName || '';
+  var mat = part.mat || '';
+  var idx = 1;
+  if (lay && lay.placements) {
+    var i = lay.placements.indexOf(p);
+    if (i >= 0) idx = i + 1;
+  }
+  var qrData = name || ('part-' + idx);
+
+  // SVG designed in landscape 792 × 400 coord space.
+  var W = 792, H = 400;
+
+  // QR area reserved in bottom-right. Bigger QR per user feedback.
+  var qrSize = 130;
+  var qrX = W - qrSize - 14;
+  var qrY = H - qrSize - 14;
+
+  // Shape area (leave room for QR at right, material text at bottom)
+  var SA_X = 50, SA_Y = 30;
+  var SA_W = W - SA_X - qrSize - 30;       // stop before QR
+  var SA_H = H - SA_Y - 50;                 // stop before bottom text row
+  var scale = Math.min(SA_W / pw, SA_H / ph);
+  var shW = Math.round(pw * scale);
+  var shH = Math.round(ph * scale);
+  var shX = SA_X + Math.round((SA_W - shW) / 2);
+  var shY = SA_Y + Math.round((SA_H - shH) / 2);
+
+  // Build shape path — prefer actual DXF outline when available
+  var shapePath = '';
+  if (part.shape && part.shape.length >= 3) {
+    // shape points are in local coords 0..l × 0..w (y-axis up in DXF space).
+    // SVG y goes down, so flip y. Scale to shape bbox (shX..shX+shW, shY..shY+shH).
+    shapePath = part.shape.map(function(pt, k){
+      var x = shX + pt.x * scale;
+      var y = shY + (pw === part.l ? (ph - pt.y) : pt.y) * scale; // respect rotation
+      return (k ? 'L' : 'M') + x.toFixed(1) + ' ' + y.toFixed(1);
+    }).join(' ') + ' Z';
+    // Holes (sub-paths with fill-rule:evenodd)
+    (part.holes || []).forEach(function(h){
+      shapePath += ' ' + h.map(function(pt, k){
+        var x = shX + pt.x * scale;
+        var y = shY + (pw === part.l ? (ph - pt.y) : pt.y) * scale;
+        return (k ? 'L' : 'M') + x.toFixed(1) + ' ' + y.toFixed(1);
+      }).join(' ') + ' Z';
+    });
+  }
+
+  var qrSvg = qrToSVG(qrData, qrSize) || '';
+
+  var svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 '+W+' '+H+'" style="width:100%;height:100%;background:#fff;display:block">';
+  // Outer border
+  svg += '<rect x="3" y="3" width="'+(W-6)+'" height="'+(H-6)+'" fill="none" stroke="#000" stroke-width="3"/>';
+
+  // Part shape — real DXF outline if present, else rectangle
+  if (shapePath) {
+    svg += '<path d="'+shapePath+'" fill="#D4DDE8" stroke="#000" stroke-width="2" fill-rule="evenodd"/>';
+  } else {
+    svg += '<rect x="'+shX+'" y="'+shY+'" width="'+shW+'" height="'+shH+'" fill="#D4DDE8" stroke="#000" stroke-width="2"/>';
+  }
+
+  // Dimension badges — straddle the bbox edges of the shape's bounding box
+  function badge(cx, cy, text){
+    var bw = Math.max(52, String(text).length * 14 + 16);
+    var bh = 26;
+    var x = cx - bw/2, y = cy - bh/2;
+    var out = '<rect x="'+x+'" y="'+y+'" width="'+bw+'" height="'+bh+'" fill="#000"/>';
+    out += '<text x="'+cx+'" y="'+(cy+7)+'" text-anchor="middle" font-family="Arial,sans-serif" font-size="20" font-weight="bold" fill="#fff">'+esc(String(text))+'</text>';
+    return out;
+  }
+  svg += badge(shX + shW/2, shY, pw);          // top
+  svg += badge(shX + shW/2, shY + shH, pw);    // bottom
+  svg += badge(shX, shY + shH/2, ph);          // left
+  svg += badge(shX + shW, shY + shH/2, ph);    // right
+
+  // #N centered in shape (approx — for non-rectangular shapes, visual center
+  // of bbox is fine since the shape is drawn over the bbox anyway)
+  var centerX = shX + shW/2, centerY = shY + shH/2;
+  if (shW >= 160 && shH >= 70) {
+    svg += '<text x="'+centerX+'" y="'+(centerY-4)+'" text-anchor="middle" font-family="Arial,sans-serif" font-size="34" font-weight="bold" fill="#000">#'+idx+'</text>';
+    svg += '<text x="'+centerX+'" y="'+(centerY+24)+'" text-anchor="middle" font-family="Arial,sans-serif" font-size="18" font-weight="normal" fill="#000">'+esc(name)+'</text>';
+  } else {
+    svg += '<text x="'+centerX+'" y="'+(centerY+10)+'" text-anchor="middle" font-family="Arial,sans-serif" font-size="26" font-weight="bold" fill="#000">#'+idx+'</text>';
+  }
+
+  // QR code (bigger) in bottom-right
+  svg += '<g transform="translate('+qrX+','+qrY+')">'+qrSvg+'</g>';
+
+  // Material text bottom-left (normal weight)
+  svg += '<text x="18" y="'+(H-14)+'" font-family="Arial,sans-serif" font-size="17" font-weight="normal" fill="#000">MAT: '+esc(mat)+'</text>';
+  // Small dims text bottom-center (normal weight)
+  svg += '<text x="'+(W/2 - 60)+'" y="'+(H-14)+'" text-anchor="middle" font-family="Arial,sans-serif" font-size="14" font-weight="normal" fill="#000">'+pw+'x'+ph+'x'+thick+'</text>';
+
+  svg += '</svg>';
+  var lp = document.getElementById('lprev');
+  lp.classList.add('simple');
+  lp.innerHTML = svg;
 }
 
 
-function buildZPL(p,lay){
-  var part=p.part, eb=part.eb||{};
-  var dims = p.pw+'x'+p.ph+'x'+part.thick;
-  var sn   = name2sn(part.origName);
-  var mat  = (part.mat||'').substring(0,26);
-  var name = (part.origName||'').substring(0,38);
-  var op1  = part.op1||'';
-  var op2  = part.op2||'';
-  var hasCNC = part.hasCNC||op1.length>0;
-  var shNum= lay?lay.idx+1:1;
-  var eb1=eb.eb1||'', eb2=eb.eb2||'', eb3=eb.eb3||'', eb4=eb.eb4||'';
 
-  // 99x50mm at 203dpi = 794x406 dots
-  // Layout mirrors Excel SWOOD label exactly:
-  //  [QR1 130w] [EBL 26w] [CENTER 330w] [EBR 26w] [QR2 130w] + margins
-  // Positions:
-  var QR1_X=6,   QR1_Y=46,  QR_SZ=280; // QR spans rows 2-8 (7x40=280 dots)
-  var EBL_X=138, EBL_Y=46,  EBL_W=26,  EBL_H=280;
-  var CTR_X=166, CTR_Y=46,  CTR_W=330;
-  var EBR_X=628, EBR_Y=46,  EBR_W=26,  EBR_H=280;
-  var QR2_X=656, QR2_Y=46;
-  var HDR_Y=6;
-  var DIM_Y=330, MAT_Y=368;
+// ═══════════════════════════════════════════════════════════════
+// buildZPL — generates ZPL for a SIMPLE part label (no xlsm data).
+// Layout matches the SWOOD PDF optimization-summary style:
+//   - Part shape drawn proportional to real dimensions
+//   - Width dimension boxed on top and bottom edges
+//   - Height dimension boxed (rotated) on left and right edges
+//   - #N part_index + part_name stacked inside the shape
+//   - QR code in bottom-right corner of label
+//   - Material text at bottom-left of label
+//
+// Label: 50mm × 99mm, feeds 50mm-wide first (portrait feed).
+// At 203 dpi: ^PW=400, ^LL=792. Content reads LANDSCAPE (99mm horizontal).
+//
+// DESIGN APPROACH: draw everything in LANDSCAPE coords (W=792 × H=400)
+// where (0,0) is top-left as operator reads it. Then rotate 90° CCW
+// onto the portrait printer page via helper functions. This keeps the
+// code readable — no mental rotation while writing geometry.
+// ═══════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════
+// Build the label as an SVG STRING (same content as buildSimpleLabel,
+// but returned as a standalone SVG document suitable for rasterization).
+// ═══════════════════════════════════════════════════════════════
+function buildSimpleLabelSVG(p, lay){
+  var part = p.part;
+  var pw = Math.round(p.pw || part.l || 100);
+  var ph = Math.round(p.ph || part.w || 100);
+  var thick = part.thick || 18;
+  var name = part.origName || '';
+  var mat = part.mat || '';
+  var idx = 1;
+  if (lay && lay.placements) {
+    var i = lay.placements.indexOf(p);
+    if (i >= 0) idx = i + 1;
+  }
+  var qrData = name || ('part-' + idx);
 
-  var L=['^XA','^PW794','^LL406'];
+  var W = 792, H = 400;
+  var qrSize = 130;
+  var qrX = W - qrSize - 14;
+  var qrY = H - qrSize - 14;
+  var SA_X = 50, SA_Y = 30;
+  var SA_W = W - SA_X - qrSize - 30;
+  var SA_H = H - SA_Y - 50;
+  var scale = Math.min(SA_W / pw, SA_H / ph);
+  var shW = Math.round(pw * scale);
+  var shH = Math.round(ph * scale);
+  var shX = SA_X + Math.round((SA_W - shW) / 2);
+  var shY = SA_Y + Math.round((SA_H - shH) / 2);
 
-  // ── Header row (y=6, h=38) ──
-  // 1OP box
-  L.push('^FO'+QR1_X+','+HDR_Y+'^GB130,38,38^FS'); // filled black box
-  L.push('^CF0,24^FO'+QR1_X+','+HDR_Y+'^FR^CI28^FD1OP^FS'); // white text on black
-  // Op ID text
-  L.push('^CF0,18^FO140,'+HDR_Y+'^FD'+(op1||'–').substring(0,32)+'^FS');
-  // 2OP box
-  L.push('^FO656,'+HDR_Y+'^GB132,38,38^FS');
-  L.push('^CF0,24^FO656,'+HDR_Y+'^FR^CI28^FD2OP^FS');
+  var shapePath = '';
+  if (part.shape && part.shape.length >= 3) {
+    shapePath = part.shape.map(function(pt, k){
+      var x = shX + pt.x * scale;
+      var y = shY + (pw === part.l ? (ph - pt.y) : pt.y) * scale;
+      return (k ? 'L' : 'M') + x.toFixed(1) + ' ' + y.toFixed(1);
+    }).join(' ') + ' Z';
+    (part.holes || []).forEach(function(h){
+      shapePath += ' ' + h.map(function(pt, k){
+        var x = shX + pt.x * scale;
+        var y = shY + (pw === part.l ? (ph - pt.y) : pt.y) * scale;
+        return (k ? 'L' : 'M') + x.toFixed(1) + ' ' + y.toFixed(1);
+      }).join(' ') + ' Z';
+    });
+  }
 
-  // ── QR codes (y=46, h=280) ──
-  // QR1 — 1OP
-  if(hasCNC && op1){
-    L.push('^FO'+QR1_X+','+QR1_Y+'^BQN,2,4^FDMM,A'+op1+'^FS');
+  var qrSvgInner = qrToSVG(qrData, qrSize) || '';
+
+  // Note: for PRINT we don't want the shape fill (use white interior so it
+  // doesn't waste ink/thermal media). Just draw outline.
+  var s = '<svg xmlns="http://www.w3.org/2000/svg" width="'+W+'" height="'+H+'" viewBox="0 0 '+W+' '+H+'" style="background:#fff">';
+  s += '<rect width="'+W+'" height="'+H+'" fill="#fff"/>';
+  s += '<rect x="3" y="3" width="'+(W-6)+'" height="'+(H-6)+'" fill="none" stroke="#000" stroke-width="3"/>';
+  if (shapePath) {
+    s += '<path d="'+shapePath+'" fill="#fff" stroke="#000" stroke-width="2" fill-rule="evenodd"/>';
   } else {
-    L.push('^FO'+QR1_X+','+QR1_Y+'^GB130,280,2^FS'); // empty box
-    L.push('^CF0,18^FO20,160^FDNO^FS^FO20,182^FDCNC^FS^FO20,204^FDOPS^FS');
+    s += '<rect x="'+shX+'" y="'+shY+'" width="'+shW+'" height="'+shH+'" fill="#fff" stroke="#000" stroke-width="2"/>';
   }
-
-  // QR2 — 2OP
-  if(op2){
-    L.push('^FO'+QR2_X+','+QR2_Y+'^BQN,2,4^FDMM,A'+op2+'^FS');
+  function badge(cx, cy, text){
+    var bw = Math.max(52, String(text).length * 14 + 16);
+    var bh = 26;
+    var x = cx - bw/2, y = cy - bh/2;
+    return '<rect x="'+x+'" y="'+y+'" width="'+bw+'" height="'+bh+'" fill="#000"/>'
+      + '<text x="'+cx+'" y="'+(cy+7)+'" text-anchor="middle" font-family="Arial,sans-serif" font-size="20" font-weight="bold" fill="#fff">'+esc(String(text))+'</text>';
+  }
+  s += badge(shX + shW/2, shY, pw);
+  s += badge(shX + shW/2, shY + shH, pw);
+  s += badge(shX, shY + shH/2, ph);
+  s += badge(shX + shW, shY + shH/2, ph);
+  var cx = shX + shW/2, cy = shY + shH/2;
+  if (shW >= 160 && shH >= 70) {
+    s += '<text x="'+cx+'" y="'+(cy-4)+'" text-anchor="middle" font-family="Arial,sans-serif" font-size="34" font-weight="bold" fill="#000">#'+idx+'</text>';
+    s += '<text x="'+cx+'" y="'+(cy+24)+'" text-anchor="middle" font-family="Arial,sans-serif" font-size="18" font-weight="normal" fill="#000">'+esc(name)+'</text>';
   } else {
-    L.push('^FO'+QR2_X+','+QR2_Y+'^GB130,280,2^FS');
+    s += '<text x="'+cx+'" y="'+(cy+10)+'" text-anchor="middle" font-family="Arial,sans-serif" font-size="26" font-weight="bold" fill="#000">#'+idx+'</text>';
   }
+  s += '<g transform="translate('+qrX+','+qrY+')">'+qrSvgInner+'</g>';
+  s += '<text x="18" y="'+(H-14)+'" font-family="Arial,sans-serif" font-size="17" font-weight="normal" fill="#000">MAT: '+esc(mat)+'</text>';
+  s += '<text x="'+(W/2 - 60)+'" y="'+(H-14)+'" text-anchor="middle" font-family="Arial,sans-serif" font-size="14" font-weight="normal" fill="#000">'+pw+'x'+ph+'x'+thick+'</text>';
+  s += '</svg>';
+  return s;
+}
 
-  // ── Edgebands (vertical bars beside panel) ──
-  // EBL — left edge (thin bar, text rotated)
-  L.push('^FO'+EBL_X+','+EBL_Y+'^GB'+EBL_W+','+EBL_H+','+(eb1?EBL_W:2)+'^FS');
-  if(eb1) L.push('^CF0,14^FO'+EBL_X+',130^BC,1,N^FO'+EBL_X+',46^FR^FD'+eb1.substring(0,8)+'^FS');
+// ═══════════════════════════════════════════════════════════════
+// Rasterize an SVG string to a 1-bit B&W ImageData, rotated 90° CCW
+// to suit the Zebra GK420d's portrait feed (50mm wide × 99mm long).
+//   Input SVG is designed landscape 792×400 px.
+//   Output image is portrait 400×792 px (what the printer sees).
+// Returns a Promise<{ width, height, bits }> where bits is a Uint8Array
+// of packed 1-bit pixels (row-major, MSB first, padded to byte).
+// ═══════════════════════════════════════════════════════════════
+function svgToZplBitmap(svgString, threshold){
+  threshold = threshold || 160; // 0..255 — darker pixels become black
+  var SRC_W = 792, SRC_H = 400;
+  var DST_W = 400, DST_H = 792;
+  return new Promise(function(resolve, reject){
+    var img = new Image();
+    var svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+    var url = URL.createObjectURL(svgBlob);
+    img.onload = function(){
+      try {
+        // First rasterize at source size, then rotate into dest canvas
+        var c = document.createElement('canvas');
+        c.width = DST_W; c.height = DST_H;
+        var g = c.getContext('2d');
+        g.fillStyle = '#fff';
+        g.fillRect(0, 0, DST_W, DST_H);
+        // Rotate 90° CCW: translate to (0, DST_H), rotate -90°,
+        // then draw the source at (0,0) with its own size.
+        g.translate(0, DST_H);
+        g.rotate(-Math.PI / 2);
+        g.drawImage(img, 0, 0, SRC_W, SRC_H);
+        URL.revokeObjectURL(url);
 
-  // EBR — right edge
-  L.push('^FO'+EBR_X+','+EBR_Y+'^GB'+EBR_W+','+EBR_H+','+(eb4?EBR_W:2)+'^FS');
+        // Threshold to 1 bit
+        var imgData = g.getImageData(0, 0, DST_W, DST_H);
+        var px = imgData.data;
+        var bytesPerRow = Math.ceil(DST_W / 8);
+        var bits = new Uint8Array(bytesPerRow * DST_H);
+        for (var y = 0; y < DST_H; y++) {
+          for (var x = 0; x < DST_W; x++) {
+            var i = (y * DST_W + x) * 4;
+            // Luminance; treat alpha<128 as white
+            var a = px[i+3];
+            var lum = (px[i] * 0.3 + px[i+1] * 0.59 + px[i+2] * 0.11);
+            var isBlack = (a >= 128 && lum < threshold);
+            if (isBlack) {
+              var byteIdx = y * bytesPerRow + (x >> 3);
+              var bitIdx = 7 - (x & 7);
+              bits[byteIdx] |= (1 << bitIdx);
+            }
+          }
+        }
+        resolve({ width: DST_W, height: DST_H, bytesPerRow: bytesPerRow, bits: bits });
+      } catch(e){
+        URL.revokeObjectURL(url);
+        reject(e);
+      }
+    };
+    img.onerror = function(e){
+      URL.revokeObjectURL(url);
+      reject(new Error('SVG rasterize failed'));
+    };
+    img.src = url;
+  });
+}
 
-  // EBB — top edge of panel area (row 2 in center col)
-  L.push('^FO'+CTR_X+','+CTR_Y+'^GB'+CTR_W+',38,'+(eb2?38:2)+'^FS');
-  if(eb2) L.push('^CF0,18^FO170,54^FR^FD'+eb2.substring(0,18)+'^FS');
-
-  // EBF — bottom edge of panel area (row 8)
-  L.push('^FO'+CTR_X+',288^GB'+CTR_W+',38,'+(eb3?38:2)+'^FS');
-  if(eb3) L.push('^CF0,18^FO170,296^FR^FD'+eb3.substring(0,18)+'^FS');
-
-  // ── Panel image area (rows 3-7, center col, y=86 h=200) ──
-  // Draw part outline
-  L.push('^FO'+CTR_X+',86^GB'+CTR_W+',200,2^FS');
-  if(hasCNC){
-    // CNC drill mark dots at corners
-    var dot=12;
-    L.push('^FO'+(CTR_X+16)+',100^GB'+dot+','+dot+','+dot+'^FS');
-    L.push('^FO'+(CTR_X+CTR_W-16-dot)+',100^GB'+dot+','+dot+','+dot+'^FS');
-    L.push('^FO'+(CTR_X+16)+',256^GB'+dot+','+dot+','+dot+'^FS');
-    L.push('^FO'+(CTR_X+CTR_W-16-dot)+',256^GB'+dot+','+dot+','+dot+'^FS');
-    // Center dot
-    L.push('^FO'+(CTR_X+CTR_W/2-6)+',178^GB12,12,12^FS');
-    // "CNC" text
-    L.push('^CF0,24^FO'+(CTR_X+CTR_W/2-24)+',268^FDCNC^FS');
+// ═══════════════════════════════════════════════════════════════
+// Wrap a 1-bit bitmap into a complete ZPL job using ^GFA.
+// ^GFA format: ^GFA,totalBytes,totalBytes,bytesPerRow,hex-data
+// ═══════════════════════════════════════════════════════════════
+function bitmapToZPL(bm){
+  var totalBytes = bm.bits.length;
+  var hex = '';
+  // Convert to uppercase hex without spaces
+  for (var i = 0; i < bm.bits.length; i++) {
+    var b = bm.bits[i];
+    hex += (b < 16 ? '0' : '') + b.toString(16).toUpperCase();
   }
+  var zpl = '^XA';
+  zpl += '^PON';
+  zpl += '^PW' + bm.width;
+  zpl += '^LL' + bm.height;
+  zpl += '^LH0,0';
+  zpl += '^LT0';
+  zpl += '^FO0,0';
+  zpl += '^GFA,' + totalBytes + ',' + totalBytes + ',' + bm.bytesPerRow + ',' + hex;
+  zpl += '^FS';
+  zpl += '^XZ';
+  return zpl;
+}
 
-  // ── Dims row (y=330) ──
-  L.push('^FO6,'+DIM_Y+'^GB786,38,2^FS');
-  L.push('^CF0,24^FO10,'+(DIM_Y+6)+'^FD'+dims+'^FS');
-  L.push('^CF0,22^FO360,'+(DIM_Y+7)+'^FD'+sn.substring(0,16)+'^FS');
+// ═══════════════════════════════════════════════════════════════
+// buildZPL — dispatcher. For non-xlsm parts, we render the same SVG
+// used for preview into a bitmap and send as ^GFA so the print matches
+// the preview exactly (including the real DXF shape).
+//
+// Returns a PROMISE because rasterizing is async.
+// ═══════════════════════════════════════════════════════════════
+function buildZPL(p, lay){
+  var svg = buildSimpleLabelSVG(p, lay);
+  return svgToZplBitmap(svg).then(function(bm){
+    return bitmapToZPL(bm);
+  });
+}
 
-  // ── Material / name row (y=368) ──
-  L.push('^FO6,'+MAT_Y+'^GB786,34,2^FS');
-  L.push('^CF0,18^FO10,'+(MAT_Y+7)+'^FDMAT: '+mat+'^FS');
-  L.push('^CF0,16^FO10,'+(MAT_Y+22)+'^FD'+name+'^FS');
-
-  // ── Outer border ──
-  L.push('^FO4,4^GB786,398,2^FS');
-  L.push('^XZ');
-
-  return L.filter(Boolean).join('\n');
+// Escape ZPL control chars so user data can't break the format.
+function zplEsc(s){
+  return String(s==null?'':s).replace(/[\^~]/g, ' ');
 }
 
 function name2sn(n){ return (n||'').split('_').slice(0,3).join('_'); }
@@ -4511,185 +5856,271 @@ function saveZPL(){
   download('label.zpl', zpl, 'application/octet-stream');
 }
 // ═══════════════════════════════════════════════════════════════
-// doPrint — opens a new window with the label built from scratch
-// using _labelPart data (NOT cloned from preview, because outerHTML
-// can mangle inline SVG namespaces). Uses several print-quality
-// tricks to minimize blur on thermal printers:
-//   1. Render SVGs fresh in the new window (not serialized via outerHTML)
-//   2. Use geometricPrecision text-rendering
-//   3. Force bold weights (thermal heads render thin weights poorly)
-//   4. Use shape-rendering:crispEdges on SVG strokes
-//   5. Encode QR at high module density
+// doPrint — sends a print request to the local PowerShell server,
+// which uses Excel COM to print the exact label range from the
+// imported .xlsm. Result: pixel-perfect SWOOD label, native quality.
+//
+// Flow: app → POST /print-label {xlsm, sheet, range, printer}
+//       → PowerShell server → Excel.Application → GK420d
+// ═══════════════════════════════════════════════════════════════
+// ── Get the active xlsm path (absolute path from picker, or filename fallback) ──
+function getXlsmPath(){
+  // Prefer the absolute path picked via /pick-file
+  var p = '';
+  try { p = localStorage.getItem('fabflow_xlsm_path') || ''; } catch(e){}
+  if (p) return p;
+  // Fallback: bare filename from import (will resolve in server folder)
+  return window.activeXlsmName || (function(){
+    try { return localStorage.getItem('fabflow_xlsm_name')||''; } catch(e){ return ''; }
+  })();
+}
+
+// ── Refresh the "current xlsm" hint shown above the print status ──
+function refreshXlsmInfo(){
+  var el = document.getElementById('xlsmInfo');
+  if (!el) return;
+  var p = getXlsmPath();
+  if (!p){
+    el.innerHTML = '<span style="color:#B84040">No .xlsm chosen yet \u2014 click <b>📂 Choose .xlsm…</b></span>';
+  } else {
+    // Show only filename if it's a long path
+    var disp = p;
+    if (p.length > 60){
+      var slash = Math.max(p.lastIndexOf('\\'), p.lastIndexOf('/'));
+      disp = (slash >= 0 ? '…' + p.substring(slash) : p.substring(p.length-60));
+    }
+    el.innerHTML = '<b>File:</b> ' + esc(disp);
+  }
+}
+
+// ── Open the OS file picker via the local server, store the chosen path ──
+function pickXlsmFile(){
+  var pst = document.getElementById('pst');
+  pst.innerHTML = '<span style="color:#6B6455">Opening file picker…</span>';
+  fetch('/pick-file').then(function(r){
+    return r.json().then(function(j){ return { ok:r.ok, body:j }; });
+  }).then(function(res){
+    if (res.ok && res.body && res.body.ok){
+      var path = res.body.path || '';
+      if (!path){
+        pst.innerHTML = '<span style="color:#6B6455">Picker cancelled.</span>';
+        return;
+      }
+      try { localStorage.setItem('fabflow_xlsm_path', path); } catch(e){}
+      refreshXlsmInfo();
+      pst.innerHTML = '<b style="color:#3D6B4F">\u2713 File set</b>';
+    } else {
+      pst.innerHTML = '<b style="color:#B84040">Picker failed: '+esc((res.body&&res.body.error)||'unknown')+'</b>';
+    }
+  }).catch(function(err){
+    pst.innerHTML = '<b style="color:#B84040">Server unreachable \u2014 is start-fabflow.cmd running?</b>';
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// doPrint — smart dispatch:
+//   - If part has labelRange (came from a SWOOD .xlsm import): use Excel
+//     via /print-label → pixel-perfect SWOOD label
+//   - Otherwise: generate ZPL from part data and send via Zebra Browser
+//     Print SDK → simple label with QR, dims, name, material
 // ═══════════════════════════════════════════════════════════════
 function doPrint(){
   var pst = document.getElementById('pst');
   var p = _labelPart;
   if (!p || !p.part){pst.innerHTML='<b style="color:#B84040">No part selected</b>';return;}
-  var part = p.part, eb = part.eb || {};
-  var lay = layouts[curSheet];
 
-  var dims = p.pw+'.0x'+p.ph+'.0x'+part.thick+'.0';
-  var sn   = part.origName.split('_').slice(0,3).join('_');
-  var op1  = part.op1||'';
-  var op2  = part.op2||'';
-  var hasCNC = part.hasCNC || op1.length>0;
-  var eb1=eb.eb1||'', eb2=eb.eb2||'', eb3=eb.eb3||'', eb4=eb.eb4||'';
-
-  // Nesting index
-  var idx = 1;
-  if (lay && lay.placements) {
-    var i = lay.placements.indexOf(p);
-    if (i >= 0) idx = i + 1;
-  }
-
-  // Build SVGs fresh. They'll be inserted as HTML strings into the new doc,
-  // which ensures xmlns is preserved by the destination parser.
-  var panelSVG = partToSVG(p.pw, p.ph, hasCNC, idx);
-  var qr1SVG   = op1 ? qrToSVG(op1, 200) : '';
-  var qr2SVG   = op2 ? qrToSVG(op2, 200) : '';
-
-  var title = (part.origName || 'label').replace(/[<>&"']/g,'_');
-
-  // ── Label HTML built from scratch — independent of preview DOM ──
-  // Using explicit spans/divs so no data is lost in serialization.
-  var labelHtml =
-    '<div class="lbl-outer">' +
-      // Row 1: 1OP header | op1 ID | 2OP header
-      '<div class="lc lhdr">1OP</div>' +
-      '<div class="lc lhdr hdr-id">'+esc(op1||'–')+'</div>' +
-      '<div class="lc lhdr">2OP</div>' +
-      // QR1 (rowspan 6)
-      '<div class="lc lqr lqr-1">' +
-        (qr1SVG ? qr1SVG : '<div class="lqr-empty">NO<br>CNC</div>') +
-      '</div>' +
-      // EBL (rowspan 6)
-      '<div class="lc leb">'+esc(eb1)+'</div>' +
-      // EB-top
-      '<div class="lc leb-top">'+esc(eb2)+'</div>' +
-      // Panel (rowspan 4)
-      '<div class="lc lpanel">'+panelSVG+'</div>' +
-      // EB-bot
-      '<div class="lc leb-bot">'+esc(eb3)+'</div>' +
-      // EBR (rowspan 6)
-      '<div class="lc leb">'+esc(eb4)+'</div>' +
-      // QR2 (rowspan 6)
-      '<div class="lc lqr lqr-2">' +
-        (qr2SVG ? qr2SVG : '<div class="lqr-empty">2OP<br>–</div>') +
-      '</div>' +
-      // Row 8: dims | short name
-      '<div class="lc ldims lc-l">'+esc(dims)+'</div>' +
-      '<div class="lc ldesc">'+esc(sn)+'</div>' +
-      // Row 9: material | full name
-      '<div class="lc lmat lc-l">'+esc('MAT: '+(part.mat||''))+'</div>' +
-      '<div class="lc lfull lc-l">'+esc(part.origName||'')+'</div>' +
-    '</div>';
-
-  // Print CSS in mm units. High-quality hints applied throughout.
-  var printCSS = [
-    '@page { size: 99mm 50mm; margin: 0; }',
-    'html, body { margin:0; padding:0; background:#fff; width:99mm; height:50mm; overflow:hidden; }',
-    'body {',
-    '  font-family: Arial, "Helvetica Neue", Helvetica, sans-serif;',
-    '  color:#000;',
-    '  -webkit-print-color-adjust:exact;',
-    '  print-color-adjust:exact;',
-    '  text-rendering: geometricPrecision;',
-    '  -webkit-font-smoothing: none;',
-    '  font-smooth: never;',
-    '}',
-    // Wrapper = printable area (1mm printer-safe margin inside 99x50 page)
-    '.print-wrap { width:97mm; height:48mm; margin:1mm; position:relative; }',
-    // Grid: 5 cols × 9 rows, all mm
-    '.lbl-outer {',
-    '  width:97mm; height:48mm;',
-    '  border:0.3mm solid #000;',
-    '  display:grid;',
-    '  grid-template-columns: 16mm 3mm 1fr 3mm 16mm;',
-    '  grid-template-rows: 4mm 3mm 1fr 1fr 1fr 1fr 3mm 5mm 4mm;',
-    '  box-sizing:border-box;',
-    '  gap:0;',
-    '  background:#fff;',
-    '}',
-    '.lc {',
-    '  border:0.25mm solid #000;',
-    '  padding:0.4mm;',
-    '  overflow:hidden;',
-    '  box-sizing:border-box;',
-    '  display:flex;',
-    '  align-items:center;',
-    '  justify-content:center;',
-    '  text-align:center;',
-    '  line-height:1.1;',
-    '  word-break:break-word;',
-    '  font-weight:700;', // force bold — thin weights blur on thermal
-    '}',
-    '.lc-l { justify-content:flex-start; text-align:left; padding-left:1mm; }',
-    // Header
-    '.lhdr { font-size:2.8mm; border:0.3mm solid #000; }',
-    '.hdr-id { grid-column: span 3; justify-content:flex-start; padding-left:1.2mm; font-size:2.6mm; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }',
-    // QR cells
-    '.lqr { grid-row: span 6; background:#fff; padding:0.8mm; position:relative; }',
-    '.lqr svg { width:100%; height:100%; display:block; }',
-    '.lqr-empty { font-size:2.2mm; color:#aaa; text-align:center; line-height:1.2; }',
-    '.lqr::before {',
-    '  content:"";',
-    '  position:absolute; top:0; right:0;',
-    '  width:0; height:0;',
-    '  border-style:solid;',
-    '  border-width:0 3mm 3mm 0;',
-    '  border-color:transparent #000 transparent transparent;', // black on thermal (no color)
-    '}',
-    // Edgebands (vertical sides)
-    '.leb {',
-    '  grid-row: span 6;',
-    '  font-size:2.2mm;',
-    '  writing-mode: vertical-lr;',
-    '  transform: rotate(180deg);',
-    '  letter-spacing:0.3mm;',
-    '  text-decoration:underline;',
-    '}',
-    '.leb-top, .leb-bot { font-size:2.2mm; text-decoration:underline; }',
-    // Panel (part image)
-    '.lpanel { grid-row: span 4; background:#fff; padding:0.5mm; }',
-    '.lpanel svg { width:100%; height:100%; display:block; }',
-    // Bottom rows
-    '.ldims { grid-column: span 2; font-size:3.2mm; }',
-    '.ldesc { grid-column: span 3; font-size:3mm; }',
-    '.lmat  { grid-column: span 2; font-size:2.4mm; }',
-    '.lfull { grid-column: span 3; font-size:2mm; font-weight:600; }',
-    // Screen-only UI
-    '@media screen { body { padding:8mm; background:#eee; } .print-wrap { box-shadow:0 4px 16px rgba(0,0,0,.2); background:#fff; } }',
-    '@media print { .no-print { display:none !important; } }'
-  ].join('\n');
-
-  var doc = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>'+esc(title)+'</title>' +
-    '<style>'+printCSS+'</style>' +
-    '</head><body>' +
-    '<div class="no-print" style="position:fixed;top:6px;right:6px;display:flex;gap:5px;font-family:sans-serif;z-index:999">' +
-      '<button onclick="window.print()" style="padding:5px 12px;background:#3D6B4F;color:#fff;border:none;border-radius:3px;cursor:pointer;font-size:12px;font-weight:600">🖨 Print</button>' +
-      '<button onclick="window.close()" style="padding:5px 12px;background:#B84040;color:#fff;border:none;border-radius:3px;cursor:pointer;font-size:12px">Close</button>' +
-    '</div>' +
-    '<div class="print-wrap">' + labelHtml + '</div>' +
-    '<script>' +
-      'window.addEventListener("load", function(){ setTimeout(function(){ window.print(); }, 500); });' +
-      'window.addEventListener("afterprint", function(){ setTimeout(function(){ window.close(); }, 400); });' +
-    '<\/script>' +
-    '</body></html>';
-
-  var w = window.open('', '_blank', 'width=760,height=500');
-  if (!w){
-    pst.innerHTML = '<b style="color:#B84040">Popup blocked</b><br>' +
-      '<span style="font-size:11px">Allow pop-ups for this page, then click Print again.</span>';
+  if (location.protocol === 'file:'){
+    pst.innerHTML =
+      '<b style="color:#B84040">App must run via http://, not file://</b><br>' +
+      '<span style="font-size:11px;color:#6B6455">' +
+      'Run start-fabflow.cmd to launch the local server, then open ' +
+      '<a href="http://localhost:8000" target="_blank">http://localhost:8000</a>.' +
+      '</span>';
     return;
   }
-  w.document.open();
-  w.document.write(doc);
-  w.document.close();
-  pst.innerHTML = '<b style="color:#3D6B4F">✓ Print dialog opened</b><br>' +
-    '<span style="font-size:11px;color:#6B6455">' +
-    'Dialog: <b>ZDesigner GK420d</b> → Margins: <b>None</b> → Scale: <b>100</b> → Print.' +
-    '</span>';
+
+  // ── PATH 1: part has a SWOOD label range → print via Excel ─────────────
+  if (p.part.labelRange) {
+    doPrintViaExcel(p, pst);
+    return;
+  }
+
+  // ── PATH 2: no xlsm / no label range → print via Browser Print + ZPL ──
+  doPrintViaBrowserPrint(p, pst);
 }
+
+// ── Print-status tracking ─────────────────────────────────────────
+// `p` here is a PLACEMENT ({part, pw, ph}). We want to mark that
+// specific part instance (by id) as printed so the per-part checkmark
+// reflects correctly. If multiple parts in a group share origName/mat/dims,
+// marking one means "1 of N in the group printed".
+function markPartPrinted(p){
+  if (!p || !p.part) return;
+  var partId = p.part.id;
+  for (var i = 0; i < parts.length; i++){
+    if (parts[i].id === partId) {
+      parts[i].printed = true;
+      break;
+    }
+  }
+  // Refresh UI — counter, list, canvas
+  renderParts();
+  try { renderCanvas(curSheet); } catch(e) {}
+}
+
+// Count printed vs total across all parts
+function getPrintStats(){
+  var total = parts.length, printed = 0;
+  for (var i = 0; i < parts.length; i++) if (parts[i].printed) printed++;
+  return { total: total, printed: printed };
+}
+
+// Manual "Reset" — marks all parts unprinted
+function resetPrintStatus(){
+  if (!parts.length) return;
+  var stats = getPrintStats();
+  if (stats.printed === 0) return; // nothing to reset
+  if (!confirm('Reset print status for all ' + stats.total + ' parts? (' + stats.printed + ' currently marked printed)')) return;
+  parts.forEach(function(pt){ pt.printed = false; });
+  renderParts();
+  try { renderCanvas(curSheet); } catch(e) {}
+}
+
+function doPrintViaExcel(p, pst){
+  var xlsm = getXlsmPath();
+  if (!xlsm){
+    pst.innerHTML =
+      '<b style="color:#B84040">No .xlsm chosen</b><br>' +
+      '<span style="font-size:11px;color:#6B6455">' +
+      'Click <b>📂 Choose .xlsm…</b> to select your SWOOD file (e.g. from OneDrive).' +
+      '</span>';
+    return;
+  }
+
+  var range = p.part.labelRange;
+
+  // Range comes as "LABEL!A2:F10" — split into sheet + range
+  var sheetName = 'LABEL', rangeOnly = range;
+  var bang = range.indexOf('!');
+  if (bang > 0){
+    sheetName = range.substring(0, bang);
+    rangeOnly = range.substring(bang+1);
+  }
+
+  var printer = (document.getElementById('prn').value || 'ZDesigner GK420d').trim();
+
+  pst.innerHTML = '<span style="color:#6B6455">Excel \u2192 '+esc(printer)+'\u2026</span>';
+
+  fetch('/print-label', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      xlsm: xlsm,
+      sheet: sheetName,
+      range: rangeOnly,
+      printer: printer
+    })
+  }).then(function(r){
+    return r.json().then(function(j){ return { ok:r.ok, status:r.status, body:j }; });
+  }).then(function(res){
+    if (res.ok && res.body && res.body.ok){
+      markPartPrinted(p);
+      pst.innerHTML =
+        '<b style="color:#3D6B4F">\u2713 Printed</b><br>' +
+        '<span style="font-size:11px;color:#6B6455">' +
+        esc(sheetName)+'!'+esc(rangeOnly)+' \u2192 '+esc(printer)+
+        '</span>';
+    } else {
+      var msg = (res.body && res.body.error) ? res.body.error : ('HTTP '+res.status);
+      pst.innerHTML =
+        '<b style="color:#B84040">Print failed</b><br>' +
+        '<span style="font-size:11px;color:#6B6455">'+esc(msg)+'</span>';
+    }
+  }).catch(function(err){
+    pst.innerHTML =
+      '<b style="color:#B84040">Server unreachable</b><br>' +
+      '<span style="font-size:11px;color:#6B6455">' +
+      'Make sure start-fabflow.cmd is running.<br>' +
+      esc(String(err))+
+      '</span>';
+  });
+}
+
+// ── Print a simple part label via Zebra Browser Print (ZPL) ──
+// Used when the part has no SWOOD .xlsm label range (dropped DXF, manual add).
+function doPrintViaBrowserPrint(p, pst){
+  if (typeof BrowserPrint === 'undefined'){
+    pst.innerHTML =
+      '<b style="color:#B84040">Zebra Browser Print not loaded</b><br>' +
+      '<span style="font-size:11px;color:#6B6455">' +
+      'Install Zebra Browser Print from ' +
+      '<a href="https://www.zebra.com/browserprint" target="_blank">zebra.com/browserprint</a>, ' +
+      'then reload this page.' +
+      '</span>';
+    return;
+  }
+
+  var lay = layouts[curSheet];
+  pst.innerHTML = '<span style="color:#6B6455">Rasterizing label\u2026</span>';
+
+  // buildZPL is now async (SVG → canvas → 1-bit bitmap → ZPL ^GFA)
+  var zplPromise;
+  try {
+    zplPromise = buildZPL(p, lay);
+  } catch(e){
+    pst.innerHTML = '<b style="color:#B84040">ZPL generation failed: '+esc(e.message)+'</b>';
+    return;
+  }
+
+  zplPromise.then(function(zpl){
+    if (!zpl || zpl.length < 10){
+      pst.innerHTML = '<b style="color:#B84040">Empty ZPL</b>';
+      return;
+    }
+    pst.innerHTML = '<span style="color:#6B6455">Sending to printer\u2026 ('+Math.round(zpl.length/1024)+' KB)</span>';
+
+    BrowserPrint.getDefaultDevice('printer',
+      function(device){
+        if (!device){
+          pst.innerHTML =
+            '<b style="color:#B84040">No default printer</b><br>' +
+            '<span style="font-size:11px;color:#6B6455">' +
+            'Open the Zebra Browser Print tray icon \u2192 select ' +
+            '<b>ZDesigner GK420d</b> \u2192 Set as Default.' +
+            '</span>';
+          return;
+        }
+        device.send(zpl,
+          function(){
+            markPartPrinted(p);
+            pst.innerHTML =
+              '<b style="color:#3D6B4F">\u2713 Printed</b><br>' +
+              '<span style="font-size:11px;color:#6B6455">'+
+              esc(device.name||'printer') +
+              ' \u2014 simple label (no xlsm)</span>';
+          },
+          function(err){
+            pst.innerHTML =
+              '<b style="color:#B84040">Print failed</b><br>' +
+              '<span style="font-size:11px;color:#6B6455">'+esc(String(err))+'</span>';
+          }
+        );
+      },
+      function(err){
+        pst.innerHTML =
+          '<b style="color:#B84040">Browser Print service unreachable</b><br>' +
+          '<span style="font-size:11px;color:#6B6455">' +
+          'Check the tray icon. Visit ' +
+          '<a href="https://localhost:9101/available" target="_blank">https://localhost:9101/available</a> ' +
+          'and accept the certificate if prompted.' +
+          '</span>';
+      }
+    );
+  }).catch(function(e){
+    pst.innerHTML = '<b style="color:#B84040">Rasterization failed: '+esc(e.message||String(e))+'</b>';
+  });
+}
+
 // ── Save raw ZPL as a file — handled by existing saveZPL() at line ~4508 ──
 </script>
 </body>
