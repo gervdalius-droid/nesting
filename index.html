@@ -346,9 +346,18 @@ body.print-mode{background:#fff}
   </div>
   <div>
     <div class="sec" data-i18n="cutSettings">Cut settings</div>
+    <div style="margin-bottom:6px">
+      <label class="fl" style="margin-bottom:3px">Machine</label>
+      <select id="machine-mode" onchange="onMachineModeChange()" style="width:100%;font-size:11px;padding:3px 5px">
+        <option value="cnc" selected>🤖 CNC only — every sheet routed on CNC</option>
+        <option value="saw">🪚 Saw only — every sheet cut on saw</option>
+        <option value="both">🪚🤖 Both — saw for plain rectangles, CNC for shapes/holes</option>
+      </select>
+    </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
-      <div><label class="fl" data-i18n="sawKerf">Saw kerf (mm)</label><input id="kerf" type="number" value="3" min="0" max="20"></div>
-      <div><label class="fl" data-i18n="boardTrim">Board trim (mm)</label><input id="trim" type="number" value="15" min="0" max="100"></div>
+      <div id="kerf-saw-wrap"><label class="fl">🪚 Saw kerf (mm)</label><input id="kerf" type="number" value="3" min="0" max="20" title="Kerf for saw-cut parts (panel saw, table saw, etc.)"></div>
+      <div id="kerf-cnc-wrap"><label class="fl">🤖 CNC kerf (mm)</label><input id="kerf-cnc" type="number" value="4" min="0" max="20" title="Kerf for CNC-routed parts (varies with router bit diameter)"></div>
+      <div style="grid-column:1/-1"><label class="fl" data-i18n="boardTrim">Board trim (mm)</label><input id="trim" type="number" value="15" min="0" max="100"></div>
     </div>
   </div>
   <div>
@@ -1412,6 +1421,8 @@ function collectProjectState(){
     curSheet:curSheet,
     settings:{
       kerf:parseInt((document.getElementById('kerf')||{}).value||3),
+      kerfCnc:parseInt((document.getElementById('kerf-cnc')||{}).value||4),
+      machineMode:getMachineMode(),
       trimInputs:getSettingsTrim()
     },
     opIdMap:opIdMap
@@ -1489,6 +1500,9 @@ function applyProjectState(d){
     // Apply settings
     if(d.settings){
       var kerfEl=document.getElementById('kerf');if(kerfEl&&d.settings.kerf!=null)kerfEl.value=d.settings.kerf;
+      var kerfCncEl=document.getElementById('kerf-cnc');if(kerfCncEl&&d.settings.kerfCnc!=null)kerfCncEl.value=d.settings.kerfCnc;
+      var modeEl=document.getElementById('machine-mode');if(modeEl&&d.settings.machineMode)modeEl.value=d.settings.machineMode;
+      onMachineModeChange(); // hide/show kerf inputs to match restored mode
     }
     // Rerender everything
     renderBoards();refreshSel();renderParts();renderGroups();
@@ -1951,6 +1965,8 @@ setInterval(function(){drainPendingQueue();},30000);
 document.addEventListener('DOMContentLoaded',function(){
   // Restore last imported xlsm filename for Excel-based label printing
   try { window.activeXlsmName = localStorage.getItem('fabflow_xlsm_name') || ''; } catch(e) {}
+  // Apply initial machine mode (default 'cnc' hides the saw kerf input)
+  if(typeof onMachineModeChange==='function') onMachineModeChange();
   // URL override: ?project=NAME
   var urlName=null;
   try{var u=new URLSearchParams(location.search);urlName=u.get('project');}catch(e){}
@@ -3020,14 +3036,9 @@ var _pwSort='name';
 
 function openPartsWindow(){
   var ov=document.getElementById('pw-overlay');ov.classList.add('open');
-  // Populate material filter
-  var mats=[...new Set(parts.map(function(p){return p.mat;}))].sort();
-  var ms=document.getElementById('pw-mat');
-  var curMat=ms.value;
-  ms.innerHTML='<option value="">All materials</option>'+mats.map(function(m){return'<option value="'+esc(m)+'">'+esc(m)+'</option>';}).join('');
-  ms.value=curMat;
   // Populate group filters and assign dropdown
   refreshGroupSelects();
+  // Materials dropdown is refreshed inside renderPartsWindow on every render
   renderPartsWindow();
 }
 function closePartsWindow(){document.getElementById('pw-overlay').classList.remove('open');}
@@ -3048,13 +3059,36 @@ function pwToggleAll(checked){
   renderPartsWindow();
 }
 function filteredPwParts(){
+  // Refresh the materials dropdown so it always reflects the current set of
+  // materials in parts AND in boards (in case a board was added but no part uses it yet).
+  // Materials are normalized (whitespace collapsed) so subtle "X Y" vs "X  Y"
+  // entries can't cause duplicates or filter mismatches.
+  var matSet={};
+  parts.forEach(function(p){
+    var n=normalizeMat(p.mat);
+    if(n) matSet[n]=true;
+  });
+  boards.forEach(function(b){
+    var n=normalizeMat(b.mat);
+    if(n) matSet[n]=true;
+  });
+  var mats=Object.keys(matSet).sort();
+  var ms=document.getElementById('pw-mat');
+  if(ms){
+    var curMat=ms.value;
+    ms.innerHTML='<option value="">All materials</option>'+mats.map(function(m){return'<option value="'+esc(m)+'">'+esc(m)+'</option>';}).join('');
+    // Restore previous selection if it still exists; otherwise reset to All
+    if(curMat && mats.indexOf(curMat)>=0) ms.value=curMat;
+    else ms.value='';
+  }
   var search=(document.getElementById('pw-search').value||'').toLowerCase();
-  var matF=document.getElementById('pw-mat').value;
+  var matF=document.getElementById('pw-mat').value;       // already normalized (it came from matSet)
   var grpF=document.getElementById('pw-grp').value;
   var grpOnly=document.getElementById('pw-grouped').checked;
   var filtered=parts.filter(function(p){
     if(search&&p.origName.toLowerCase().indexOf(search)<0)return false;
-    if(matF&&p.mat!==matF)return false;
+    // Compare normalized to avoid whitespace mismatches between dropdown value and stored part.mat
+    if(matF && normalizeMat(p.mat)!==matF) return false;
     if(grpF==='__none__'&&p.groupId)return false;
     if(grpF&&grpF!=='__none__'&&String(p.groupId)!==grpF)return false;
     if(grpOnly&&!p.groupId)return false;
@@ -3613,6 +3647,46 @@ function renderVersionBar(){
   }
 }
 
+// Determine which machine a part should be cut on.
+//   p.machine === 'saw' | 'cnc' → manual override (operator's explicit choice)
+//   p.machine === 'auto' or undefined → auto-detect:
+//     CNC if part has any of: DXF shape, holes, OP1/OP2 (CNC ops), hasCNC flag
+//     Otherwise SAW (plain rectangle, no operations)
+function partMachine(p){
+  if(p.machine==='saw' || p.machine==='cnc') return p.machine;
+  // Auto-detection
+  var hasShape=p.shape && p.shape.length>=3;
+  var hasHoles=p.holes && p.holes.length>0;
+  var hasOps=!!(p.op1 || p.op2 || p.hasCNC);
+  return (hasShape || hasHoles || hasOps) ? 'cnc' : 'saw';
+}
+
+// Read the project's machine mode: 'cnc' (default), 'saw', or 'both'
+function getMachineMode(){
+  var el=document.getElementById('machine-mode');
+  return el ? el.value : 'cnc';
+}
+
+// Hide/show kerf inputs based on machine mode.
+function onMachineModeChange(){
+  var mode=getMachineMode();
+  var sawWrap=document.getElementById('kerf-saw-wrap');
+  var cncWrap=document.getElementById('kerf-cnc-wrap');
+  if(!sawWrap || !cncWrap) return;
+  if(mode==='saw'){
+    sawWrap.style.display='block';
+    cncWrap.style.display='none';
+  } else if(mode==='cnc'){
+    sawWrap.style.display='none';
+    cncWrap.style.display='block';
+  } else {
+    // both
+    sawWrap.style.display='block';
+    cncWrap.style.display='block';
+  }
+  scheduleSave();
+}
+
 function optimize(){
   if(!boards.length||!parts.length){alert(t('alertAddBoardsParts'));return;}
   // ── Guard: warn if operator would lose manual changes by re-optimizing.
@@ -3628,7 +3702,9 @@ function optimize(){
       if(!confirm(msg)) return;
     }
   }
-  var kerf=parseInt(document.getElementById('kerf').value)||0;
+  var sawKerf=parseInt(document.getElementById('kerf').value)||0;
+  var cncKerf=parseInt((document.getElementById('kerf-cnc')||{}).value)||sawKerf;
+  var mode=getMachineMode(); // 'cnc', 'saw', or 'both'
   var trim=parseInt(document.getElementById('trim').value)||0;
   layouts=[];selP=null;hovP=null;
   var warnings=[];
@@ -3652,6 +3728,26 @@ function optimize(){
     // Perimeter decreasing (catches some edge cases)
     function(a, b){ return (b.l + b.w) - (a.l + a.w); }
   ];
+  // Try every strategy and keep the result that places the MOST parts
+  // (tie-break by efficiency).
+  function tryAllStrategies(partsList, uw, uh, kerf, color, usedTrim, grainLocked){
+    var bestLayouts=null, bestEff=-1, bestPlacedIds=null;
+    strategies.forEach(function(sfn){
+      var res=pack(uw, uh, partsList.slice().sort(sfn), kerf, color, 0, usedTrim, grainLocked);
+      var used=res.reduce(function(a,l){return a+l.placements.reduce(function(b,p){return b+p.pw*p.ph;},0);},0);
+      var tot=res.reduce(function(a,l){return a+l.uw*l.uh;},0);
+      var e=tot>0?used/tot:0;
+      var placedCount=res.reduce(function(a,l){return a+l.placements.length;},0);
+      var bestPlacedCount=bestLayouts?bestLayouts.reduce(function(a,l){return a+l.placements.length;},0):-1;
+      if((placedCount>bestPlacedCount) || (placedCount===bestPlacedCount && e>bestEff)){
+        bestEff=e; bestLayouts=res;
+        var ids={};
+        res.forEach(function(l){l.placements.forEach(function(pl){ids[pl.part.id]=true;});});
+        bestPlacedIds=ids;
+      }
+    });
+    return { layouts: bestLayouts || [], placedIds: bestPlacedIds || {} };
+  }
   boards.forEach(function(bd){
     var bp=byBoard[bd.id];if(!bp||!bp.length)return;
     var uw=bd.w-(trim*2),uh=bd.h-(trim*2),usedTrim=trim;
@@ -3661,29 +3757,55 @@ function optimize(){
       warnings.push('⚠ "'+bd.mat+'" — trim reduced to 0 (parts up to '+maxL+'mm, max safe trim: '+ms+'mm)\n   Operator: cut edge-to-edge, factory edge is straight.');
       uw=bd.w;uh=bd.h;usedTrim=0;
     }
-    var bestLayouts=null,bestEff=-1,bestPlacedIds=null;
     var grainLocked=!!bd.grain;
-    strategies.forEach(function(sfn){
-      var res=pack(uw,uh,bp.slice().sort(sfn),kerf,bd.color,bd.qty,usedTrim,grainLocked);
-      var used=res.reduce(function(a,l){return a+l.placements.reduce(function(b,p){return b+p.pw*p.ph;},0);},0);
-      var tot=res.reduce(function(a,l){return a+l.uw*l.uh;},0);
-      var e=tot>0?used/tot:0;
-      // Prefer strategies that PLACE MORE PARTS first; tie-break by efficiency
-      var placedCount=res.reduce(function(a,l){return a+l.placements.length;},0);
-      var bestPlacedCount=bestLayouts?bestLayouts.reduce(function(a,l){return a+l.placements.length;},0):-1;
-      var pick=(placedCount>bestPlacedCount)||(placedCount===bestPlacedCount&&e>bestEff);
-      if(pick){
-        bestEff=e; bestLayouts=res;
-        var ids={};
-        res.forEach(function(l){l.placements.forEach(function(pl){ids[pl.part.id]=true;});});
-        bestPlacedIds=ids;
+    var allPlacedIds={};
+    if(mode==='both'){
+      // ── Two-pass nesting ──
+      // Pass 1: SAW-only sheets (only auto-classified saw parts, saw kerf).
+      // Pass 2: CNC sheets (auto-classified CNC parts + any saw parts that
+      //         didn't fit on saw sheets, CNC kerf).
+      var sawParts=bp.filter(function(p){ return partMachine(p)==='saw'; });
+      var cncParts=bp.filter(function(p){ return partMachine(p)==='cnc'; });
+      if(sawParts.length){
+        var sawRes=tryAllStrategies(sawParts, uw, uh, sawKerf, bd.color, usedTrim, grainLocked);
+        sawRes.layouts.forEach(function(l){
+          l.idx=layouts.length;
+          l.matName=bd.mat; l.matColor=bd.color;
+          l.sw=bd.w; l.sh=bd.h;
+          l.trimWarning=(usedTrim===0 && trim>0);
+          l.machine='saw'; l.kerf=sawKerf;
+          layouts.push(l);
+        });
+        Object.keys(sawRes.placedIds).forEach(function(id){ allPlacedIds[id]=true; });
       }
-    });
-    if(bestLayouts&&bestLayouts.length){
-      bestLayouts.forEach(function(l){l.idx=layouts.length;l.matName=bd.mat;l.matColor=bd.color;l.sw=bd.w;l.sh=bd.h;l.trimWarning=(usedTrim===0&&trim>0);layouts.push(l);});
+      var cncEligible=cncParts.concat(sawParts.filter(function(p){ return !allPlacedIds[p.id]; }));
+      if(cncEligible.length){
+        var cncRes=tryAllStrategies(cncEligible, uw, uh, cncKerf, bd.color, usedTrim, grainLocked);
+        cncRes.layouts.forEach(function(l){
+          l.idx=layouts.length;
+          l.matName=bd.mat; l.matColor=bd.color;
+          l.sw=bd.w; l.sh=bd.h;
+          l.trimWarning=(usedTrim===0 && trim>0);
+          l.machine='cnc'; l.kerf=cncKerf;
+          layouts.push(l);
+        });
+        Object.keys(cncRes.placedIds).forEach(function(id){ allPlacedIds[id]=true; });
+      }
+    } else {
+      // ── Single-machine mode (cnc OR saw): one nesting pass per material ──
+      var kerf = mode==='saw' ? sawKerf : cncKerf;
+      var res=tryAllStrategies(bp, uw, uh, kerf, bd.color, usedTrim, grainLocked);
+      res.layouts.forEach(function(l){
+        l.idx=layouts.length;
+        l.matName=bd.mat; l.matColor=bd.color;
+        l.sw=bd.w; l.sh=bd.h;
+        l.trimWarning=(usedTrim===0 && trim>0);
+        l.machine=mode; l.kerf=kerf;
+        layouts.push(l);
+      });
+      Object.keys(res.placedIds).forEach(function(id){ allPlacedIds[id]=true; });
     }
-    // Count any unplaced parts from this material (exceeded board qty, or didn't fit)
-    var unplacedHere=bp.filter(function(p){ return !bestPlacedIds || !bestPlacedIds[p.id]; });
+    var unplacedHere=bp.filter(function(p){ return !allPlacedIds[p.id]; });
     if(unplacedHere.length){
       unplacedByMat[bd.mat]={count:unplacedHere.length, boardQty:bd.qty, parts:unplacedHere};
     }
@@ -3994,7 +4116,12 @@ function buildTabs(){
   document.getElementById('tabs').innerHTML=layouts.map(function(l,i){
     var warn=l.trimWarning?'<span style="color:#B84040;margin-left:2px" title="No trim">⚠</span>':'';
     var grain=l.grainLocked?'<span style="color:#3D6B4F;margin-left:2px" title="Grain locked">🌾</span>':'';
+    // Machine icon: 🪚 for saw, 🤖 for cnc, nothing for unspecified (older layouts)
+    var mach=l.machine==='saw' ? '<span title="Saw — k='+l.kerf+'mm" style="margin-right:2px">🪚</span>'
+           : l.machine==='cnc' ? '<span title="CNC — k='+l.kerf+'mm" style="margin-right:2px">🤖</span>'
+           : '';
     return'<div class="tab" id="tab-'+i+'" onclick="activateTab('+i+')">'
+      +mach
       +'<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:'+l.matColor+'"></span>'
       +esc(l.matName.split(' ').slice(0,2).join(' '))+' #'+(i+1)+warn+grain+'</div>';
   }).join('');
