@@ -357,7 +357,8 @@ body.print-mode{background:#fff}
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
       <div id="kerf-saw-wrap"><label class="fl">🪚 Saw kerf (mm)</label><input id="kerf" type="number" value="3" min="0" max="20" title="Kerf for saw-cut parts (panel saw, table saw, etc.)"></div>
       <div id="kerf-cnc-wrap"><label class="fl">🤖 CNC kerf (mm)</label><input id="kerf-cnc" type="number" value="4" min="0" max="20" title="Kerf for CNC-routed parts (varies with router bit diameter)"></div>
-      <div style="grid-column:1/-1"><label class="fl" data-i18n="boardTrim">Board trim (mm)</label><input id="trim" type="number" value="15" min="0" max="100"></div>
+      <div id="trim-saw-wrap"><label class="fl">🪚 Saw trim (mm)</label><input id="trim" type="number" value="15" min="0" max="100" title="Edge trim for saw sheets"></div>
+      <div id="trim-cnc-wrap"><label class="fl">🤖 CNC trim (mm)</label><input id="trim-cnc" type="number" value="15" min="0" max="100" title="Edge trim for CNC sheets (often less since CNC clamping uses interior surface)"></div>
     </div>
   </div>
   <div>
@@ -1422,6 +1423,8 @@ function collectProjectState(){
     settings:{
       kerf:parseInt((document.getElementById('kerf')||{}).value||3),
       kerfCnc:parseInt((document.getElementById('kerf-cnc')||{}).value||4),
+      trim:parseInt((document.getElementById('trim')||{}).value||15),
+      trimCnc:parseInt((document.getElementById('trim-cnc')||{}).value||15),
       machineMode:getMachineMode(),
       trimInputs:getSettingsTrim()
     },
@@ -1501,8 +1504,10 @@ function applyProjectState(d){
     if(d.settings){
       var kerfEl=document.getElementById('kerf');if(kerfEl&&d.settings.kerf!=null)kerfEl.value=d.settings.kerf;
       var kerfCncEl=document.getElementById('kerf-cnc');if(kerfCncEl&&d.settings.kerfCnc!=null)kerfCncEl.value=d.settings.kerfCnc;
+      var trimEl=document.getElementById('trim');if(trimEl&&d.settings.trim!=null)trimEl.value=d.settings.trim;
+      var trimCncEl=document.getElementById('trim-cnc');if(trimCncEl&&d.settings.trimCnc!=null)trimCncEl.value=d.settings.trimCnc;
       var modeEl=document.getElementById('machine-mode');if(modeEl&&d.settings.machineMode)modeEl.value=d.settings.machineMode;
-      onMachineModeChange(); // hide/show kerf inputs to match restored mode
+      onMachineModeChange(); // hide/show kerf+trim inputs to match restored mode
     }
     // Rerender everything
     renderBoards();refreshSel();renderParts();renderGroups();
@@ -3650,15 +3655,37 @@ function renderVersionBar(){
 // Determine which machine a part should be cut on.
 //   p.machine === 'saw' | 'cnc' → manual override (operator's explicit choice)
 //   p.machine === 'auto' or undefined → auto-detect:
-//     CNC if part has any of: DXF shape, holes, OP1/OP2 (CNC ops), hasCNC flag
-//     Otherwise SAW (plain rectangle, no operations)
+//     CNC if part has any of: NON-rectangular DXF shape, holes, OP1/OP2 (CNC ops), hasCNC flag
+//     Otherwise SAW (plain rectangle is saw-friendly even if it came from DXF)
 function partMachine(p){
   if(p.machine==='saw' || p.machine==='cnc') return p.machine;
-  // Auto-detection
-  var hasShape=p.shape && p.shape.length>=3;
-  var hasHoles=p.holes && p.holes.length>0;
-  var hasOps=!!(p.op1 || p.op2 || p.hasCNC);
-  return (hasShape || hasHoles || hasOps) ? 'cnc' : 'saw';
+  // Auto-detection — a DXF shape is only a CNC candidate if it's truly non-rectangular.
+  var hasNonRectShape = p.shape && p.shape.length>=3 && !isAxisAlignedRectShape(p.shape, p.l, p.w);
+  var hasHoles = p.holes && p.holes.length>0;
+  var hasOps = !!(p.op1 || p.op2 || p.hasCNC);
+  return (hasNonRectShape || hasHoles || hasOps) ? 'cnc' : 'saw';
+}
+
+// True if the shape polygon is just an axis-aligned rectangle matching the part's bbox.
+// Tolerance is 1mm to absorb rounding from DXF import.
+function isAxisAlignedRectShape(shape, l, w){
+  if(!shape || shape.length<3 || shape.length>8) return false; // > 8 verts → definitely not a rectangle
+  var TOL = 1.0;
+  var minX=Infinity, minY=Infinity, maxX=-Infinity, maxY=-Infinity;
+  shape.forEach(function(pt){
+    if(pt.x<minX)minX=pt.x; if(pt.x>maxX)maxX=pt.x;
+    if(pt.y<minY)minY=pt.y; if(pt.y>maxY)maxY=pt.y;
+  });
+  // BBox should match the part's L×W
+  if(Math.abs(maxX-minX - l) > TOL || Math.abs(maxY-minY - w) > TOL) return false;
+  // Every vertex should be at one of the four corners
+  for(var i=0;i<shape.length;i++){
+    var pt=shape[i];
+    var atCorner = (Math.abs(pt.x-minX)<TOL || Math.abs(pt.x-maxX)<TOL) &&
+                   (Math.abs(pt.y-minY)<TOL || Math.abs(pt.y-maxY)<TOL);
+    if(!atCorner) return false;
+  }
+  return true;
 }
 
 // Read the project's machine mode: 'cnc' (default), 'saw', or 'both'
@@ -3667,22 +3694,24 @@ function getMachineMode(){
   return el ? el.value : 'cnc';
 }
 
-// Hide/show kerf inputs based on machine mode.
+// Hide/show kerf and trim inputs based on machine mode.
 function onMachineModeChange(){
   var mode=getMachineMode();
-  var sawWrap=document.getElementById('kerf-saw-wrap');
-  var cncWrap=document.getElementById('kerf-cnc-wrap');
-  if(!sawWrap || !cncWrap) return;
+  var sawKerfWrap=document.getElementById('kerf-saw-wrap');
+  var cncKerfWrap=document.getElementById('kerf-cnc-wrap');
+  var sawTrimWrap=document.getElementById('trim-saw-wrap');
+  var cncTrimWrap=document.getElementById('trim-cnc-wrap');
+  if(!sawKerfWrap || !cncKerfWrap) return;
   if(mode==='saw'){
-    sawWrap.style.display='block';
-    cncWrap.style.display='none';
+    sawKerfWrap.style.display='block'; cncKerfWrap.style.display='none';
+    sawTrimWrap.style.display='block'; cncTrimWrap.style.display='none';
   } else if(mode==='cnc'){
-    sawWrap.style.display='none';
-    cncWrap.style.display='block';
+    sawKerfWrap.style.display='none';  cncKerfWrap.style.display='block';
+    sawTrimWrap.style.display='none';  cncTrimWrap.style.display='block';
   } else {
     // both
-    sawWrap.style.display='block';
-    cncWrap.style.display='block';
+    sawKerfWrap.style.display='block'; cncKerfWrap.style.display='block';
+    sawTrimWrap.style.display='block'; cncTrimWrap.style.display='block';
   }
   scheduleSave();
 }
@@ -3705,7 +3734,9 @@ function optimize(){
   var sawKerf=parseInt(document.getElementById('kerf').value)||0;
   var cncKerf=parseInt((document.getElementById('kerf-cnc')||{}).value)||sawKerf;
   var mode=getMachineMode(); // 'cnc', 'saw', or 'both'
-  var trim=parseInt(document.getElementById('trim').value)||0;
+  var sawTrim=parseInt((document.getElementById('trim')||{}).value)||0;
+  var cncTrim=parseInt((document.getElementById('trim-cnc')||{}).value);
+  if(isNaN(cncTrim))cncTrim=sawTrim; // fall back to saw trim if cnc not set
   layouts=[];selP=null;hovP=null;
   var warnings=[];
   var unplacedByMat={}; // mat -> count of parts that didn't fit
@@ -3750,29 +3781,38 @@ function optimize(){
   }
   boards.forEach(function(bd){
     var bp=byBoard[bd.id];if(!bp||!bp.length)return;
-    var uw=bd.w-(trim*2),uh=bd.h-(trim*2),usedTrim=trim;
-    var maxL=Math.max.apply(null,bp.map(function(p){return Math.max(p.l,p.w);}));
-    if(maxL>Math.max(uw,uh)){
-      var ms=Math.max(0,Math.floor((Math.max(bd.w,bd.h)-maxL)/2));
-      warnings.push('⚠ "'+bd.mat+'" — trim reduced to 0 (parts up to '+maxL+'mm, max safe trim: '+ms+'mm)\n   Operator: cut edge-to-edge, factory edge is straight.');
-      uw=bd.w;uh=bd.h;usedTrim=0;
+    // Per-machine usable area calculation. If a part is bigger than what
+    // the trim allows, we reduce trim to 0 only for the machine that's
+    // actually using that big part — the other machine keeps its trim.
+    function computeUsable(trimVal, partsForMachine){
+      var u={uw:bd.w-trimVal*2, uh:bd.h-trimVal*2, usedTrim:trimVal, warned:false};
+      if(partsForMachine && partsForMachine.length){
+        var maxL=Math.max.apply(null, partsForMachine.map(function(p){return Math.max(p.l,p.w);}));
+        if(maxL>Math.max(u.uw,u.uh)){
+          var ms=Math.max(0, Math.floor((Math.max(bd.w,bd.h)-maxL)/2));
+          warnings.push('⚠ "'+bd.mat+'" — trim reduced to 0 (parts up to '+maxL+'mm, max safe trim: '+ms+'mm)\n   Operator: cut edge-to-edge, factory edge is straight.');
+          u.uw=bd.w; u.uh=bd.h; u.usedTrim=0; u.warned=true;
+        }
+      }
+      return u;
     }
     var grainLocked=!!bd.grain;
     var allPlacedIds={};
     if(mode==='both'){
       // ── Two-pass nesting ──
-      // Pass 1: SAW-only sheets (only auto-classified saw parts, saw kerf).
+      // Pass 1: SAW-only sheets (only auto-classified saw parts, saw kerf, saw trim).
       // Pass 2: CNC sheets (auto-classified CNC parts + any saw parts that
-      //         didn't fit on saw sheets, CNC kerf).
+      //         didn't fit on saw sheets, CNC kerf, CNC trim).
       var sawParts=bp.filter(function(p){ return partMachine(p)==='saw'; });
       var cncParts=bp.filter(function(p){ return partMachine(p)==='cnc'; });
       if(sawParts.length){
-        var sawRes=tryAllStrategies(sawParts, uw, uh, sawKerf, bd.color, usedTrim, grainLocked);
+        var u=computeUsable(sawTrim, sawParts);
+        var sawRes=tryAllStrategies(sawParts, u.uw, u.uh, sawKerf, bd.color, u.usedTrim, grainLocked);
         sawRes.layouts.forEach(function(l){
           l.idx=layouts.length;
           l.matName=bd.mat; l.matColor=bd.color;
           l.sw=bd.w; l.sh=bd.h;
-          l.trimWarning=(usedTrim===0 && trim>0);
+          l.trimWarning=(u.usedTrim===0 && sawTrim>0);
           l.machine='saw'; l.kerf=sawKerf;
           layouts.push(l);
         });
@@ -3780,12 +3820,13 @@ function optimize(){
       }
       var cncEligible=cncParts.concat(sawParts.filter(function(p){ return !allPlacedIds[p.id]; }));
       if(cncEligible.length){
-        var cncRes=tryAllStrategies(cncEligible, uw, uh, cncKerf, bd.color, usedTrim, grainLocked);
+        var u2=computeUsable(cncTrim, cncEligible);
+        var cncRes=tryAllStrategies(cncEligible, u2.uw, u2.uh, cncKerf, bd.color, u2.usedTrim, grainLocked);
         cncRes.layouts.forEach(function(l){
           l.idx=layouts.length;
           l.matName=bd.mat; l.matColor=bd.color;
           l.sw=bd.w; l.sh=bd.h;
-          l.trimWarning=(usedTrim===0 && trim>0);
+          l.trimWarning=(u2.usedTrim===0 && cncTrim>0);
           l.machine='cnc'; l.kerf=cncKerf;
           layouts.push(l);
         });
@@ -3794,12 +3835,14 @@ function optimize(){
     } else {
       // ── Single-machine mode (cnc OR saw): one nesting pass per material ──
       var kerf = mode==='saw' ? sawKerf : cncKerf;
-      var res=tryAllStrategies(bp, uw, uh, kerf, bd.color, usedTrim, grainLocked);
+      var trimForMode = mode==='saw' ? sawTrim : cncTrim;
+      var u3=computeUsable(trimForMode, bp);
+      var res=tryAllStrategies(bp, u3.uw, u3.uh, kerf, bd.color, u3.usedTrim, grainLocked);
       res.layouts.forEach(function(l){
         l.idx=layouts.length;
         l.matName=bd.mat; l.matColor=bd.color;
         l.sw=bd.w; l.sh=bd.h;
-        l.trimWarning=(usedTrim===0 && trim>0);
+        l.trimWarning=(u3.usedTrim===0 && trimForMode>0);
         l.machine=mode; l.kerf=kerf;
         layouts.push(l);
       });
@@ -3978,6 +4021,48 @@ function pack(UW, UH, partsIn, kerf, color, _ignoredMaxSheets, trim, grainLocked
           if (newY < pl.y){ pl.y = newY; movedAny = true; }
         });
         if (!movedAny) break;
+      }
+      // Second-chance placement: after compaction, the sheet may have new
+      // free space we couldn't see during the initial pass. Recompute the
+      // free-rectangle list from the COMPACTED placements and try to place
+      // any still-unplaced parts. This is the key fix for "obvious empty
+      // spot in the corner where part X clearly fits".
+      if(unplaced.length){
+        var freeAfter = [{x:0, y:0, w:UW, h:UH}];
+        placements.forEach(function(pl){
+          var usedR = {x:pl.x, y:pl.y, w:pl.pw + kerf, h:pl.ph + kerf};
+          freeAfter = subtractRectFromFreeList(freeAfter, usedR);
+        });
+        var stillUnplaced = unplaced.slice();
+        stillUnplaced.forEach(function(p){
+          var noRot;
+          if (p.allowRotate === true)       noRot = false;
+          else if (p.allowRotate === false) noRot = true;
+          else                              noRot = grainLocked || (p.groupId ? true : false);
+          var tries = noRot ? [[p.l, p.w, false]] : [[p.l, p.w, false], [p.w, p.l, true]];
+          var best = { score1: Infinity, score2: Infinity, found: false };
+          tries.forEach(function(t){
+            var pw = t[0] + kerf, ph = t[1] + kerf;
+            for (var fi = 0; fi < freeAfter.length; fi++){
+              var fr = freeAfter[fi];
+              if (pw <= fr.w && ph <= fr.h){
+                var leftW = fr.w - pw, leftH = fr.h - ph;
+                var shortSide = Math.min(leftW, leftH);
+                var longSide  = Math.max(leftW, leftH);
+                if (shortSide < best.score1 || (shortSide === best.score1 && longSide < best.score2)){
+                  best = {score1:shortSide, score2:longSide, x:fr.x, y:fr.y, pw:t[0], ph:t[1], rot:t[2], found:true};
+                }
+              }
+            }
+          });
+          if (best.found){
+            placements.push({part:p, x:best.x, y:best.y, pw:best.pw, ph:best.ph, rot:best.rot, color:tint(color, ci++)});
+            unplaced = unplaced.filter(function(u){ return u.id !== p.id; });
+            // Update free list for subsequent retries in this pass
+            var ur = {x:best.x, y:best.y, w:best.pw + kerf, h:best.ph + kerf};
+            freeAfter = subtractRectFromFreeList(freeAfter, ur);
+          }
+        });
       }
       out.push({ uw: UW, uh: UH, trim: trim, placements: placements, grainLocked: grainLocked });
     }
@@ -4300,9 +4385,11 @@ function draw(lay){
 }
 
 // ── Collision detection (axis-aligned, kerf gap) ──
+// Use the layout's own kerf (which was set when the optimizer ran) so saw
+// sheets get saw kerf and CNC sheets get CNC kerf — even if the operator
+// later changed the kerf inputs in the panel.
 function checkCollision(lay,movingP,nx,ny){
-  var kerf=parseInt(document.getElementById('kerf').value)||0;
-  var K=kerf; // minimum gap required between parts
+  var K=getLayoutKerf(lay);
   return lay.placements.some(function(p){
     if(p===movingP)return false;
     // AABB with kerf gap — parts must be at least K apart
@@ -4311,10 +4398,16 @@ function checkCollision(lay,movingP,nx,ny){
   });
 }
 
+// Resolve which kerf to apply to drag/snap interactions on a given layout.
+// Priority: layout.kerf (set during optimize) → saw kerf input (legacy fallback).
+function getLayoutKerf(lay){
+  if(lay && typeof lay.kerf === 'number') return lay.kerf;
+  return parseInt((document.getElementById('kerf')||{}).value)||0;
+}
+
 // ── Snap to grid of candidate positions (corners of all other parts + kerf) ──
 function snapToCorner(lay,movingP,rawX,rawY){
-  var kerf=parseInt(document.getElementById('kerf').value)||0;
-  var K=kerf;
+  var K=getLayoutKerf(lay);
   var UW=lay.uw,UH=lay.uh,pw=movingP.pw,ph=movingP.ph;
   // Build candidate X and Y coords from all other part edges + kerf
   var xs=[0,UW-pw],ys=[0,UH-ph]; // board edges always candidates
@@ -4343,8 +4436,7 @@ function snapToCorner(lay,movingP,rawX,rawY){
 
 // ── Push-away: resolve collision by nudging to nearest free spot ──
 function resolveCollision(lay,movingP,rawX,rawY){
-  var kerf=parseInt(document.getElementById('kerf').value)||0;
-  var K=kerf,pw=movingP.pw,ph=movingP.ph,UW=lay.uw,UH=lay.uh;
+  var K=getLayoutKerf(lay),pw=movingP.pw,ph=movingP.ph,UW=lay.uw,UH=lay.uh;
   if(!checkCollision(lay,movingP,rawX,rawY))return{x:rawX,y:rawY};
   // Try snap-to-corner first
   var snapped=snapToCorner(lay,movingP,rawX,rawY);
@@ -5136,8 +5228,24 @@ function buildExport(){
   document.getElementById('ep').style.display='block';
   var rows=document.getElementById('erows');rows.innerHTML='';
   var files=[];
-  files.push({name:'cut_all_sheets.dxf',text:makeDXFAll(layouts)});
-  layouts.forEach(function(l,i){files.push({name:'sheet_'+(i+1)+'_'+l.matName.replace(/[^a-z0-9]/gi,'_').substring(0,18)+'.dxf',text:makeDXF(l,i)});});
+  // Combined DXFs — one for ALL sheets, then optional per-machine combined files
+  files.push({name:'cut_all_sheets.dxf', text:makeDXFAll(layouts)});
+  // Per-machine combined files: makes operator's life easier when sending
+  // batches to different machines. Skip if the project is single-machine
+  // (only one of the two will exist anyway).
+  var sawSheets=layouts.filter(function(l){return l.machine==='saw';});
+  var cncSheets=layouts.filter(function(l){return l.machine==='cnc';});
+  if(sawSheets.length && cncSheets.length){
+    files.push({name:'cut_SAW_only.dxf', text:makeDXFAll(sawSheets)});
+    files.push({name:'cut_CNC_only.dxf', text:makeDXFAll(cncSheets)});
+  }
+  layouts.forEach(function(l,i){
+    // Tag each sheet's filename with its machine so operator knows which
+    // pile of files goes to which machine without opening them.
+    var prefix = l.machine==='saw' ? 'SAW_' : l.machine==='cnc' ? 'CNC_' : '';
+    var matSlug=l.matName.replace(/[^a-z0-9]/gi,'_').substring(0,18);
+    files.push({name:prefix+'sheet_'+(i+1)+'_'+matSlug+'.dxf', text:makeDXF(l,i)});
+  });
   files.push({name:'cut_report.csv',text:makeCSV()});
 
   // "Download all as ZIP" row at the top
