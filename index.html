@@ -1442,6 +1442,9 @@ function cheapFingerprint(){
     var l=layouts[i];fp+='|L'+i+':'+(l.placements||[]).length;
     (l.placements||[]).forEach(function(pl){fp+=','+pl.x+','+pl.y+','+(pl.rot?1:0);});
   }
+  // Versions: id + name (so adding/renaming/deleting bumps the fingerprint)
+  fp+='|V'+versions.length+':'+(activeVersionId||'_');
+  for(var i=0;i<versions.length;i++){var v=versions[i];fp+=',v'+v.id+':'+v.name;}
   return fp;
 }
 function getSettingsTrim(){
@@ -3960,6 +3963,9 @@ function pack(UW, UH, partsIn, kerf, color, _ignoredMaxSheets, trim, grainLocked
             var leftW = fr.w - pw, leftH = fr.h - ph;
             var shortSide = Math.min(leftW, leftH);
             var longSide  = Math.max(leftW, leftH);
+            // Tertiary tiebreaker: prefer bottom-left placement (lower x+y).
+            // Forces tight packing along board origin instead of "floating" center placements.
+            var positionTiebreak = fr.x + fr.y;
             // Group bonus: parts in the same group prefer to stay adjacent
             if (p.groupId){
               var adj = placements.some(function(pl){
@@ -3975,9 +3981,13 @@ function pack(UW, UH, partsIn, kerf, color, _ignoredMaxSheets, trim, grainLocked
               });
               if (adj) shortSide -= 10000; // strong preference to stay together
             }
-            if (shortSide < best.score1 || (shortSide === best.score1 && longSide < best.score2)){
+            // Pick if score better OR tied scores but better position
+            var betterScore = shortSide < best.score1 || (shortSide === best.score1 && longSide < best.score2);
+            var sameScore = shortSide === best.score1 && longSide === best.score2;
+            var betterPosition = sameScore && positionTiebreak < (best.posTiebreak || Infinity);
+            if (betterScore || betterPosition){
               best = {
-                score1: shortSide, score2: longSide,
+                score1: shortSide, score2: longSide, posTiebreak: positionTiebreak,
                 x: fr.x, y: fr.y,
                 pw: t[0], ph: t[1],
                 rot: t[2], found: true
@@ -4785,51 +4795,107 @@ function _refreshStats(){
 function consolidateSheets(){
   if(!layouts.length){alert(t('noLayouts'));return;}
   if(!confirm(t('confirmConsolidate')))return;
-  // Collect every currently-placed part (with its current rotation so flipped parts stay flipped)
+  // Collect every currently-placed part
   var placed=[];
   layouts.forEach(function(l){
     (l.placements||[]).forEach(function(pl){
-      // Re-export part with rotation applied to l/w if rotated
       var p=pl.part;
       if(!p)return;
       placed.push(p);
     });
   });
   if(!placed.length){alert(t('noPartsConsolidate'));return;}
-  // Group by material
+  // Group parts by material
   var byBoard={};
   placed.forEach(function(p){
     var bd=matchBoard(p.mat);if(!bd)bd=ensureBoard(p.mat);
     if(!byBoard[bd.id])byBoard[bd.id]=[];
     byBoard[bd.id].push(p);
   });
-  var kerf=parseInt((document.getElementById('kerf')||{}).value||0)||0;
-  var trim=parseInt((document.getElementById('trim')||{}).value||0)||0;
+  // Read same per-machine settings as optimize() so consolidate respects them
+  var sawKerf=parseInt((document.getElementById('kerf')||{}).value||0)||0;
+  var cncKerf=parseInt((document.getElementById('kerf-cnc')||{}).value)||sawKerf;
+  var sawTrim=parseInt((document.getElementById('trim')||{}).value||0)||0;
+  var cncTrim=parseInt((document.getElementById('trim-cnc')||{}).value);
+  if(isNaN(cncTrim))cncTrim=sawTrim;
+  var mode=getMachineMode();
   var newLayouts=[];
   var strategies=[
     function(a,b){return(b.l*b.w)-(a.l*a.w);},
     function(a,b){return Math.max(b.l,b.w)-Math.max(a.l,a.w);},
+    function(a,b){return Math.min(b.l,b.w)-Math.min(a.l,a.w);},
     function(a,b){return b.l-a.l;},
     function(a,b){return b.w-a.w;}
   ];
-  boards.forEach(function(bd){
-    var bp=byBoard[bd.id];if(!bp||!bp.length)return;
-    var uw=bd.w-trim*2,uh=bd.h-trim*2,usedTrim=trim;
-    var maxL=Math.max.apply(null,bp.map(function(p){return Math.max(p.l,p.w);}));
-    if(maxL>Math.max(uw,uh)){uw=bd.w;uh=bd.h;usedTrim=0;}
-    var bestLays=null,bestEff=-1;
-    var grainLocked=!!bd.grain;
+  function tryAllStrategies(partsList, uw, uh, kerf, color, usedTrim, grainLocked){
+    var bestLayouts=null, bestEff=-1, bestPlacedIds=null;
     strategies.forEach(function(sfn){
-      var res=pack(uw,uh,bp.slice().sort(sfn),kerf,bd.color,bd.qty,usedTrim,grainLocked);
+      var res=pack(uw, uh, partsList.slice().sort(sfn), kerf, color, 0, usedTrim, grainLocked);
       var used=res.reduce(function(a,l){return a+l.placements.reduce(function(b,p){return b+p.pw*p.ph;},0);},0);
       var tot=res.reduce(function(a,l){return a+l.uw*l.uh;},0);
       var e=tot>0?used/tot:0;
-      if(e>bestEff){bestEff=e;bestLays=res;}
+      var placedCount=res.reduce(function(a,l){return a+l.placements.length;},0);
+      var bestPlacedCount=bestLayouts?bestLayouts.reduce(function(a,l){return a+l.placements.length;},0):-1;
+      if((placedCount>bestPlacedCount) || (placedCount===bestPlacedCount && e>bestEff)){
+        bestEff=e; bestLayouts=res;
+        var ids={};
+        res.forEach(function(l){l.placements.forEach(function(pl){ids[pl.part.id]=true;});});
+        bestPlacedIds=ids;
+      }
     });
-    if(bestLays&&bestLays.length){
-      bestLays.forEach(function(l){
-        l.idx=newLayouts.length;l.matName=bd.mat;l.matColor=bd.color;l.sw=bd.w;l.sh=bd.h;
-        l.trimWarning=(usedTrim===0&&trim>0);
+    return { layouts: bestLayouts || [], placedIds: bestPlacedIds || {} };
+  }
+  boards.forEach(function(bd){
+    var bp=byBoard[bd.id];if(!bp||!bp.length)return;
+    function computeUsable(trimVal, partsForMachine){
+      var u={uw:bd.w-trimVal*2, uh:bd.h-trimVal*2, usedTrim:trimVal};
+      if(partsForMachine && partsForMachine.length){
+        var maxL=Math.max.apply(null, partsForMachine.map(function(p){return Math.max(p.l,p.w);}));
+        if(maxL>Math.max(u.uw,u.uh)){u.uw=bd.w; u.uh=bd.h; u.usedTrim=0;}
+      }
+      return u;
+    }
+    var grainLocked=!!bd.grain;
+    if(mode==='both'){
+      // Pass 1: saw parts → saw sheets
+      var sawParts=bp.filter(function(p){ return partMachine(p)==='saw'; });
+      var cncParts=bp.filter(function(p){ return partMachine(p)==='cnc'; });
+      var allPlacedIds={};
+      if(sawParts.length){
+        var u=computeUsable(sawTrim, sawParts);
+        var sawRes=tryAllStrategies(sawParts, u.uw, u.uh, sawKerf, bd.color, u.usedTrim, grainLocked);
+        sawRes.layouts.forEach(function(l){
+          l.idx=newLayouts.length;
+          l.matName=bd.mat; l.matColor=bd.color; l.sw=bd.w; l.sh=bd.h;
+          l.trimWarning=(u.usedTrim===0 && sawTrim>0);
+          l.machine='saw'; l.kerf=sawKerf;
+          newLayouts.push(l);
+        });
+        Object.keys(sawRes.placedIds).forEach(function(id){ allPlacedIds[id]=true; });
+      }
+      var cncEligible=cncParts.concat(sawParts.filter(function(p){ return !allPlacedIds[p.id]; }));
+      if(cncEligible.length){
+        var u2=computeUsable(cncTrim, cncEligible);
+        var cncRes=tryAllStrategies(cncEligible, u2.uw, u2.uh, cncKerf, bd.color, u2.usedTrim, grainLocked);
+        cncRes.layouts.forEach(function(l){
+          l.idx=newLayouts.length;
+          l.matName=bd.mat; l.matColor=bd.color; l.sw=bd.w; l.sh=bd.h;
+          l.trimWarning=(u2.usedTrim===0 && cncTrim>0);
+          l.machine='cnc'; l.kerf=cncKerf;
+          newLayouts.push(l);
+        });
+      }
+    } else {
+      // Single-machine consolidation
+      var k = mode==='saw' ? sawKerf : cncKerf;
+      var tForMode = mode==='saw' ? sawTrim : cncTrim;
+      var u3=computeUsable(tForMode, bp);
+      var res=tryAllStrategies(bp, u3.uw, u3.uh, k, bd.color, u3.usedTrim, grainLocked);
+      res.layouts.forEach(function(l){
+        l.idx=newLayouts.length;
+        l.matName=bd.mat; l.matColor=bd.color; l.sw=bd.w; l.sh=bd.h;
+        l.trimWarning=(u3.usedTrim===0 && tForMode>0);
+        l.machine=mode; l.kerf=k;
         newLayouts.push(l);
       });
     }
