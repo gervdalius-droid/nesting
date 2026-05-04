@@ -4426,7 +4426,42 @@ function pruneNonMaximal(rects){
 // ═══════════════════════════════════════════════════════════════
 // CANVAS
 // ═══════════════════════════════════════════════════════════════
+// Detect identical layouts so we can show "×N" badges and produce only one
+// DXF per pattern instead of N copies.
+//
+// Two layouts are "identical" when they're cut the same way:
+//   - Same material + sheet size + machine
+//   - Same set of part placements (origName, dims, x, y, rotation)
+//
+// Returns:
+//   sigById  : Map layoutIdx → signature string
+//   countBy  : Map signature → count of layouts that share it
+//   firstIdx : Map signature → first layout index (the "representative")
+//   occurrence: Map layoutIdx → 1-based occurrence within its duplicate group
+function computeLayoutDupGroups(){
+  var sigs = layouts.map(function(l){
+    // Signature: material + machine + sorted list of (name, dims, position, rot).
+    // Sort placements so two layouts with same parts in same positions but
+    // different placement order still match.
+    var parts = (l.placements||[]).map(function(pl){
+      var p = pl.part || {};
+      return [p.origName||p.name||'?', pl.pw, pl.ph, pl.x, pl.y, pl.rot?1:0].join(',');
+    }).sort().join('|');
+    return (l.matName||'?')+'#'+(l.machine||'?')+'#'+l.sw+'x'+l.sh+'@@'+parts;
+  });
+  var firstIdx = {};
+  var countBy = {};
+  var occurrence = {};
+  sigs.forEach(function(s, i){
+    if(firstIdx[s] === undefined) firstIdx[s] = i;
+    countBy[s] = (countBy[s]||0) + 1;
+    occurrence[i] = countBy[s];
+  });
+  return { sigs:sigs, countBy:countBy, firstIdx:firstIdx, occurrence:occurrence };
+}
+
 function buildTabs(){
+  var dups = computeLayoutDupGroups();
   document.getElementById('tabs').innerHTML=layouts.map(function(l,i){
     var warn=l.trimWarning?'<span style="color:#B84040;margin-left:2px" title="No trim">⚠</span>':'';
     var grain=l.grainLocked?'<span style="color:#3D6B4F;margin-left:2px" title="Grain locked">🌾</span>':'';
@@ -4434,10 +4469,18 @@ function buildTabs(){
     var mach=l.machine==='saw' ? '<span title="Saw — k='+l.kerf+'mm" style="margin-right:2px">🪚</span>'
            : l.machine==='cnc' ? '<span title="CNC — k='+l.kerf+'mm" style="margin-right:2px">🤖</span>'
            : '';
+    // Duplicate badge: if this sheet is one of N identical sheets, show "×N"
+    // alongside which copy this is (e.g. 2/3).
+    var sig = dups.sigs[i];
+    var dupCount = dups.countBy[sig];
+    var dupBadge = '';
+    if(dupCount > 1){
+      dupBadge = '<span style="margin-left:4px;padding:0 4px;background:#3D6B4F;color:#fff;border-radius:3px;font-size:9px;font-weight:600" title="'+dups.occurrence[i]+' of '+dupCount+' identical sheets">×'+dupCount+'</span>';
+    }
     return'<div class="tab" id="tab-'+i+'" onclick="activateTab('+i+')">'
       +mach
       +'<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:'+l.matColor+'"></span>'
-      +esc(l.matName.split(' ').slice(0,2).join(' '))+' #'+(i+1)+warn+grain+'</div>';
+      +esc(l.matName.split(' ').slice(0,2).join(' '))+' #'+(i+1)+warn+grain+dupBadge+'</div>';
   }).join('');
 }
 function activateTab(i){curSheet=i;selP=null;hovP=null;document.querySelectorAll('.tab').forEach(function(t,ti){t.className='tab'+(ti===i?' active':'');});renderCanvas(i);}
@@ -4879,7 +4922,9 @@ function closeMovePopover(){
 // If excludeSelf is true, ignore the placement itself (used when moving within same sheet).
 // Returns {x,y} or null if nothing fits.
 function findFreeSpot(lay,placement,excludeSelf){
-  var kerf=parseInt((document.getElementById('kerf')||{}).value||0)||0;
+  // Use the layout's own kerf (set during optimize) so collision checks
+  // match the target sheet's machine/kerf settings.
+  var kerf=getLayoutKerf(lay);
   var K=kerf, pw=placement.pw, ph=placement.ph, UW=lay.uw, UH=lay.uh;
   if(pw>UW||ph>UH)return null;
   // Build hypothetical placements list that excludes self if needed
@@ -4927,6 +4972,19 @@ function moveToSheet(targetIdx){
   var dstLay=layouts[targetIdx];
   if(!srcLay||!dstLay||srcLay===dstLay)return;
   if(dstLay.matName!==selP.part.mat){alert(t('alertDiffMaterial'));return;}
+  // Block moves between sheets that use different machines/kerfs.
+  // The geometry is incompatible: a part placed with 12mm kerf gaps
+  // can't simply land on a 4mm-kerf sheet — the implied tool path differs.
+  if(srcLay.machine && dstLay.machine && srcLay.machine !== dstLay.machine){
+    alert('Cannot move parts between different machines.\n\n'
+      +'Source sheet: '+(srcLay.machine==='saw'?'🪚 Saw':'🤖 CNC')+' (kerf '+srcLay.kerf+'mm)\n'
+      +'Target sheet: '+(dstLay.machine==='saw'?'🪚 Saw':'🤖 CNC')+' (kerf '+dstLay.kerf+'mm)\n\n'
+      +'If you really need this part on the target machine, change its '
+      +'machine assignment in the Parts Manager and re-Optimize.');
+    return;
+  }
+  // findFreeSpot reads dstLay.kerf via getLayoutKerf — so the spot it returns
+  // already respects the target sheet's kerf, no extra logic needed here.
   var pos=findFreeSpot(dstLay,selP,false);
   if(!pos){alert(t('alertNoFreeSpace',{n:targetIdx+1}));return;}
   // Remove from source
@@ -4958,13 +5016,25 @@ function moveToNewSheet(){
   var srcLay=layouts[curSheet];
   var bd=boards.find(function(b){return b.mat===selP.part.mat;});
   if(!bd){alert(t('alertNoBoard',{mat:selP.part.mat}));return;}
-  var trim=parseInt((document.getElementById('trim')||{}).value||0)||0;
+  // Inherit machine + kerf from the source sheet so the new sheet stays
+  // in the same workflow (saw → another saw sheet, CNC → another CNC sheet).
+  var srcMachine=srcLay&&srcLay.machine ? srcLay.machine : getMachineMode();
+  var srcKerf=srcLay&&typeof srcLay.kerf==='number' ? srcLay.kerf : (parseInt((document.getElementById('kerf')||{}).value)||0);
+  // Use the matching per-machine trim
+  var trim;
+  if(srcMachine==='cnc'){
+    trim=parseInt((document.getElementById('trim-cnc')||{}).value);
+    if(isNaN(trim))trim=parseInt((document.getElementById('trim')||{}).value||0)||0;
+  } else {
+    trim=parseInt((document.getElementById('trim')||{}).value||0)||0;
+  }
   // Create a fresh layout mirroring the existing sheet geometry for this material
   var newLay={
     idx:layouts.length,
     uw:bd.w-trim*2,uh:bd.h-trim*2,sw:bd.w,sh:bd.h,trim:trim,
     matName:bd.mat,matColor:bd.color,
     grainLocked:!!bd.grain,trimWarning:false,
+    machine:srcMachine, kerf:srcKerf,
     placements:[]
   };
   // Check the part actually fits
@@ -5407,8 +5477,13 @@ function buildPrintView(){
   });
   var kerf=parseInt((document.getElementById('kerf')||{}).value||0)||0;
   var trim=parseInt((document.getElementById('trim')||{}).value||0)||0;
-  // Total pages = cover + N sheets + summary
-  var totalPages=1+layouts.length+1;
+  // Total pages = cover + N unique sheets + summary
+  var dupsForTotal = computeLayoutDupGroups();
+  var uniqueSheetCount = 0;
+  layouts.forEach(function(l, i){
+    if(dupsForTotal.firstIdx[dupsForTotal.sigs[i]] === i) uniqueSheetCount++;
+  });
+  var totalPages=1+uniqueSheetCount+1;
   var pageNo=1;
   var html='';
   // ── COVER PAGE ──
@@ -5459,24 +5534,27 @@ function buildPrintView(){
     +'<div>↑ — '+t('legendGrain')+'</div>'
     +'</div>';
   html+=footer(pageNo++,totalPages)+'</div>';
-  // ── ONE PAGE PER SHEET ──
+  // ── ONE PAGE PER UNIQUE SHEET (duplicates collapsed with ×N notation) ──
+  var pdfDups = computeLayoutDupGroups();
   layouts.forEach(function(lay,i){
+    // Skip duplicates of an already-printed sheet — saves paper for the
+    // operator. The ×N annotation on the canonical page tells them to cut
+    // N copies of this layout.
+    if(pdfDups.firstIdx[pdfDups.sigs[i]] !== i) return;
     var placements=(lay.placements||[]).slice();
     var usedA=placements.reduce(function(n,p){return n+p.pw*p.ph;},0);
     var eff=lay.uw*lay.uh?Math.round(usedA/(lay.uw*lay.uh)*100):0;
     var matLabel=esc(lay.matName||'?');
-    // Density tier based on row count. Thresholds tuned so the table
-    // always fits on one A4 alongside the SVG preview and specs.
-    //   ≤15 rows : default (font 10px, comfortable)
-    //   16-25    : .dense        (font 8px, SVG shrinks to 85mm)
-    //   26-40    : .ultra-dense  (font 7px, SVG shrinks to 70mm)
-    //   41+      : .nano-dense   (font 6px, SVG shrinks to 60mm)
+    var dupCount = pdfDups.countBy[pdfDups.sigs[i]];
     var densityCls = placements.length <= 15 ? ''
                    : placements.length <= 25 ? 'dense'
                    : placements.length <= 40 ? 'ultra-dense'
                    : 'nano-dense';
     html+='<div class="pp sheet-page '+densityCls+'">'+header(t('sheetPageTitle',{n:i+1,total:layouts.length}));
-    html+='<h1 style="margin-top:4px;font-size:18px"><span style="display:inline-block;width:12px;height:12px;background:'+lay.matColor+';border-radius:50%;vertical-align:middle;margin-right:6px"></span>'+matLabel+' — '+t('sheetLabel',{n:i+1})+'</h1>';
+    var copiesNote = dupCount>1
+      ? ' <span style="background:#3D6B4F;color:#fff;border-radius:4px;padding:2px 8px;font-size:14px;margin-left:6px">CUT × '+dupCount+'</span>'
+      : '';
+    html+='<h1 style="margin-top:4px;font-size:18px"><span style="display:inline-block;width:12px;height:12px;background:'+lay.matColor+';border-radius:50%;vertical-align:middle;margin-right:6px"></span>'+matLabel+' — '+t('sheetLabel',{n:i+1})+copiesNote+'</h1>';
     // SVG sheet — constrained by .pp-sheet-svg CSS to fit within page height.
     html+='<div class="pp-sheet-svg">'+printSheetSVG(lay,170)+'</div>';
     // Specs & parts below
@@ -5484,7 +5562,9 @@ function buildPrintView(){
       +'<div class="row"><span>'+t('boardSize')+'</span><b>'+lay.sw+' × '+lay.sh+' mm</b></div>'
       +'<div class="row"><span>'+t('usableArea')+'</span><b>'+lay.uw+' × '+lay.uh+' mm</b> '+(lay.trim?'(' +t('withTrim')+ ' '+lay.trim+' mm)':'')+'</div>'
       +'<div class="row"><span>'+t('partsOnSheet')+'</span><b>'+placements.length+'</b></div>'
+      +(dupCount>1?'<div class="row" style="color:#3D6B4F"><span>📐 Cut copies of this sheet</span><b>×'+dupCount+' (total '+(placements.length*dupCount)+' parts)</b></div>':'')
       +'<div class="row"><span>'+t('statEfficiency')+'</span><b>'+eff+'%</b></div>'
+      +(lay.machine ? '<div class="row"><span>Machine</span><b>'+(lay.machine==='saw'?'🪚 Saw':'🤖 CNC')+' (kerf '+lay.kerf+'mm)</b></div>' : '')
       +(lay.grainLocked?'<div class="row"><span>'+t('grainLock')+'</span><b>'+t('locked')+' ↑</b></div>':'')
       +(lay.trimWarning?'<div class="row" style="color:#B84040"><span>⚠ '+t('trimWarn')+'</span></div>':'')
       +'</div>';
@@ -5548,6 +5628,43 @@ function buildPrintView(){
   });
   html+='<tr style="font-weight:700;background:#EAE6DC"><td colspan="5">'+t('totalRow')+'</td><td class="num">×'+sumQty+'</td><td class="num">'+sumArea.toFixed(3)+'</td></tr>';
   html+='</tbody></table>';
+
+  // ── Sheet plan: which sheets are unique vs duplicated ──
+  var planDups = computeLayoutDupGroups();
+  var planRows = [];
+  layouts.forEach(function(lay, i){
+    if(planDups.firstIdx[planDups.sigs[i]] !== i) return;
+    var copies = planDups.countBy[planDups.sigs[i]];
+    var partsCount = (lay.placements||[]).length;
+    planRows.push({idx:i, copies:copies, lay:lay, partsCount:partsCount});
+  });
+  // Show plan only if there's at least one duplicated sheet (saves space otherwise)
+  var hasDups = planRows.some(function(r){return r.copies>1;});
+  if(hasDups){
+    html+='<h2 style="margin-top:16px">📐 Sheet plan</h2>';
+    html+='<table class="ppt"><thead><tr>'
+      +'<th class="num">Sheet #</th><th>Material</th><th>Machine</th>'
+      +'<th class="num">Parts/sheet</th><th class="num">Cut copies</th><th class="num">Total parts</th>'
+      +'</tr></thead><tbody>';
+    var totalSheetsToCut = 0;
+    planRows.forEach(function(r){
+      var copyBadge = r.copies>1
+        ? '<b style="color:#3D6B4F">×'+r.copies+'</b>'
+        : '×1';
+      var mach = r.lay.machine==='saw' ? '🪚 Saw' : r.lay.machine==='cnc' ? '🤖 CNC' : '—';
+      totalSheetsToCut += r.copies;
+      html+='<tr>'
+        +'<td class="num">'+(r.idx+1)+'</td>'
+        +'<td><span style="display:inline-block;width:8px;height:8px;background:'+r.lay.matColor+';border-radius:50%;margin-right:4px"></span>'+esc(r.lay.matName||'?')+'</td>'
+        +'<td>'+mach+'</td>'
+        +'<td class="num">'+r.partsCount+'</td>'
+        +'<td class="num">'+copyBadge+'</td>'
+        +'<td class="num">'+(r.partsCount*r.copies)+'</td>'
+        +'</tr>';
+    });
+    html+='<tr style="font-weight:700;background:#EAE6DC"><td colspan="4">'+planRows.length+' unique pattern(s) → '+totalSheetsToCut+' sheets to cut total</td><td class="num"></td><td class="num"></td></tr>';
+    html+='</tbody></table>';
+  }
   html+='<div class="note" style="margin-top:14px">'+t('summaryNote')+'</div>';
   html+=footer(pageNo++,totalPages)+'</div>';
   root.innerHTML=html;
@@ -5582,12 +5699,20 @@ function buildExport(){
     files.push({name:'cut_SAW_only.dxf', text:makeDXFAll(sawSheets)});
     files.push({name:'cut_CNC_only.dxf', text:makeDXFAll(cncSheets)});
   }
+  // Only emit ONE DXF per unique sheet pattern. Append _xN suffix when
+  // multiple identical layouts exist, so the operator knows to cut N copies.
+  var dups = computeLayoutDupGroups();
   layouts.forEach(function(l,i){
-    // Tag each sheet's filename with its machine so operator knows which
-    // pile of files goes to which machine without opening them.
+    // Skip duplicates of an earlier sheet — we already emitted the canonical one.
+    if(dups.firstIdx[dups.sigs[i]] !== i) return;
     var prefix = l.machine==='saw' ? 'SAW_' : l.machine==='cnc' ? 'CNC_' : '';
     var matSlug=l.matName.replace(/[^a-z0-9]/gi,'_').substring(0,18);
-    files.push({name:prefix+'sheet_'+(i+1)+'_'+matSlug+'.dxf', text:makeDXF(l,i)});
+    var dupCount = dups.countBy[dups.sigs[i]];
+    // Use the index of the first occurrence in the file name so numbering
+    // remains predictable (sheet_1, sheet_4 etc., not sheet_1, sheet_2 with
+    // hidden duplicates).
+    var fname = prefix+'sheet_'+(i+1)+'_'+matSlug+(dupCount>1?'_x'+dupCount:'')+'.dxf';
+    files.push({name:fname, text:makeDXF(l,i)});
   });
   files.push({name:'cut_report.csv',text:makeCSV()});
 
@@ -5828,12 +5953,20 @@ function makeDXFAll(lays){
   L.push('0','ENDSEC','0','EOF');return L.join('\r\n');
 }
 function makeCSV(){
-  var rows=['Sheet,Material,PartName,X,Y,Length,Width,Thickness,OP1_ID,EB1,EB2,EB3,EB4,Rotated,TrimWarning'];
-  layouts.forEach(function(l,si){l.placements.forEach(function(p){
-    var eb=p.part.eb||{};
-    rows.push([si+1,'"'+l.matName+'"','"'+p.part.origName+'"',(p.x+l.trim),(p.y+l.trim),p.pw,p.ph,p.part.thick||18,
-      '"'+(p.part.op1||'')+'"',eb.eb1||'',eb.eb2||'',eb.eb3||'',eb.eb4||'',p.rot?'Yes':'No',l.trimWarning?'NO-TRIM':''].join(','));
-  });});
+  var dups = computeLayoutDupGroups();
+  var rows=['Sheet,Copies,Machine,Material,PartName,X,Y,Length,Width,Thickness,OP1_ID,EB1,EB2,EB3,EB4,Rotated,TrimWarning'];
+  layouts.forEach(function(l,si){
+    // Skip duplicates of earlier sheets — they cut identically, listing them
+    // separately would inflate the report. Operator sees "Copies: N" instead.
+    if(dups.firstIdx[dups.sigs[si]] !== si) return;
+    var copies = dups.countBy[dups.sigs[si]];
+    var machine = l.machine || '';
+    l.placements.forEach(function(p){
+      var eb=p.part.eb||{};
+      rows.push([si+1,copies,machine,'"'+l.matName+'"','"'+p.part.origName+'"',(p.x+l.trim),(p.y+l.trim),p.pw,p.ph,p.part.thick||18,
+        '"'+(p.part.op1||'')+'"',eb.eb1||'',eb.eb2||'',eb.eb3||'',eb.eb4||'',p.rot?'Yes':'No',l.trimWarning?'NO-TRIM':''].join(','));
+    });
+  });
   return rows.join('\r\n');
 }
 
