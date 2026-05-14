@@ -272,31 +272,39 @@ body.print-mode{background:#fff}
 .pp table.ppt td{padding:3px 6px;border:1px solid #D4CFC2;vertical-align:top}
 .pp table.ppt td.num{font-family:monospace;text-align:right}
 .pp table.ppt tr:nth-child(even) td{background:#FBFAF6}
-/* Sheet pages: flex layout so the SVG shrinks and the table takes what's left */
+/* Sheet pages: portrait A4, diagram-dominant layout.
+   The diagram gets the lion's share of vertical space (was 95mm in the old
+   design, now up to 155mm — fills the page width at ~200mm × 150mm for a
+   typical 2800×2070 board). Parts table shrinks to compensate. */
 .pp.sheet-page{display:flex;flex-direction:column}
-.pp.sheet-page > h1{flex-shrink:0}
-.pp.sheet-page .pp-sheet-svg{flex-shrink:1;text-align:center;margin:6px 0 4px;max-height:95mm;overflow:hidden}
-.pp.sheet-page .pp-sheet-svg svg{max-width:100%;max-height:95mm;width:auto;height:auto}
-.pp.sheet-page .sheet-specs{flex-shrink:0}
+.pp.sheet-page > h1{flex-shrink:0;margin:4px 0 6px}
+.pp.sheet-page .pp-sheet-svg{flex-shrink:0;text-align:center;margin:4px 0;max-height:155mm;overflow:hidden}
+.pp.sheet-page .pp-sheet-svg svg{max-width:100%;max-height:155mm;width:auto;height:auto}
+.pp.sheet-page .sheet-specs{flex-shrink:0;font-size:9.5px;padding:4px 8px;line-height:1.35;
+  display:grid;grid-template-columns:1fr 1fr;gap:0 14px;margin-bottom:4px}
+.pp.sheet-page .sheet-specs .row{padding:0}
 .pp.sheet-page .pp-parts-wrap{flex:1 1 auto;min-height:0;overflow:hidden;position:relative}
-/* Density tiers — kick in based on how many parts are on the sheet.
-   The available vertical space for the table after header/SVG/specs is ~80mm.
-   Roughly: default ≈ 4mm/row, dense ≈ 3mm/row, ultra ≈ 2.3mm/row, nano ≈ 1.9mm/row. */
-.pp.sheet-page.dense table.ppt{font-size:8px}
-.pp.sheet-page.dense table.ppt th{padding:1px 4px;font-size:7.5px}
+/* Density tiers — adapt table density to part count so the diagram stays huge.
+   Available vertical space for the table after header/diagram/specs is ~55-65mm.
+   Default: ≤10 parts, normal 9px font.
+   Dense: 11-20 parts, 7.5px font.
+   Ultra: 21-35 parts, 6.5px font + reduced padding.
+   Nano: 36+ parts, 5.8px font; table will still slightly clip if extreme. */
+.pp.sheet-page.dense table.ppt{font-size:7.5px;line-height:1.15}
+.pp.sheet-page.dense table.ppt th{padding:1px 4px;font-size:7px}
 .pp.sheet-page.dense table.ppt td{padding:0 4px}
-.pp.sheet-page.dense .pp-sheet-svg{max-height:85mm}
-.pp.sheet-page.dense .pp-sheet-svg svg{max-height:85mm}
-.pp.sheet-page.ultra-dense table.ppt{font-size:7px;line-height:1.1}
-.pp.sheet-page.ultra-dense table.ppt th{padding:1px 3px;font-size:7px}
+.pp.sheet-page.dense .pp-sheet-svg{max-height:140mm}
+.pp.sheet-page.dense .pp-sheet-svg svg{max-height:140mm}
+.pp.sheet-page.ultra-dense table.ppt{font-size:6.5px;line-height:1.05}
+.pp.sheet-page.ultra-dense table.ppt th{padding:0 3px;font-size:6.5px}
 .pp.sheet-page.ultra-dense table.ppt td{padding:0 3px}
-.pp.sheet-page.ultra-dense .pp-sheet-svg{max-height:70mm}
-.pp.sheet-page.ultra-dense .pp-sheet-svg svg{max-height:70mm}
-.pp.sheet-page.nano-dense table.ppt{font-size:6px;line-height:1.05}
-.pp.sheet-page.nano-dense table.ppt th{padding:0 3px;font-size:6px}
-.pp.sheet-page.nano-dense table.ppt td{padding:0 3px}
-.pp.sheet-page.nano-dense .pp-sheet-svg{max-height:60mm}
-.pp.sheet-page.nano-dense .pp-sheet-svg svg{max-height:60mm}
+.pp.sheet-page.ultra-dense .pp-sheet-svg{max-height:125mm}
+.pp.sheet-page.ultra-dense .pp-sheet-svg svg{max-height:125mm}
+.pp.sheet-page.nano-dense table.ppt{font-size:5.8px;line-height:1}
+.pp.sheet-page.nano-dense table.ppt th{padding:0 2px;font-size:5.8px}
+.pp.sheet-page.nano-dense table.ppt td{padding:0 2px}
+.pp.sheet-page.nano-dense .pp-sheet-svg{max-height:115mm}
+.pp.sheet-page.nano-dense .pp-sheet-svg svg{max-height:115mm}
 .pp .sheet-block{display:flex;gap:10px;margin-top:10px;align-items:flex-start}
 .pp .sheet-svg-wrap{flex:0 0 auto}
 .pp .sheet-side{flex:1;min-width:0;font-size:9px}
@@ -3807,12 +3815,26 @@ function optimize(){
       // LCG (Lehmer): deterministic pseudo-random in [0,1)
       var s = seed || 1;
       function rand(){ s = (s * 16807) % 2147483647; return s / 2147483647; }
+      // Group-aware rotation: parts sharing a groupId must all rotate together
+      // (or not at all). Otherwise the "same grain direction" promise breaks
+      // and group parts end up oriented inconsistently. For 'rand' mode, the
+      // coin-flip is decided ONCE per group, then applied to every member.
+      var groupDecisions = {};
       return list.map(function(p){
         if(p.shape || p.allowRotate===false) return p; // shapes / locked parts: don't pre-rotate
         var doSwap;
-        if(mode==='h') doSwap = p.w > p.l;             // make horizontal (l > w)
-        else if(mode==='v') doSwap = p.l > p.w;         // make vertical (w > l)
-        else if(mode==='rand') doSwap = rand() < 0.5;   // random
+        if(mode==='h')      doSwap = p.w > p.l;       // make horizontal (l > w)
+        else if(mode==='v') doSwap = p.l > p.w;       // make vertical (w > l)
+        else if(mode==='rand'){
+          if(p.groupId){
+            // One coin flip per group, shared across all members
+            var gk = 'g'+p.groupId;
+            if(!(gk in groupDecisions)) groupDecisions[gk] = (rand() < 0.5);
+            doSwap = groupDecisions[gk];
+          } else {
+            doSwap = rand() < 0.5;
+          }
+        }
         else doSwap = false;
         if(!doSwap) return p;
         // Return a shallow copy with l/w swapped — original part untouched
@@ -4006,6 +4028,13 @@ function optimize(){
 // Only effective when partsIn has 1-3 distinct sizes. We bail out otherwise.
 function packGridFill(UW, UH, partsIn, kerf, color, trim, grainLocked){
   if(!partsIn.length) return [];
+  // Group-aware: grid-fill buckets purely by dimensions and would scatter
+  // grouped parts across the primary band and right-side strip. Skip it
+  // entirely when any part has a groupId — pack() handles those correctly
+  // with its adjacency bonus.
+  for(var gi = 0; gi < partsIn.length; gi++){
+    if(partsIn[gi].groupId) return [];
+  }
   // Bucket parts by exact dimensions (key = "lxw" sorted so 244x455 == 455x244)
   var buckets = {};
   partsIn.forEach(function(p){
@@ -4172,6 +4201,18 @@ function pack(UW, UH, partsIn, kerf, color, _ignoredMaxSheets, trim, grainLocked
                         : [[p.l, p.w, false], [p.w, p.l, true]];
 
       var best = { score1: Infinity, score2: Infinity, x: 0, y: 0, pw: 0, ph: 0, rot: false, found: false };
+      // Pre-compute the group's centroid for proximity bonus (Fix #1: keeps
+      // group parts clustered even when no direct edge-touch is possible).
+      var groupCentroid = null;
+      if (p.groupId){
+        var gx = 0, gy = 0, gn = 0;
+        placements.forEach(function(pl){
+          if (pl.part && pl.part.groupId === p.groupId){
+            gx += pl.x + pl.pw/2; gy += pl.y + pl.ph/2; gn++;
+          }
+        });
+        if (gn > 0) groupCentroid = { x: gx/gn, y: gy/gn };
+      }
       tries.forEach(function(t){
         var pw = t[0] + kerf, ph = t[1] + kerf;
         for (var fi = 0; fi < free.length; fi++){
@@ -4199,6 +4240,16 @@ function pack(UW, UH, partsIn, kerf, color, _ignoredMaxSheets, trim, grainLocked
                 return horizTouch || vertTouch;
               });
               if (adj) shortSide -= 10000; // strong preference to stay together
+              // Even when not edge-adjacent, prefer positions closer to the
+              // group's centroid. This catches the case where the BSSF "best
+              // fit" rect is on the far side of the board — the proximity
+              // tiebreaker beats it back toward the cluster.
+              if (groupCentroid){
+                var dx = (fr.x + pw/2) - groupCentroid.x;
+                var dy = (fr.y + ph/2) - groupCentroid.y;
+                // Override positionTiebreak with group-distance for grouped parts
+                positionTiebreak = Math.sqrt(dx*dx + dy*dy);
+              }
             }
             // Pick if score better OR tied scores but better position
             var betterScore = shortSide < best.score1 || (shortSide === best.score1 && longSide < best.score2);
@@ -4278,6 +4329,23 @@ function pack(UW, UH, partsIn, kerf, color, _ignoredMaxSheets, trim, grainLocked
                 var leftW = fr.w - pw, leftH = fr.h - ph;
                 var shortSide = Math.min(leftW, leftH);
                 var longSide  = Math.max(leftW, leftH);
+                // Group adjacency bonus (same logic as primary placement pass)
+                // — without this, straggler group parts placed in the second
+                // chance pass would land wherever fits best, breaking the
+                // group's "placed consecutively" promise.
+                if (p.groupId){
+                  var adj2 = placements.some(function(pl){
+                    if (!pl.part || pl.part.groupId !== p.groupId) return false;
+                    var plR = pl.x + pl.pw, plB = pl.y + pl.ph;
+                    var frR = fr.x + pw,    frB = fr.y + ph;
+                    var horizTouch = (Math.abs(plR - fr.x) < kerf + 2 || Math.abs(frR - pl.x) < kerf + 2)
+                                     && !(plB < fr.y || frB < pl.y);
+                    var vertTouch  = (Math.abs(plB - fr.y) < kerf + 2 || Math.abs(frB - pl.y) < kerf + 2)
+                                     && !(plR < fr.x || frR < pl.x);
+                    return horizTouch || vertTouch;
+                  });
+                  if (adj2) shortSide -= 10000;
+                }
                 if (shortSide < best.score1 || (shortSide === best.score1 && longSide < best.score2)){
                   best = {score1:shortSide, score2:longSide, x:fr.x, y:fr.y, pw:t[0], ph:t[1], rot:t[2], found:true};
                 }
@@ -5534,41 +5602,46 @@ function buildPrintView(){
     +'<div>↑ — '+t('legendGrain')+'</div>'
     +'</div>';
   html+=footer(pageNo++,totalPages)+'</div>';
-  // ── ONE PAGE PER UNIQUE SHEET (duplicates collapsed with ×N notation) ──
+  // ── ONE PORTRAIT PAGE PER UNIQUE SHEET (duplicates collapsed with ×N) ──
+  // The diagram now takes the lion's share of the page (up to 155mm tall).
+  // Specs are presented as a compact 2-column grid below it, then the parts
+  // table fills the remaining ~55-65mm with density tiering for >10 parts.
   var pdfDups = computeLayoutDupGroups();
   layouts.forEach(function(lay,i){
-    // Skip duplicates of an already-printed sheet — saves paper for the
-    // operator. The ×N annotation on the canonical page tells them to cut
-    // N copies of this layout.
     if(pdfDups.firstIdx[pdfDups.sigs[i]] !== i) return;
     var placements=(lay.placements||[]).slice();
     var usedA=placements.reduce(function(n,p){return n+p.pw*p.ph;},0);
     var eff=lay.uw*lay.uh?Math.round(usedA/(lay.uw*lay.uh)*100):0;
     var matLabel=esc(lay.matName||'?');
     var dupCount = pdfDups.countBy[pdfDups.sigs[i]];
-    var densityCls = placements.length <= 15 ? ''
-                   : placements.length <= 25 ? 'dense'
-                   : placements.length <= 40 ? 'ultra-dense'
+    // Density tiers tuned for the new bigger-diagram layout. Thresholds bumped
+    // up slightly since the table has less vertical room than before.
+    var densityCls = placements.length <= 10 ? ''
+                   : placements.length <= 20 ? 'dense'
+                   : placements.length <= 35 ? 'ultra-dense'
                    : 'nano-dense';
     html+='<div class="pp sheet-page '+densityCls+'">'+header(t('sheetPageTitle',{n:i+1,total:layouts.length}));
     var copiesNote = dupCount>1
       ? ' <span style="background:#3D6B4F;color:#fff;border-radius:4px;padding:2px 8px;font-size:14px;margin-left:6px">CUT × '+dupCount+'</span>'
       : '';
-    html+='<h1 style="margin-top:4px;font-size:18px"><span style="display:inline-block;width:12px;height:12px;background:'+lay.matColor+';border-radius:50%;vertical-align:middle;margin-right:6px"></span>'+matLabel+' — '+t('sheetLabel',{n:i+1})+copiesNote+'</h1>';
-    // SVG sheet — constrained by .pp-sheet-svg CSS to fit within page height.
-    html+='<div class="pp-sheet-svg">'+printSheetSVG(lay,170)+'</div>';
-    // Specs & parts below
+    html+='<h1 style="margin-top:4px;font-size:16px"><span style="display:inline-block;width:12px;height:12px;background:'+lay.matColor+';border-radius:50%;vertical-align:middle;margin-right:6px"></span>'+matLabel+' — '+t('sheetLabel',{n:i+1})+copiesNote+'</h1>';
+    // The diagram — rendered at 190mm wide (full content width). CSS max-height
+    // caps it so the aspect ratio is preserved while filling whichever
+    // dimension is smaller.
+    html+='<div class="pp-sheet-svg">'+printSheetSVG(lay,190)+'</div>';
+    // Compact 2-column specs grid — fits twice as much info in half the height.
     html+='<div class="sheet-specs">'
       +'<div class="row"><span>'+t('boardSize')+'</span><b>'+lay.sw+' × '+lay.sh+' mm</b></div>'
-      +'<div class="row"><span>'+t('usableArea')+'</span><b>'+lay.uw+' × '+lay.uh+' mm</b> '+(lay.trim?'(' +t('withTrim')+ ' '+lay.trim+' mm)':'')+'</div>'
+      +'<div class="row"><span>'+t('usableArea')+'</span><b>'+lay.uw+' × '+lay.uh+' mm</b></div>'
       +'<div class="row"><span>'+t('partsOnSheet')+'</span><b>'+placements.length+'</b></div>'
-      +(dupCount>1?'<div class="row" style="color:#3D6B4F"><span>📐 Cut copies of this sheet</span><b>×'+dupCount+' (total '+(placements.length*dupCount)+' parts)</b></div>':'')
       +'<div class="row"><span>'+t('statEfficiency')+'</span><b>'+eff+'%</b></div>'
-      +(lay.machine ? '<div class="row"><span>Machine</span><b>'+(lay.machine==='saw'?'🪚 Saw':'🤖 CNC')+' (kerf '+lay.kerf+'mm)</b></div>' : '')
+      +(lay.trim?'<div class="row"><span>'+t('withTrim')+'</span><b>'+lay.trim+' mm</b></div>':'')
+      +(lay.machine ? '<div class="row"><span>Machine</span><b>'+(lay.machine==='saw'?'🪚 Saw':'🤖 CNC')+' · kerf '+lay.kerf+'mm</b></div>' : '')
+      +(dupCount>1?'<div class="row" style="color:#3D6B4F"><span>📐 Copies</span><b>×'+dupCount+' (total '+(placements.length*dupCount)+')</b></div>':'')
       +(lay.grainLocked?'<div class="row"><span>'+t('grainLock')+'</span><b>'+t('locked')+' ↑</b></div>':'')
-      +(lay.trimWarning?'<div class="row" style="color:#B84040"><span>⚠ '+t('trimWarn')+'</span></div>':'')
+      +(lay.trimWarning?'<div class="row" style="color:#B84040;grid-column:1/-1"><span>⚠ '+t('trimWarn')+'</span></div>':'')
       +'</div>';
-    // Parts table wrapped so overflow is hidden (shouldn't happen with density tiers, but safe)
+    // Parts table — fills whatever vertical space is left.
     html+='<div class="pp-parts-wrap"><table class="ppt"><thead><tr>'
       +'<th class="num">#</th><th>'+t('name')+'</th>'
       +'<th class="num">'+t('lengthMm')+'</th><th class="num">'+t('widthMm')+'</th>'
