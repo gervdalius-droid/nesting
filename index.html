@@ -125,6 +125,47 @@ input[type=color]{padding:2px 3px;height:27px;cursor:pointer}
 .pli-qty{font-family:monospace;color:#3D6B4F;font-size:10px;font-weight:600;min-width:22px;text-align:right}
 .pli-x{border:none;background:transparent;color:#B84040;cursor:pointer;font-size:14px;padding:0 2px;line-height:1;opacity:.55}
 .pli-x:hover{opacity:1}
+/* ─── Pricing / Quotation ─────────────────────────────────────── */
+.bprice{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:6px;padding-top:6px;border-top:1px solid #E8E4DB}
+.bprice .fl{font-size:9px}
+.bprice input{font-size:11px;padding:3px 5px}
+.bprice-toggle{font-size:10px;color:#3D6B4F;cursor:pointer;user-select:none;margin-top:6px;padding-top:5px;border-top:1px solid #E8E4DB;display:flex;align-items:center;gap:4px}
+.bprice-toggle:hover{color:#2D5040}
+.bprice-wrap{display:none}
+.bprice-wrap.open{display:block}
+.qp{background:#FDFCF9;border:1px solid #D4CFC2;border-radius:10px;padding:11px;margin-bottom:6px}
+.qp-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:9px;gap:8px;flex-wrap:wrap}
+.qp-hdr .sec{margin:0}
+.qp-grand{font-size:18px;font-weight:700;font-family:monospace;color:#3D6B4F;background:#EEF7EE;padding:4px 12px;border-radius:6px;border:1px solid #C3DCC8}
+.qp-mfg{font-size:13px;font-weight:600;font-family:monospace;color:#6B6455;background:#F2EFE8;padding:4px 10px;border-radius:6px;border:1px solid #D4CFC2}
+.qp-mfg-lbl{font-size:9px;color:#A09888;text-transform:uppercase;letter-spacing:.05em;display:block;line-height:1}
+.qp-grand-lbl{font-size:9px;color:#3D6B4F;opacity:.7;text-transform:uppercase;letter-spacing:.05em;display:block;line-height:1}
+.qp-mfg-row td{background:#F2EFE8!important;font-weight:600;border-top:1px solid #1C1A14!important;padding-top:7px!important;color:#1C1A14}
+.qp-cfg{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-bottom:10px;padding:8px;background:#F2EFE8;border-radius:8px;border:1px solid #E8E4DB}
+.qp-cfg .qp-fld label{display:block;font-size:10px;color:#A09888;margin-bottom:2px;text-transform:uppercase;letter-spacing:.04em;font-family:monospace}
+.qp-cfg input,.qp-cfg select{font-size:12px;padding:4px 6px;background:#FDFCF9}
+.qp-cfg .qp-cb{display:flex;align-items:center;gap:5px;font-size:11px;color:#6B6455;cursor:pointer;padding-top:14px}
+.qp-cfg .qp-cb input{width:auto;cursor:pointer;accent-color:#3D6B4F}
+.qp-tbl{width:100%;border-collapse:collapse;font-size:11px;margin-bottom:6px}
+.qp-tbl th{text-align:left;padding:4px 6px;border-bottom:1px solid #D4CFC2;color:#A09888;font-weight:500;font-size:10px;text-transform:uppercase;letter-spacing:.04em;font-family:monospace}
+.qp-tbl th.qp-num,.qp-tbl td.qp-num{text-align:right;font-family:monospace}
+.qp-tbl td{padding:5px 6px;border-bottom:1px solid #EAE6DC;vertical-align:middle}
+.qp-tbl tr:last-child td{border:none}
+.qp-tbl .qp-mat-row td{background:#FCFAF4}
+.qp-tbl .qp-mat-name{display:flex;align-items:center;gap:5px}
+.qp-tbl .qp-mat-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.qp-tot{font-weight:600;background:#F7F5F0!important}
+.qp-tot td{border-top:1px solid #D4CFC2!important;padding-top:6px!important}
+.qp-grand-row td{background:#EEF7EE!important;color:#3D6B4F;font-weight:700;font-size:13px;border-top:2px solid #3D6B4F!important;padding-top:7px!important;padding-bottom:7px!important}
+.qp-empty{padding:14px;text-align:center;color:#A09888;font-size:12px;background:#F2EFE8;border-radius:6px;border:1px dashed #D4CFC2}
+.qp-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;padding-top:8px;border-top:1px solid #E8E4DB}
+@media print{
+  .hdr,.side,#stats,#ep,#tabs,#cvc,.qp-actions,.qp-cfg{display:none!important}
+  body,.main{background:#fff!important;color:#000!important;height:auto!important;overflow:visible!important;font-size:12px!important}
+  .app{display:block!important;height:auto!important}
+  .main{padding:20px!important}
+  .qp{border:none!important;padding:0!important}
+}
 /* Print-status indicator for each parts-list row */
 .pli-print{font-family:monospace;font-size:10px;font-weight:700;min-width:26px;text-align:center;padding:0 3px;border-radius:3px;flex-shrink:0}
 .pli-print.done{color:#3D6B4F;background:#E4EDE3}
@@ -435,6 +476,55 @@ body.print-mode{background:#fff}
     <div class="stat"><div class="sv" id="sv2">–</div><div class="sl" data-i18n="statParts">Parts</div></div>
     <div class="stat"><div class="sv" id="sv3">–</div><div class="sl" data-i18n="statEfficiency">Efficiency</div><div class="efb"><div class="eff" id="ef" style="width:0%"></div></div></div>
     <div class="stat"><div class="sv" id="sv4">–</div><div class="sl" data-i18n="statWaste">Waste m²</div></div>
+  </div>
+  <!-- ─── Quotation panel ──────────────────────────────────────────
+       Shows itemized pricing: material area + cutting length + per-part + edgeband,
+       per material, then overall totals. Pricing inputs are stored per board. -->
+  <div id="qp" class="qp" style="display:none">
+    <div class="qp-hdr">
+      <div class="sec" style="margin:0">💶 Quotation</div>
+      <div style="display:flex;gap:8px;align-items:center;margin-left:auto;flex-wrap:wrap">
+        <div class="qp-mfg" id="qp-mfg-badge" title="Manufacturing cost — your raw cost before markup and VAT"><span class="qp-mfg-lbl">Mfg. cost</span><span id="qp-mfg">€0.00</span></div>
+        <div class="qp-grand" id="qp-grand-badge" title="Customer price — what you charge the customer (incl. markup &amp; VAT)"><span class="qp-grand-lbl">Customer price</span><span id="qp-grand">€0.00</span></div>
+      </div>
+    </div>
+    <div class="qp-cfg">
+      <div class="qp-fld">
+        <label>Currency</label>
+        <select id="qp-cur" onchange="renderQuote()">
+          <option value="€">€ EUR</option>
+          <option value="$">$ USD</option>
+          <option value="£">£ GBP</option>
+          <option value="zł">zł PLN</option>
+        </select>
+      </div>
+      <div class="qp-fld">
+        <label>Material billed</label>
+        <select id="qp-matmode" onchange="renderQuote()" title="Bill material by full sheet area (includes waste) or only by used part area">
+          <option value="sheet" selected>Full sheets (incl. waste)</option>
+          <option value="used">Used part area only</option>
+        </select>
+      </div>
+      <div class="qp-fld">
+        <label>Setup fee / sheet</label>
+        <input id="qp-setup" type="number" step="0.01" min="0" value="0" oninput="renderQuote()">
+      </div>
+      <div class="qp-fld">
+        <label>Markup %</label>
+        <input id="qp-margin" type="number" step="0.1" min="0" value="0" oninput="renderQuote()" title="Profit markup added on top of manufacturing cost">
+      </div>
+      <div class="qp-fld">
+        <label>VAT %</label>
+        <input id="qp-vat" type="number" step="0.1" min="0" value="0" oninput="renderQuote()">
+      </div>
+      <label class="qp-cb" title="Include edgeband cost (uses SWOOD edgeband lengths if present)"><input type="checkbox" id="qp-edge" checked onchange="renderQuote()"> Edgeband</label>
+    </div>
+    <div id="qp-body"></div>
+    <div class="qp-actions">
+      <button class="btn bs" onclick="openQuotePrint()" title="Open printable quotation (Save as PDF in print dialog)" style="color:#3D6B4F;border-color:#3D6B4F">🖨 Print quote</button>
+      <button class="btn bs" onclick="copyQuoteCSV()" title="Copy itemized quote to clipboard as CSV">📋 Copy CSV</button>
+      <span style="margin-left:auto;font-size:10px;color:#A09888;font-family:monospace;align-self:center">Pricing set per material in left panel</span>
+    </div>
   </div>
   <div id="ep" class="ep" style="display:none">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:7px">
@@ -1436,6 +1526,15 @@ function collectProjectState(){
       machineMode:getMachineMode(),
       trimInputs:getSettingsTrim()
     },
+    // Quote/pricing settings (pricing per material lives on boards[*])
+    quote:{
+      cur:    (document.getElementById('qp-cur')||{}).value || '€',
+      matMode:(document.getElementById('qp-matmode')||{}).value || 'sheet',
+      setup:  parseFloat((document.getElementById('qp-setup')||{}).value) || 0,
+      margin: parseFloat((document.getElementById('qp-margin')||{}).value) || 0,
+      vat:    parseFloat((document.getElementById('qp-vat')||{}).value) || 0,
+      useEdge: !!((document.getElementById('qp-edge')||{}).checked)
+    },
     opIdMap:opIdMap
   };
 }
@@ -1520,6 +1619,15 @@ function applyProjectState(d){
       var modeEl=document.getElementById('machine-mode');if(modeEl&&d.settings.machineMode)modeEl.value=d.settings.machineMode;
       onMachineModeChange(); // hide/show kerf+trim inputs to match restored mode
     }
+    // Restore quote/pricing UI settings
+    if(d.quote){
+      var qCur=document.getElementById('qp-cur');         if(qCur&&d.quote.cur)qCur.value=d.quote.cur;
+      var qMM =document.getElementById('qp-matmode');     if(qMM&&d.quote.matMode)qMM.value=d.quote.matMode;
+      var qSU =document.getElementById('qp-setup');       if(qSU&&d.quote.setup!=null)qSU.value=d.quote.setup;
+      var qMg =document.getElementById('qp-margin');      if(qMg&&d.quote.margin!=null)qMg.value=d.quote.margin;
+      var qVt =document.getElementById('qp-vat');         if(qVt&&d.quote.vat!=null)qVt.value=d.quote.vat;
+      var qEb =document.getElementById('qp-edge');        if(qEb)qEb.checked = d.quote.useEdge!==false;
+    }
     // Rerender everything
     renderBoards();refreshSel();renderParts();renderGroups();
     if(layouts.length){
@@ -1541,11 +1649,13 @@ function applyProjectState(d){
       // Show export panel
       document.getElementById('ep').style.display='block';
       buildExport();
+      renderQuote();
     } else {
       // Hide export / stats / tabs — but do NOT wipe #cvc's inner HTML,
       // that would destroy #ssnap, #rot-btn, #tip and break drag on next use.
       document.getElementById('stats').style.display='none';
       document.getElementById('ep').style.display='none';
+      var _qp=document.getElementById('qp');if(_qp)_qp.style.display='none';
       document.getElementById('tabs').innerHTML='';
       var cvc=document.getElementById('cvc');if(cvc)cvc.style.display='none';
       // Clear any drawing on the existing canvas
@@ -1859,6 +1969,7 @@ function newProject(){
     renderBoards();refreshSel();renderParts();renderGroups();
     document.getElementById('stats').style.display='none';
     document.getElementById('ep').style.display='none';
+    var _qp=document.getElementById('qp');if(_qp)_qp.style.display='none';
     document.getElementById('tabs').innerHTML='';
     var cvc=document.getElementById('cvc');if(cvc)cvc.style.display='none';
     var cv=document.getElementById('cv');
@@ -1918,6 +2029,7 @@ async function newProjectPrompt(){
     renderBoards();refreshSel();renderParts();renderGroups();
     document.getElementById('stats').style.display='none';
     document.getElementById('ep').style.display='none';
+    var _qp=document.getElementById('qp');if(_qp)_qp.style.display='none';
     document.getElementById('tabs').innerHTML='';
     var cvc=document.getElementById('cvc');if(cvc)cvc.style.display='none';
     var cv=document.getElementById('cv');
@@ -2022,7 +2134,8 @@ function tint(hex,i){
 // ═══════════════════════════════════════════════════════════════
 function ensureBoard(mat){
   var ex=boards.find(function(b){return b.mat===mat;});if(ex)return ex;
-  var b={id:bId++,mat:mat,w:2800,h:2070,qty:15,color:COLORS[boards.length%COLORS.length],grain:false};
+  var b={id:bId++,mat:mat,w:2800,h:2070,qty:15,color:COLORS[boards.length%COLORS.length],grain:false,
+    priceM2:0,priceCutM:0,pricePart:0,priceEdge:0};
   boards.push(b);renderBoards();refreshSel();return b;
 }
 
@@ -2034,18 +2147,27 @@ function normalizeMat(s){
   // Collapse all whitespace runs (including non-breaking space, tabs) to single space, then trim
   return String(s).replace(/\s+/g, ' ').trim();
 }
-function addBoard(){boards.push({id:bId++,mat:'New Material',w:2800,h:2070,qty:15,color:COLORS[boards.length%COLORS.length],grain:false});renderBoards();refreshSel();}
-function removeBoard(id){boards=boards.filter(function(b){return b.id!==id;});renderBoards();refreshSel();}
+function addBoard(){boards.push({id:bId++,mat:'New Material',w:2800,h:2070,qty:15,color:COLORS[boards.length%COLORS.length],grain:false,priceM2:0,priceCutM:0,pricePart:0,priceEdge:0});renderBoards();refreshSel();}
+function removeBoard(id){boards=boards.filter(function(b){return b.id!==id;});renderBoards();refreshSel();renderQuote();}
 function updateBoard(id,f,v){
   var b=boards.find(function(b){return b.id===id;});if(!b)return;
   if(f==='w'||f==='h'||f==='qty')v=parseInt(v)||0;
+  else if(f==='priceM2'||f==='priceCutM'||f==='pricePart'||f==='priceEdge')v=parseFloat(v)||0;
   b[f]=v;if(f==='color')renderBoards();refreshSel();
+  // Pricing changes -> live-update the quote
+  if(f==='priceM2'||f==='priceCutM'||f==='pricePart'||f==='priceEdge') renderQuote();
 }
 function matchBoard(mat){return boards.find(function(b){return b.mat===mat;})||null;}
 function renderBoards(){
   var el=document.getElementById('blist');el.innerHTML='';
   document.getElementById('bempty').style.display=boards.length?'none':'block';
   boards.forEach(function(b){
+    // Backfill pricing fields on legacy boards loaded from older saves
+    if(b.priceM2==null)b.priceM2=0;
+    if(b.priceCutM==null)b.priceCutM=0;
+    if(b.pricePart==null)b.pricePart=0;
+    if(b.priceEdge==null)b.priceEdge=0;
+    var pOpen=(b.priceM2||b.priceCutM||b.pricePart||b.priceEdge)?' open':'';
     var d=document.createElement('div');d.className='bc';
     d.innerHTML='<div class="bh"><div class="bd" style="background:'+b.color+'"></div>'
       +'<input class="bn" value="'+esc(b.mat)+'" oninput="updateBoard('+b.id+',\'mat\',this.value)">'
@@ -2058,7 +2180,19 @@ function renderBoards(){
       +'<label style="display:flex;align-items:center;gap:6px;font-size:11px;color:#6B6455;cursor:pointer;margin-top:6px;padding-top:5px;border-top:1px solid #E8E4DB">'
       +'<input type="checkbox" '+(b.grain?'checked':'')+' onchange="updateBoard('+b.id+',\'grain\',this.checked)" style="accent-color:#3D6B4F;width:auto;cursor:pointer">'
       +'<span>🌾 Lock grain direction <span style="color:#A09888;font-size:10px">(no rotation)</span></span>'
-      +'</label>';
+      +'</label>'
+      +'<div class="bprice-toggle" onclick="this.nextElementSibling.classList.toggle(\'open\');this.querySelector(\'.bprice-arr\').textContent=this.nextElementSibling.classList.contains(\'open\')?\'▾\':\'▸\'">'
+      +'<span class="bprice-arr">'+(pOpen?'▾':'▸')+'</span><span>💶 Pricing</span>'
+      +'<span style="margin-left:auto;color:#A09888;font-size:10px;font-family:monospace">'+(b.priceM2?'€'+b.priceM2+'/m²':'set prices')+'</span>'
+      +'</div>'
+      +'<div class="bprice-wrap'+pOpen+'">'
+      +'<div class="bprice">'
+      +'<div><label class="fl">Material €/m²</label><input type="number" step="0.01" min="0" value="'+b.priceM2+'" onchange="updateBoard('+b.id+',\'priceM2\',this.value)"></div>'
+      +'<div><label class="fl">Cutting €/m</label><input type="number" step="0.01" min="0" value="'+b.priceCutM+'" onchange="updateBoard('+b.id+',\'priceCutM\',this.value)"></div>'
+      +'<div><label class="fl">Flat €/part</label><input type="number" step="0.01" min="0" value="'+b.pricePart+'" onchange="updateBoard('+b.id+',\'pricePart\',this.value)"></div>'
+      +'<div><label class="fl">Edgeband €/m</label><input type="number" step="0.01" min="0" value="'+b.priceEdge+'" onchange="updateBoard('+b.id+',\'priceEdge\',this.value)"></div>'
+      +'</div>'
+      +'</div>';
     el.appendChild(d);
   });
   scheduleSave();
@@ -3971,6 +4105,7 @@ function optimize(){
   document.getElementById('wlc').style.display='none';
   document.getElementById('cvc').style.display='block';
   buildExport();buildTabs();curSheet=0;activateTab(0);
+  renderQuote();
   // ── Build unplaced-parts warning (parts that couldn't fit on ANY sheet) ──
   var totUnplaced=0;
   for(var m in unplacedByMat) totUnplaced += unplacedByMat[m].count;
@@ -5144,6 +5279,316 @@ function _refreshStats(){
   e=document.getElementById('sv3');if(e)e.textContent=eff+'%';
   e=document.getElementById('ef');if(e)e.style.width=eff+'%';
   e=document.getElementById('sv4');if(e)e.textContent=((totA-usedA)/1e6).toFixed(2)+'m²';
+  // Quote piggy-backs on stats updates so it stays in sync after every edit
+  renderQuote();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// QUOTATION
+// Builds a per-material breakdown using:
+//   - sheet area (uw*uh) or used part area (pw*ph)        -> €/m²
+//   - cutting length: perimeter of each part placement     -> €/m
+//   - flat per-part fee                                    -> €/part
+//   - edgeband length from p.eb (eb1/eb3 = L, eb2/eb4 = W) -> €/m
+//   - setup fee per sheet
+// then applies margin% and VAT% on the subtotal.
+// ═══════════════════════════════════════════════════════════════
+// Perimeter in mm of a single placement. Uses real shape polygon if present
+// (DXF parts), otherwise falls back to rectangle perimeter 2*(L+W).
+function _placementPerimeter(p){
+  var part = p.part;
+  if (part && part.shape && part.shape.length >= 3){
+    var s = part.shape, n = s.length, sum = 0;
+    for (var i=0; i<n; i++){
+      var a = s[i], b = s[(i+1)%n];
+      var dx = b[0]-a[0], dy = b[1]-a[1];
+      sum += Math.sqrt(dx*dx + dy*dy);
+    }
+    return sum;
+  }
+  // Use placement footprint (already includes rotation, in mm)
+  return 2 * ((p.pw||0) + (p.ph||0));
+}
+// Total edgeband length in mm for one placement (uses original part L/W,
+// since edges 1&3 are along L and 2&4 along W, regardless of rotation).
+function _placementEdgebandMm(p){
+  var part = p.part; if(!part) return 0;
+  var eb = part.eb || {};
+  var L = part.l||0, W = part.w||0;
+  var mm = 0;
+  if (eb.eb1) mm += L;
+  if (eb.eb3) mm += L;
+  if (eb.eb2) mm += W;
+  if (eb.eb4) mm += W;
+  return mm;
+}
+function _fmtMoney(cur, n){
+  if (!isFinite(n)) n = 0;
+  // Round to 2 decimals; for currencies on the right (zł) put symbol after.
+  var v = (Math.round(n*100)/100).toFixed(2);
+  if (cur === 'zł') return v + ' ' + cur;
+  return cur + v;
+}
+function _quoteData(){
+  var cur     = (document.getElementById('qp-cur')||{}).value || '€';
+  var matMode = (document.getElementById('qp-matmode')||{}).value || 'sheet';
+  var setup   = parseFloat((document.getElementById('qp-setup')||{}).value) || 0;
+  var margin  = parseFloat((document.getElementById('qp-margin')||{}).value) || 0;
+  var vat     = parseFloat((document.getElementById('qp-vat')||{}).value) || 0;
+  var useEdge = !!((document.getElementById('qp-edge')||{}).checked);
+
+  // Aggregate by material name (= boards[].mat)
+  var byMat = {}; // matName -> { sheets, sheetArea_m2, usedArea_m2, cutM, parts, edgeM, board }
+  layouts.forEach(function(l){
+    var mat = l.matName || 'Unknown';
+    var bd = matchBoard(mat);
+    if(!byMat[mat]) byMat[mat] = {
+      sheets:0, sheetArea_m2:0, usedArea_m2:0, cutM:0, parts:0, edgeM:0,
+      board: bd, color: (bd&&bd.color) || l.matColor || '#A09888'
+    };
+    var row = byMat[mat];
+    row.sheets += 1;
+    row.sheetArea_m2 += (l.uw * l.uh) / 1e6;
+    (l.placements||[]).forEach(function(p){
+      row.usedArea_m2 += (p.pw * p.ph) / 1e6;
+      row.cutM        += _placementPerimeter(p) / 1000;
+      row.edgeM       += _placementEdgebandMm(p) / 1000;
+      row.parts       += 1;
+    });
+  });
+
+  // Compute money per material
+  var rows = []; var subtotal = 0;
+  Object.keys(byMat).forEach(function(mat){
+    var r = byMat[mat], bd = r.board || {};
+    var pM2  = parseFloat(bd.priceM2)    || 0;
+    var pCut = parseFloat(bd.priceCutM)  || 0;
+    var pPrt = parseFloat(bd.pricePart)  || 0;
+    var pEdg = parseFloat(bd.priceEdge)  || 0;
+    var area_m2 = (matMode==='sheet') ? r.sheetArea_m2 : r.usedArea_m2;
+    var costMat   = area_m2 * pM2;
+    var costCut   = r.cutM  * pCut;
+    var costPart  = r.parts * pPrt;
+    var costEdge  = useEdge ? (r.edgeM * pEdg) : 0;
+    var costSetup = r.sheets * setup;
+    var rowTotal  = costMat + costCut + costPart + costEdge + costSetup;
+    subtotal += rowTotal;
+    rows.push({
+      mat:mat, color:r.color, sheets:r.sheets, parts:r.parts,
+      area_m2:area_m2, cutM:r.cutM, edgeM:r.edgeM,
+      pM2:pM2, pCut:pCut, pPrt:pPrt, pEdg:pEdg,
+      costMat:costMat, costCut:costCut, costPart:costPart, costEdge:costEdge, costSetup:costSetup,
+      rowTotal:rowTotal,
+      missingPrice: (pM2===0 && pCut===0 && pPrt===0 && pEdg===0)
+    });
+  });
+  var marginAmt = subtotal * margin / 100;
+  var afterMargin = subtotal + marginAmt;
+  var vatAmt = afterMargin * vat / 100;
+  var grand = afterMargin + vatAmt;
+  return {
+    cur:cur, matMode:matMode, setup:setup, margin:margin, vat:vat, useEdge:useEdge,
+    rows:rows, subtotal:subtotal, marginAmt:marginAmt, afterMargin:afterMargin,
+    vatAmt:vatAmt, grand:grand
+  };
+}
+function renderQuote(){
+  var qp = document.getElementById('qp');
+  var body = document.getElementById('qp-body');
+  var grandEl = document.getElementById('qp-grand');
+  var mfgEl   = document.getElementById('qp-mfg');
+  if(!qp || !body) return;
+  if(!layouts.length){
+    qp.style.display='none';
+    return;
+  }
+  qp.style.display='block';
+  var q = _quoteData();
+  var cur = q.cur, fm = function(n){return _fmtMoney(cur, n);};
+  var html = '';
+  if(!q.rows.length){
+    html = '<div class="qp-empty">No materials on sheets yet.</div>';
+  } else {
+    html += '<table class="qp-tbl"><thead><tr>'
+         + '<th>Material</th>'
+         + '<th class="qp-num">Sheets</th>'
+         + '<th class="qp-num">Parts</th>'
+         + '<th class="qp-num">'+(q.matMode==='sheet'?'Sheet m²':'Used m²')+'</th>'
+         + '<th class="qp-num">Cut m</th>'
+         + (q.useEdge?'<th class="qp-num">Edge m</th>':'')
+         + '<th class="qp-num">Material</th>'
+         + '<th class="qp-num">Cutting</th>'
+         + (q.useEdge?'<th class="qp-num">Edgeband</th>':'')
+         + '<th class="qp-num">Setup</th>'
+         + '<th class="qp-num">Subtotal</th>'
+         + '</tr></thead><tbody>';
+    q.rows.forEach(function(r){
+      var warn = r.missingPrice ? ' <span title="No pricing set for this material" style="color:#B84040">⚠</span>' : '';
+      html += '<tr class="qp-mat-row">'
+           + '<td><div class="qp-mat-name"><span class="qp-mat-dot" style="background:'+r.color+'"></span><span title="'+esc(r.mat)+'">'+esc(r.mat)+'</span>'+warn+'</div></td>'
+           + '<td class="qp-num">'+r.sheets+'</td>'
+           + '<td class="qp-num">'+r.parts+'</td>'
+           + '<td class="qp-num">'+r.area_m2.toFixed(2)+'</td>'
+           + '<td class="qp-num">'+r.cutM.toFixed(1)+'</td>'
+           + (q.useEdge?'<td class="qp-num">'+r.edgeM.toFixed(1)+'</td>':'')
+           + '<td class="qp-num">'+fm(r.costMat)+'</td>'
+           + '<td class="qp-num">'+fm(r.costCut)+'</td>'
+           + (q.useEdge?'<td class="qp-num">'+fm(r.costEdge)+'</td>':'')
+           + '<td class="qp-num">'+fm(r.costSetup)+'</td>'
+           + '<td class="qp-num"><b>'+fm(r.rowTotal)+'</b></td>'
+           + '</tr>';
+    });
+    var colSpan = q.useEdge ? 10 : 8;
+    // Manufacturing cost = raw subtotal (material + cutting + per-part + edgeband + setup)
+    // This is your cost. Markup is added on top, then VAT.
+    html += '<tr class="qp-mfg-row"><td colspan="'+colSpan+'" style="text-align:right">🏭 Manufacturing cost</td><td class="qp-num">'+fm(q.subtotal)+'</td></tr>';
+    if(q.margin){
+      html += '<tr><td colspan="'+colSpan+'" style="text-align:right;color:#6B6455">+ Markup '+q.margin+'%</td><td class="qp-num">+'+fm(q.marginAmt)+'</td></tr>';
+      html += '<tr><td colspan="'+colSpan+'" style="text-align:right;color:#6B6455">= Price before VAT</td><td class="qp-num">'+fm(q.afterMargin)+'</td></tr>';
+    }
+    if(q.vat){
+      html += '<tr><td colspan="'+colSpan+'" style="text-align:right;color:#6B6455">+ VAT '+q.vat+'%</td><td class="qp-num">+'+fm(q.vatAmt)+'</td></tr>';
+    }
+    html += '<tr class="qp-grand-row"><td colspan="'+colSpan+'" style="text-align:right">💶 Customer price</td><td class="qp-num">'+fm(q.grand)+'</td></tr>';
+    html += '</tbody></table>';
+    var anyMissing = q.rows.some(function(r){return r.missingPrice;});
+    if(anyMissing){
+      html += '<div style="font-size:11px;color:#B84040;margin-top:4px">⚠ Some materials have no pricing set — open the board card in the left panel and click <b>💶 Pricing</b>.</div>';
+    }
+  }
+  body.innerHTML = html;
+  if(grandEl) grandEl.textContent = fm(q.grand);
+  if(mfgEl)   mfgEl.textContent   = fm(q.subtotal);
+  scheduleSave();
+}
+
+// Copy quotation as CSV to clipboard
+function copyQuoteCSV(){
+  if(!layouts.length){return;}
+  var q = _quoteData(), cur = q.cur;
+  var lines = [];
+  var hdr = ['Material','Sheets','Parts',(q.matMode==='sheet'?'Sheet m²':'Used m²'),'Cut m'];
+  if(q.useEdge) hdr.push('Edge m');
+  hdr = hdr.concat(['Material '+cur,'Cutting '+cur]);
+  if(q.useEdge) hdr.push('Edgeband '+cur);
+  hdr = hdr.concat(['Setup '+cur,'Subtotal '+cur]);
+  lines.push(hdr.join(','));
+  q.rows.forEach(function(r){
+    var row = [r.mat, r.sheets, r.parts, r.area_m2.toFixed(2), r.cutM.toFixed(1)];
+    if(q.useEdge) row.push(r.edgeM.toFixed(1));
+    row = row.concat([r.costMat.toFixed(2), r.costCut.toFixed(2)]);
+    if(q.useEdge) row.push(r.costEdge.toFixed(2));
+    row = row.concat([r.costSetup.toFixed(2), r.rowTotal.toFixed(2)]);
+    // Quote-escape the material name in case it has commas
+    row[0] = '"' + String(row[0]).replace(/"/g,'""') + '"';
+    lines.push(row.join(','));
+  });
+  lines.push('');
+  lines.push('Manufacturing cost,,,,,'+(q.useEdge?',':'')+',,'+(q.useEdge?',':'')+',,'+q.subtotal.toFixed(2));
+  if(q.margin) lines.push('Markup '+q.margin+'%,,,,,'+(q.useEdge?',':'')+',,'+(q.useEdge?',':'')+',,'+q.marginAmt.toFixed(2));
+  if(q.vat) lines.push('VAT '+q.vat+'%,,,,,'+(q.useEdge?',':'')+',,'+(q.useEdge?',':'')+',,'+q.vatAmt.toFixed(2));
+  lines.push('Customer price,,,,,'+(q.useEdge?',':'')+',,'+(q.useEdge?',':'')+',,'+q.grand.toFixed(2));
+  var csv = lines.join('\n');
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(csv).then(function(){
+      var b = document.querySelector('.qp-actions .btn');
+      if(b){var o=b.textContent; b.textContent='✓ Copied'; setTimeout(function(){b.textContent=o;},1200);}
+    });
+  } else {
+    var ta=document.createElement('textarea');ta.value=csv;document.body.appendChild(ta);ta.select();
+    try{document.execCommand('copy');}catch(e){}
+    document.body.removeChild(ta);
+    alert('Quote CSV copied to clipboard.');
+  }
+}
+
+// Print a clean, standalone quotation page (separate window).
+function openQuotePrint(){
+  if(!layouts.length){alert('No layouts yet. Run Optimize first.');return;}
+  var q = _quoteData(), cur = q.cur;
+  var fm = function(n){return _fmtMoney(cur, n);};
+  var today = new Date();
+  var dateStr = today.getFullYear()+'-'+String(today.getMonth()+1).padStart(2,'0')+'-'+String(today.getDate()).padStart(2,'0');
+
+  var totalSheets = q.rows.reduce(function(a,r){return a+r.sheets;},0);
+  var totalParts  = q.rows.reduce(function(a,r){return a+r.parts;},0);
+
+  var rowsHtml = '';
+  q.rows.forEach(function(r){
+    rowsHtml += '<tr>'
+      + '<td>'+esc(r.mat)+'</td>'
+      + '<td class="n">'+r.sheets+'</td>'
+      + '<td class="n">'+r.parts+'</td>'
+      + '<td class="n">'+r.area_m2.toFixed(2)+'</td>'
+      + '<td class="n">'+r.cutM.toFixed(1)+'</td>'
+      + (q.useEdge?'<td class="n">'+r.edgeM.toFixed(1)+'</td>':'')
+      + '<td class="n">'+fm(r.costMat)+'</td>'
+      + '<td class="n">'+fm(r.costCut)+'</td>'
+      + (q.useEdge?'<td class="n">'+fm(r.costEdge)+'</td>':'')
+      + '<td class="n">'+fm(r.costSetup)+'</td>'
+      + '<td class="n"><b>'+fm(r.rowTotal)+'</b></td>'
+      + '</tr>';
+  });
+  var colSpan = q.useEdge ? 10 : 8;
+
+  var html = '<!doctype html><html><head><meta charset="utf-8"><title>Quotation '+dateStr+'</title>'
+    + '<style>'
+    + 'body{font-family:-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;color:#1C1A14;padding:30px;max-width:920px;margin:0 auto;font-size:13px}'
+    + 'h1{font-size:24px;margin:0 0 4px}'
+    + '.meta{color:#6B6455;font-size:12px;margin-bottom:24px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px;padding-bottom:12px;border-bottom:2px solid #1C1A14}'
+    + '.summary{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px}'
+    + '.sc{border:1px solid #D4CFC2;border-radius:8px;padding:10px;text-align:center}'
+    + '.sc .v{font-size:18px;font-weight:700;font-family:monospace}'
+    + '.sc .l{font-size:10px;color:#A09888;text-transform:uppercase;letter-spacing:.05em;margin-top:3px}'
+    + 'table{width:100%;border-collapse:collapse;margin-bottom:20px;font-size:12px}'
+    + 'th{text-align:left;padding:7px 8px;border-bottom:2px solid #1C1A14;font-size:10px;text-transform:uppercase;letter-spacing:.04em;color:#6B6455;font-weight:600}'
+    + 'th.n,td.n{text-align:right;font-family:monospace}'
+    + 'td{padding:7px 8px;border-bottom:1px solid #EAE6DC}'
+    + 'tr.tot td{border-top:1px solid #1C1A14;border-bottom:none;font-weight:600;padding-top:10px}'
+    + 'tr.gt td{background:#1C1A14;color:#F2EFE8;font-size:15px;font-weight:700;padding:10px 8px}'
+    + '.notes{font-size:11px;color:#6B6455;margin-top:20px;padding-top:12px;border-top:1px solid #D4CFC2}'
+    + '.notes b{color:#1C1A14}'
+    + '@media print{body{padding:15mm}.no-print{display:none}}'
+    + '.no-print{position:fixed;top:12px;right:12px;display:flex;gap:6px}'
+    + '.no-print button{padding:8px 14px;border:1px solid #1C1A14;background:#FDFCF9;border-radius:6px;font-size:13px;cursor:pointer}'
+    + '.no-print button.pri{background:#3D6B4F;color:#fff;border-color:#3D6B4F}'
+    + '</style></head><body>'
+    + '<div class="no-print"><button class="pri" onclick="window.print()">🖨 Print / Save PDF</button><button onclick="window.close()">Close</button></div>'
+    + '<h1>Quotation</h1>'
+    + '<div class="meta"><div><b>Dėdės Baldai</b> — Nesting</div><div>Date: '+dateStr+'</div></div>'
+    + '<div class="summary">'
+    + '<div class="sc"><div class="v">'+totalSheets+'</div><div class="l">Sheets</div></div>'
+    + '<div class="sc"><div class="v">'+totalParts+'</div><div class="l">Parts</div></div>'
+    + '<div class="sc"><div class="v">'+fm(q.subtotal)+'</div><div class="l">Mfg. cost</div></div>'
+    + '<div class="sc"><div class="v">'+fm(q.grand)+'</div><div class="l">Customer price</div></div>'
+    + '</div>'
+    + '<table><thead><tr>'
+    + '<th>Material</th><th class="n">Sheets</th><th class="n">Parts</th>'
+    + '<th class="n">'+(q.matMode==='sheet'?'Sheet m²':'Used m²')+'</th>'
+    + '<th class="n">Cut m</th>'
+    + (q.useEdge?'<th class="n">Edge m</th>':'')
+    + '<th class="n">Material</th><th class="n">Cutting</th>'
+    + (q.useEdge?'<th class="n">Edgeband</th>':'')
+    + '<th class="n">Setup</th><th class="n">Subtotal</th>'
+    + '</tr></thead><tbody>'
+    + rowsHtml
+    + '<tr class="tot"><td colspan="'+colSpan+'" style="text-align:right">🏭 Manufacturing cost</td><td class="n">'+fm(q.subtotal)+'</td></tr>'
+    + (q.margin?('<tr><td colspan="'+colSpan+'" style="text-align:right;color:#6B6455">+ Markup '+q.margin+'%</td><td class="n">+'+fm(q.marginAmt)+'</td></tr>'):'')
+    + (q.margin?('<tr><td colspan="'+colSpan+'" style="text-align:right;color:#6B6455">= Price before VAT</td><td class="n">'+fm(q.afterMargin)+'</td></tr>'):'')
+    + (q.vat?('<tr><td colspan="'+colSpan+'" style="text-align:right;color:#6B6455">+ VAT '+q.vat+'%</td><td class="n">+'+fm(q.vatAmt)+'</td></tr>'):'')
+    + '<tr class="gt"><td colspan="'+colSpan+'" style="text-align:right">💶 Customer price</td><td class="n">'+fm(q.grand)+'</td></tr>'
+    + '</tbody></table>'
+    + '<div class="notes">'
+    + '<b>Pricing basis:</b> Material billed by '+(q.matMode==='sheet'?'full sheet area (incl. waste)':'used part area only')+'. '
+    + 'Cutting priced per meter of cut path (rectangle perimeter or true shape perimeter for DXF parts). '
+    + (q.useEdge?'Edgeband priced per meter of banded edges as recorded on each part. ':'Edgeband not included. ')
+    + (q.setup?('Setup fee of '+fm(q.setup)+' applied per sheet. '):'')
+    + '</div>'
+    + '</body></html>';
+
+  var w = window.open('', '_blank');
+  if(!w){alert('Pop-up blocked — please allow pop-ups for this page to print quote.');return;}
+  w.document.open();w.document.write(html);w.document.close();
 }
 
 // ═══════════════════════════════════════════════════════════════
