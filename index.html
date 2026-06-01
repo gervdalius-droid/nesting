@@ -2277,7 +2277,10 @@ async function processFile(f){
     opIdMap={};
     if(wb.SheetNames.indexOf('LABEL')>=0){
       var lblSheet = wb.Sheets['LABEL'];
-      var lblRows = XLSX.utils.sheet_to_json(lblSheet);
+      // header:1 forces array-of-arrays format. Without it SheetJS uses row 1
+      // as object keys (e.g. ":Date" → __EMPTY_n), and the numeric indexing
+      // below would return undefined for every cell.
+      var lblRows = XLSX.utils.sheet_to_json(lblSheet, {header:1, defval:null});
       var lblF = (lblSheet._r && lblSheet._r._f) || []; // formulas sidecar
       for(var i=0;i<lblRows.length;i++){
         var r0=lblRows[i]||[];
@@ -2303,22 +2306,48 @@ async function processFile(f){
     // ── EDGEBAND sheet → edge map: solidName → {eb1,eb2,eb3,eb4} ──
     var em={};
     if(wb.SheetNames.indexOf('EDGEBAND')>=0){
-      XLSX.utils.sheet_to_json(wb.Sheets['EDGEBAND']).forEach(function(r){
-        // cols: [_pic, Part(solidname), NumPan, Feature(Edgeband1..4), Material, ...]
-        var pn=String(r[2]||'').trim();
-        var feat=String(r[4]||'').trim();
-        var mat=String(r[5]||'').trim();
-        if(!pn||!feat)return;
-        if(!em[pn])em[pn]={eb1:'',eb2:'',eb3:'',eb4:''};
-        var idx=feat.replace(/[^0-9]/g,'');
-        if(idx)em[pn]['eb'+idx]=mat.substring(0,16);
-      });
+      // SWOOD layouts vary: some versions put Part at column B (index 1), others
+      // include a leading "Picture" column and shift everything right. We find
+      // the header row by looking for the "Part"/"Feature"/"Material" labels and
+      // resolve their actual column indices, instead of hard-coding them.
+      var ebRows = XLSX.utils.sheet_to_json(wb.Sheets['EDGEBAND'], {header:1, defval:null});
+      var ebCols = null;
+      for(var i=0;i<Math.min(ebRows.length,8);i++){
+        var hr=ebRows[i]||[];
+        var partIdx=-1, featIdx=-1, matIdx=-1;
+        for(var c=0;c<hr.length;c++){
+          var v=String(hr[c]||'').trim().toLowerCase();
+          if(v==='part') partIdx=c;
+          else if(v==='feature') featIdx=c;
+          else if(v==='material') matIdx=c;
+        }
+        if(partIdx>=0 && featIdx>=0 && matIdx>=0){
+          ebCols = {hdr:i, part:partIdx, feat:featIdx, mat:matIdx};
+          break;
+        }
+      }
+      if(ebCols){
+        for(var i=ebCols.hdr+1;i<ebRows.length;i++){
+          var r=ebRows[i]||[];
+          var pn=String(r[ebCols.part]||'').trim();
+          var feat=String(r[ebCols.feat]||'').trim();
+          var mat=String(r[ebCols.mat]||'').trim();
+          if(!pn||!feat) continue;
+          if(!em[pn]) em[pn]={eb1:'',eb2:'',eb3:'',eb4:''};
+          var idx=feat.replace(/[^0-9]/g,'');
+          if(idx) em[pn]['eb'+idx]=mat.substring(0,16);
+        }
+      }
     }
 
     var added=0;
     // ── Try PARTLIST first (SA_GA_VIRT / RIMANTE_ZAB native format) ──
     if(wb.SheetNames.indexOf('PARTLIST')>=0){
-      var plRows=XLSX.utils.sheet_to_json(wb.Sheets['PARTLIST']);
+      // header:1 → array-of-arrays. Without it, SheetJS uses row 1 as object
+      // keys (e.g. "PROJEKTAS", "MARTA_VONIA", ": Date" with sparse __EMPTY_n
+      // for everything else), and the numeric column indexing below returns
+      // undefined for every cell — silently producing zero parts.
+      var plRows=XLSX.utils.sheet_to_json(wb.Sheets['PARTLIST'], {header:1, defval:null});
       // Format: rows are 0-indexed arrays
       // Thickness group rows: row[1]='18 mm', row[5]=null, row[6]=null → sets curThickness
       // Data rows: row[5]=material, row[6]=L(number), row[7]=W(number)
@@ -2372,7 +2401,8 @@ async function processFile(f){
 
     // ── Fallback: STOCK_CORE (has Part, Material, Length, Width, Thickness, Qty) ──
     if(added===0&&wb.SheetNames.indexOf('STOCK_CORE')>=0){
-      var scRows=XLSX.utils.sheet_to_json(wb.Sheets['STOCK_CORE']);
+      // header:1 → array-of-arrays for consistent numeric column indexing.
+      var scRows=XLSX.utils.sheet_to_json(wb.Sheets['STOCK_CORE'], {header:1, defval:null});
       // Header row has: Part(col2), Feature(col4), Material(col5), Length(col8), Width(col9), Thickness(col10), Qty(col11)
       // Skip CORE rows where Feature!='CORE' is irrelevant, but all are CORE so use all
       for(var i=3;i<scRows.length;i++){
