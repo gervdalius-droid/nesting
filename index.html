@@ -501,6 +501,7 @@ body.print-mode{background:#fff}
   </div>
   <div style="display:flex;gap:4px;margin-top:6px">
     <button class="btn bp" onclick="optimize()" data-i18n="optimize" style="flex:1;padding:9px;font-size:13px">▶ Optimize &amp; Cut</button>
+    <button class="btn bs" onclick="openMergeDialog()" title="Find narrow parts (≤150mm) with matching length and merge them into strips up to 800mm wide. Saves kerf and improves nesting." style="padding:9px 10px;font-size:11px;color:#8B5A2B;border-color:#8B5A2B;white-space:nowrap">🔗 Merge narrow</button>
     <button class="btn bs" onclick="exportForDeepnest()" title="Export all shapes as one SVG for nesting in Deepnest/SVGnest (true-shape nesting with rotation)" style="padding:9px 12px;font-size:12px;color:#3D6B4F;border-color:#3D6B4F;white-space:nowrap">🔗 Deepnest</button>
   </div>
 </div>
@@ -723,6 +724,26 @@ body.print-mode{background:#fff}
   <div class="hist-foot">
     <span id="hist-status" style="font-size:10px;color:#A09888;font-family:monospace;flex:1"></span>
     <button class="btn bs" onclick="closeHistory()">Close</button>
+  </div>
+</div>
+</div>
+
+<!-- MERGE NARROW PARTS DIALOG -->
+<div class="ga-panel" id="merge-panel" onclick="if(event.target===this)closeMergeDialog()">
+<div class="ga-box" style="max-width:760px">
+  <div class="ga-head">
+    <div style="width:18px;height:18px;background:#8B5A2B;color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;border-radius:4px;flex-shrink:0">🔗</div>
+    <h3 style="flex:1;font-size:13px">Merge narrow parts</h3>
+    <button class="btn bs br" onclick="closeMergeDialog()">✕</button>
+  </div>
+  <div style="padding:9px 14px;background:#FCFAF4;font-size:11px;color:#6B6455;border-bottom:1px solid #D4CFC2;line-height:1.5">
+    Parts with one dimension ≤<strong>150 mm</strong> are merged into strips up to <strong>800 mm</strong> wide, with a saw-kerf gap between pieces. Same length, material, and thickness required to merge. The cutting operator separates them with a single saw cut along each gap.
+  </div>
+  <div class="ga-body" id="merge-body" style="padding:0"></div>
+  <div class="ga-foot">
+    <div style="flex:1;font-size:11px;color:#6B6455" id="merge-summary"></div>
+    <button class="btn bp" id="merge-apply-btn" onclick="applyMerges()" style="background:#8B5A2B;border-color:#8B5A2B">✓ Merge selected</button>
+    <button class="btn bs" onclick="closeMergeDialog()">Cancel</button>
   </div>
 </div>
 </div>
@@ -3388,15 +3409,26 @@ function renderParts(){
       : '<span class="pli-rot lock" title="'+esc(rotIconTitle)+'" onclick="event.stopPropagation();togglePartRotation(\''+k.replace(/'/g,"\\'")+'\')">🔒</span>';
 
     var rowCls = 'pli' + flash + (allDone ? ' pli-done' : '');
-    return '<div class="'+rowCls+'" title="'+esc(g.name)+' · '+esc(g.mat)+(g.hasShape?' · DXF shape':'')+'">'
+    // Detect if this row represents a merged strip (one entry per merged part,
+    // since each merge has a unique combined origName)
+    var mergedPart = (g.qty === 1) ? parts.find(function(pt){ return pt.id === g.partIds[0] && pt.__merged; }) : null;
+    var mergedTag = '';
+    if (mergedPart){
+      var pieces = mergedPart.__mergedShorts ? mergedPart.__mergedShorts.join('+') : (mergedPart.__mergedFrom ? mergedPart.__mergedFrom.length+' pcs' : '');
+      mergedTag = '<span title="Merged strip: '+pieces+' mm with '+(mergedPart.__mergedKerf||3)+'mm saw kerfs" style="font-size:10px;color:#8B5A2B;flex-shrink:0;font-weight:600">🔗</span>';
+    }
+    return '<div class="'+rowCls+'" title="'+esc(g.name)+' · '+esc(g.mat)+(g.hasShape?' · DXF shape':'')+(mergedPart?' · merged strip':'')+'">'
       +'<span class="pli-dot" style="background:'+color+'"></span>'
       +printTag
       +rotIcon
       +shapeTag
+      +mergedTag
       +'<span class="pli-name">'+esc(g.name)+'</span>'
       +'<span class="pli-dim">'+g.l+'×'+g.w+'</span>'
       +'<span class="pli-qty">×'+g.qty+'</span>'
-      +'<button class="pli-x" title="Remove" onclick="pliRemoveGroup(\''+k.replace(/'/g,"\\'")+'\')">×</button>'
+      +(mergedPart
+        ? '<button class="pli-x" title="Un-merge: restore original parts" onclick="unmergePart(\''+mergedPart.id+'\')" style="color:#8B5A2B;border-color:#8B5A2B">↩</button>'
+        : '<button class="pli-x" title="Remove" onclick="pliRemoveGroup(\''+k.replace(/'/g,"\\'")+'\')">×</button>')
       +'</div>';
   }).join('');
   listEl.innerHTML=html;
@@ -3852,6 +3884,212 @@ function gaStep(idx,delta){
   gaSetCount(idx,c.inThis+delta);
 }
 function applyGAPanel(){closeGAPanel();}
+
+// ═══════════════════════════════════════════════════════════════
+// MERGE NARROW PARTS
+// Finds parts where the short dimension ≤ MERGE_NARROW_THRESHOLD and groups them
+// by (material, thickness, long-dimension) into "merge blocks" up to
+// MERGE_MAX_WIDTH wide with kerf gaps between pieces. The cutting operator
+// then makes one saw cut along each gap to separate the strip back into the
+// original parts.
+// ═══════════════════════════════════════════════════════════════
+var MERGE_NARROW_THRESHOLD = 150;   // mm — parts with min(l,w) ≤ this are candidates
+var MERGE_MAX_WIDTH        = 800;   // mm — merged block can't exceed this on the narrow axis
+var _mergeProposals = [];            // populated by openMergeDialog, consumed by applyMerges
+var _mergeSelected   = {};           // proposal index → boolean (user toggles)
+
+// Identify candidate blocks. A "narrow" part has min(l,w) ≤ threshold.
+// Group candidates by (mat, thick, longDim) where longDim is the dimension that
+// is NOT short (rounded to nearest 5mm so 600 ≈ 601 merges). Then greedy-fit
+// candidates into blocks of total width ≤ MERGE_MAX_WIDTH.
+function findMergeCandidates(){
+  // Eligible parts: must have a short side ≤ threshold AND not already merged
+  // (no nested merges) AND not currently in a group (groups have explicit user
+  // intent — don't break them silently).
+  var eligible = parts.filter(function(p){
+    if (p.__merged || p.groupId) return false;
+    return Math.min(p.l, p.w) <= MERGE_NARROW_THRESHOLD && Math.max(p.l, p.w) > 0;
+  });
+
+  // Bucket by (mat, thick, longDim rounded)
+  var kerf = parseInt((document.getElementById('kerf')||{}).value) || 3;
+  var buckets = {};
+  eligible.forEach(function(p){
+    var longDim  = Math.max(p.l, p.w);
+    var shortDim = Math.min(p.l, p.w);
+    // Round longDim to nearest 5mm so very-slight differences still group
+    var longKey = Math.round(longDim / 5) * 5;
+    var bk = p.mat + '|' + (p.thick||0) + '|' + longKey;
+    if (!buckets[bk]) buckets[bk] = {mat:p.mat, thick:p.thick, longDim:longKey, items:[]};
+    buckets[bk].items.push({part:p, longDim:longDim, shortDim:shortDim});
+  });
+
+  // Within each bucket, sort by shortDim descending and greedy-fit blocks.
+  // We want at least 2 parts per block (a single part doesn't merge into anything).
+  var proposals = [];
+  Object.keys(buckets).forEach(function(bk){
+    var b = buckets[bk];
+    var items = b.items.slice().sort(function(a, c){ return c.shortDim - a.shortDim; });
+    while (items.length >= 2){
+      var block = [];
+      var totalW = 0;
+      for (var i = 0; i < items.length; ){
+        var it = items[i];
+        var added = totalW + (block.length ? kerf : 0) + it.shortDim;
+        if (added <= MERGE_MAX_WIDTH){
+          block.push(it);
+          totalW = added;
+          items.splice(i, 1);
+        } else {
+          i++; // try next item
+        }
+      }
+      if (block.length >= 2){
+        proposals.push({
+          mat: b.mat, thick: b.thick,
+          longDim: block[0].longDim,            // use first item's exact longDim
+          parts: block.map(function(it){return it.part;}),
+          shortDims: block.map(function(it){return it.shortDim;}),
+          combinedShort: totalW,                // sum + kerfs
+          kerf: kerf
+        });
+      } else {
+        break; // leftover singletons; can't merge
+      }
+    }
+  });
+  // Sort proposals by material then longDim for stable display
+  proposals.sort(function(a, c){
+    if (a.mat !== c.mat) return a.mat < c.mat ? -1 : 1;
+    return c.longDim - a.longDim;
+  });
+  return proposals;
+}
+
+function openMergeDialog(){
+  if (!parts.length){ alert('No parts loaded.'); return; }
+  _mergeProposals = findMergeCandidates();
+  _mergeSelected  = {};
+  _mergeProposals.forEach(function(_, i){ _mergeSelected[i] = true; }); // pre-select all
+  var body = document.getElementById('merge-body');
+  if (!_mergeProposals.length){
+    body.innerHTML = '<div style="padding:30px;text-align:center;color:#A09888;font-size:13px">'
+                  + 'No mergeable parts found.<br><br>'
+                  + '<span style="font-size:11px">Candidates need: one dimension ≤ ' + MERGE_NARROW_THRESHOLD + 'mm, '
+                  + 'matching length, material, and thickness, and at least one other partner.</span></div>';
+    document.getElementById('merge-summary').textContent = '';
+    document.getElementById('merge-apply-btn').disabled = true;
+    document.getElementById('merge-apply-btn').style.opacity = '0.4';
+  } else {
+    document.getElementById('merge-apply-btn').disabled = false;
+    document.getElementById('merge-apply-btn').style.opacity = '1';
+    renderMergeBody();
+  }
+  document.getElementById('merge-panel').classList.add('open');
+}
+
+function renderMergeBody(){
+  var body = document.getElementById('merge-body');
+  var html = '<div style="padding:6px 14px 0 14px"><table style="width:100%;border-collapse:collapse;font-size:12px">'
+           + '<thead><tr style="color:#A09888;font-size:10px;text-transform:uppercase;letter-spacing:.04em">'
+           + '<th style="text-align:left;padding:8px 4px;border-bottom:1px solid #D4CFC2;width:30px"></th>'
+           + '<th style="text-align:left;padding:8px 4px;border-bottom:1px solid #D4CFC2">Material</th>'
+           + '<th style="text-align:right;padding:8px 4px;border-bottom:1px solid #D4CFC2">Length</th>'
+           + '<th style="text-align:left;padding:8px 8px;border-bottom:1px solid #D4CFC2">Pieces</th>'
+           + '<th style="text-align:right;padding:8px 4px;border-bottom:1px solid #D4CFC2">Combined</th>'
+           + '</tr></thead><tbody>';
+  _mergeProposals.forEach(function(pr, i){
+    var checked = _mergeSelected[i] ? 'checked' : '';
+    var piecesText = pr.shortDims.join(' + ') + ' mm';
+    var combinedText = pr.combinedShort + ' mm (' + pr.parts.length + '× w/ ' + pr.kerf + 'mm kerf)';
+    html += '<tr style="border-bottom:1px solid #EAE6DC">'
+         +  '<td style="padding:8px 4px"><input type="checkbox" '+checked+' onchange="_mergeSelected['+i+']=this.checked;updateMergeSummary()" style="cursor:pointer;accent-color:#8B5A2B;width:auto"></td>'
+         +  '<td style="padding:8px 4px"><div style="font-weight:600">'+esc(pr.mat)+'</div><div style="font-size:10px;color:#A09888">'+(pr.thick||'?')+'mm thick</div></td>'
+         +  '<td style="text-align:right;padding:8px 4px;font-family:monospace;font-weight:600">'+pr.longDim+' mm</td>'
+         +  '<td style="padding:8px 8px;font-family:monospace;font-size:11px;color:#6B6455">'+piecesText+'</td>'
+         +  '<td style="text-align:right;padding:8px 4px;font-family:monospace"><b>'+pr.combinedShort+' mm</b><div style="font-size:9px;color:#A09888">'+pr.parts.length+' pieces · '+pr.kerf+'mm kerf</div></td>'
+         +  '</tr>';
+  });
+  html += '</tbody></table></div>';
+  body.innerHTML = html;
+  updateMergeSummary();
+}
+
+function updateMergeSummary(){
+  var selCount = 0, partCount = 0;
+  _mergeProposals.forEach(function(pr, i){
+    if (_mergeSelected[i]){ selCount++; partCount += pr.parts.length; }
+  });
+  var el = document.getElementById('merge-summary');
+  if (el){
+    if (selCount === 0) el.textContent = 'Nothing selected.';
+    else el.textContent = selCount + ' block(s) selected — will merge ' + partCount + ' parts into ' + selCount + ' strips.';
+  }
+}
+
+function closeMergeDialog(){
+  document.getElementById('merge-panel').classList.remove('open');
+}
+
+function applyMerges(){
+  var applied = 0;
+  _mergeProposals.forEach(function(pr, i){
+    if (!_mergeSelected[i]) return;
+    // Build a single merged "virtual" part replacing the constituents.
+    var sumShort = pr.combinedShort;   // sum of widths + kerf*(n-1)
+    var longDim  = pr.parts.reduce(function(m, p){ return Math.max(m, Math.max(p.l, p.w)); }, 0);
+    // Use the longer dimension as L (length) and the combined as W (width).
+    // This matches the natural cutting orientation: the operator rips along
+    // the length to separate the strips.
+    var merged = {
+      id: 'merged_' + Date.now() + '_' + i,
+      __merged: true,
+      __mergedFrom: pr.parts.slice(),         // keep references for un-merge
+      __mergedKerf: pr.kerf,
+      __mergedShorts: pr.shortDims.slice(),
+      name: 'MERGED ×' + pr.parts.length,
+      origName: pr.parts.map(function(p){return p.origName||p.name;}).join(' + '),
+      l: longDim,
+      w: sumShort,
+      mat: pr.mat,
+      thick: pr.thick,
+      eb: {eb1:'',eb2:'',eb3:'',eb4:''},   // merged strip itself has no edgeband
+      op1: '', op2: '', hasCNC: false,
+      labelRange: '',
+      printed: false
+    };
+    // Remove constituents from parts list and add the merged part
+    var idsToRemove = {};
+    pr.parts.forEach(function(p){ idsToRemove[p.id] = true; });
+    parts = parts.filter(function(p){ return !idsToRemove[p.id]; });
+    parts.push(merged);
+    applied++;
+  });
+  closeMergeDialog();
+  if (applied > 0){
+    renderParts();
+    scheduleSave();
+    setStatus && setStatus('ok', '✓ Merged ' + applied + ' block(s)');
+  }
+}
+
+// Un-merge a single merged part back into its constituents.
+function unmergePart(id){
+  var idx = parts.findIndex(function(p){ return p.id === id; });
+  if (idx < 0) return;
+  var m = parts[idx];
+  if (!m.__merged || !m.__mergedFrom) return;
+  if (!confirm('Un-merge this strip back into ' + m.__mergedFrom.length + ' separate parts?')) return;
+  parts.splice(idx, 1);
+  // Restore the constituents (they're stored verbatim; their ids still unique)
+  m.__mergedFrom.forEach(function(p){
+    p.printed = false;       // reset print status on restore
+    parts.push(p);
+  });
+  renderParts();
+  scheduleSave();
+}
+
 function renderGroups(){
   var el=document.getElementById('glist');
   document.getElementById('gempty').style.display=partGroups.length?'none':'block';
@@ -4569,7 +4807,115 @@ function packGridFill(UW, UH, partsIn, kerf, color, trim, grainLocked){
   return sheets;
 }
 
+// ═══════════════════════════════════════════════════════════════
+// GROUP COHESION: pack each group into a tight bounding box first,
+// then treat that bbox as a single rectangle during main packing.
+// This guarantees a group's parts stay physically adjacent — they
+// cannot be separated by ungrouped parts squeezing into gaps.
+// ═══════════════════════════════════════════════════════════════
+function _packGroupTight(members, kerf){
+  // members are passed in caller's preferred order. We try multiple arrangements
+  // and pick the smallest bounding box by area.
+  if (members.length === 1){
+    var p = members[0];
+    return {bboxW:p.l, bboxH:p.w, positions:[{part:p, dx:0, dy:0, dw:p.l, dh:p.w, rot:false}]};
+  }
+  var options = [];
+  // Sort descending by long side so largest parts anchor the layout
+  var sorted = members.slice().sort(function(a,b){
+    return Math.max(b.l,b.w) - Math.max(a.l,a.w);
+  });
+  // Option A: stack along x (parts in a row, side-by-side)
+  // bboxW = sum(l) + kerf*(n-1), bboxH = max(w)
+  var posA = [], xA = 0, maxHA = 0;
+  sorted.forEach(function(p, i){
+    posA.push({part:p, dx:xA, dy:0, dw:p.l, dh:p.w, rot:false});
+    xA += p.l;
+    if (i < sorted.length - 1) xA += kerf;
+    if (p.w > maxHA) maxHA = p.w;
+  });
+  options.push({bboxW:xA, bboxH:maxHA, positions:posA});
+  // Option B: stack along y (parts in a column, one above the other)
+  // bboxW = max(l), bboxH = sum(w) + kerf*(n-1)
+  var posB = [], yB = 0, maxWB = 0;
+  sorted.forEach(function(p, i){
+    posB.push({part:p, dx:0, dy:yB, dw:p.l, dh:p.w, rot:false});
+    yB += p.w;
+    if (i < sorted.length - 1) yB += kerf;
+    if (p.l > maxWB) maxWB = p.l;
+  });
+  options.push({bboxW:maxWB, bboxH:yB, positions:posB});
+  // Option C (≥4 parts): two-row shelf packing — useful for grids of similar
+  // parts where row+column beats single-row arrangement.
+  if (members.length >= 4){
+    var byH = sorted.slice().sort(function(a,b){return b.w - a.w;});
+    var totalL = sorted.reduce(function(a,p){return a + p.l;}, 0) + kerf*(sorted.length-1);
+    var targetRowW = totalL / 2;
+    var posC = [], rowY = 0, rowX = 0, rowH = 0;
+    byH.forEach(function(p){
+      if (rowX > 0 && rowX + p.l > targetRowW){
+        rowY += rowH + kerf;
+        rowX = 0; rowH = 0;
+      }
+      posC.push({part:p, dx:rowX, dy:rowY, dw:p.l, dh:p.w, rot:false});
+      rowX += p.l + kerf;
+      if (p.w > rowH) rowH = p.w;
+    });
+    var bboxWC = 0, bboxHC = 0;
+    posC.forEach(function(pos){
+      if (pos.dx + pos.dw > bboxWC) bboxWC = pos.dx + pos.dw;
+      if (pos.dy + pos.dh > bboxHC) bboxHC = pos.dy + pos.dh;
+    });
+    options.push({bboxW:bboxWC, bboxH:bboxHC, positions:posC});
+  }
+  // Pick smallest bbox area
+  return options.reduce(function(best, cur){
+    return (cur.bboxW * cur.bboxH < best.bboxW * best.bboxH) ? cur : best;
+  });
+}
+
 function pack(UW, UH, partsIn, kerf, color, _ignoredMaxSheets, trim, grainLocked){
+  // ── GROUP COHESION (super-parts) ────────────────────────────────────
+  // Each group is pre-packed into a tight rectangle and treated as a single
+  // unit during the main packing. After packing finishes we expand super-parts
+  // back into their members. This guarantees a group's parts can't be split
+  // by ungrouped parts squeezing into gaps. A group whose bbox is too big for
+  // the sheet is explosively-fallback-unpacked back to individual parts (so
+  // the optimizer still places them, even if not strictly contiguous).
+  var _superParts = [];
+  (function buildSupers(){
+    var ungrouped = [], byGroup = {};
+    partsIn.forEach(function(p){
+      if (p.groupId){
+        (byGroup[p.groupId] = byGroup[p.groupId] || []).push(p);
+      } else { ungrouped.push(p); }
+    });
+    var rebuilt = ungrouped.slice();
+    Object.keys(byGroup).forEach(function(gid){
+      var members = byGroup[gid];
+      // Single-member "groups" don't need wrapping.
+      if (members.length < 2){ rebuilt.push.apply(rebuilt, members); return; }
+      var tight = _packGroupTight(members, kerf);
+      // If the bounding box doesn't fit the sheet, fall back to individual parts.
+      if (tight.bboxW > UW || tight.bboxH > UH){
+        rebuilt.push.apply(rebuilt, members); return;
+      }
+      var sp = {
+        __super: true,
+        __members: tight.positions,
+        id: 'super_' + gid + '_' + Math.random().toString(36).slice(2,8),
+        groupId: parseInt(gid) || gid,
+        l: tight.bboxW,
+        w: tight.bboxH,
+        mat: members[0].mat,
+        thick: members[0].thick,
+        allowRotate: false  // internal packing fixed; group is treated as same-grain
+      };
+      _superParts.push(sp);
+      rebuilt.push(sp);
+    });
+    partsIn = rebuilt;
+  })();
   var out = [], unplaced = partsIn.slice();
   // Pre-sort: keep grouped parts together. Don't re-sort non-grouped parts —
   // the caller (`optimize()`) already sorted them using its chosen strategy,
@@ -4771,6 +5117,35 @@ function pack(UW, UH, partsIn, kerf, color, _ignoredMaxSheets, trim, grainLocked
       }
       out.push({ uw: UW, uh: UH, trim: trim, placements: placements, grainLocked: grainLocked });
     }
+  }
+  // ── Expand super-parts back into individual member placements ──────
+  // Each placed super-part is replaced with its members offset by the
+  // super's (x,y). Members inherit pre-tinted colors so they remain
+  // visually distinct. After this step, callers see only real parts —
+  // tryAllStrategies' id-relink and downstream rendering work unchanged.
+  if (_superParts.length){
+    out.forEach(function(L){
+      var expanded = [];
+      var ci2 = 0;
+      L.placements.forEach(function(pl){
+        if (pl.part && pl.part.__super){
+          pl.part.__members.forEach(function(m){
+            expanded.push({
+              part: m.part,
+              x: pl.x + m.dx,
+              y: pl.y + m.dy,
+              pw: m.dw,
+              ph: m.dh,
+              rot: m.rot,
+              color: tint(color, ci2++)
+            });
+          });
+        } else {
+          expanded.push(pl);
+        }
+      });
+      L.placements = expanded;
+    });
   }
   return out;
 }
