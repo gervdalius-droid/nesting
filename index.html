@@ -771,6 +771,9 @@ body.print-mode{background:#fff}
 <div class="ov2" id="modal">
 <div class="mdl">
   <h3>🏷 <span id="mname"></span></h3>
+  <!-- Merged-strip banner — shown only when the selected part is a merged strip.
+       Tells the operator that clicking Print will produce N labels (one per piece). -->
+  <div id="mmerged" style="display:none;background:#FCE6CE;color:#5C3A1A;border:1px solid #C28F5E;border-radius:6px;padding:7px 10px;margin-bottom:7px;font-size:12px;font-weight:600">🔗 <span id="mmerged-txt"></span></div>
   <div class="lw">
     <div style="font-size:9px;color:#888;margin-bottom:5px">99×50mm label · printed via Excel</div>
     <div class="lbl-outer" id="lprev"></div>
@@ -3971,47 +3974,79 @@ function openMergeDialog(){
   _mergeProposals = findMergeCandidates();
   _mergeSelected  = {};
   _mergeProposals.forEach(function(_, i){ _mergeSelected[i] = true; }); // pre-select all
-  var body = document.getElementById('merge-body');
-  if (!_mergeProposals.length){
-    body.innerHTML = '<div style="padding:30px;text-align:center;color:#A09888;font-size:13px">'
-                  + 'No mergeable parts found.<br><br>'
-                  + '<span style="font-size:11px">Candidates need: one dimension ≤ ' + MERGE_NARROW_THRESHOLD + 'mm, '
-                  + 'matching length, material, and thickness, and at least one other partner.</span></div>';
-    document.getElementById('merge-summary').textContent = '';
-    document.getElementById('merge-apply-btn').disabled = true;
-    document.getElementById('merge-apply-btn').style.opacity = '0.4';
-  } else {
-    document.getElementById('merge-apply-btn').disabled = false;
-    document.getElementById('merge-apply-btn').style.opacity = '1';
-    renderMergeBody();
-  }
+  // The dialog always opens — even when there are no proposals — because
+  // it now also shows existing merged strips for un-merge.
+  renderMergeBody();
   document.getElementById('merge-panel').classList.add('open');
 }
 
 function renderMergeBody(){
   var body = document.getElementById('merge-body');
-  var html = '<div style="padding:6px 14px 0 14px"><table style="width:100%;border-collapse:collapse;font-size:12px">'
-           + '<thead><tr style="color:#A09888;font-size:10px;text-transform:uppercase;letter-spacing:.04em">'
-           + '<th style="text-align:left;padding:8px 4px;border-bottom:1px solid #D4CFC2;width:30px"></th>'
-           + '<th style="text-align:left;padding:8px 4px;border-bottom:1px solid #D4CFC2">Material</th>'
-           + '<th style="text-align:right;padding:8px 4px;border-bottom:1px solid #D4CFC2">Length</th>'
-           + '<th style="text-align:left;padding:8px 8px;border-bottom:1px solid #D4CFC2">Pieces</th>'
-           + '<th style="text-align:right;padding:8px 4px;border-bottom:1px solid #D4CFC2">Combined</th>'
-           + '</tr></thead><tbody>';
-  _mergeProposals.forEach(function(pr, i){
-    var checked = _mergeSelected[i] ? 'checked' : '';
-    var piecesText = pr.shortDims.join(' + ') + ' mm';
-    var combinedText = pr.combinedShort + ' mm (' + pr.parts.length + '× w/ ' + pr.kerf + 'mm kerf)';
-    html += '<tr style="border-bottom:1px solid #EAE6DC">'
-         +  '<td style="padding:8px 4px"><input type="checkbox" '+checked+' onchange="_mergeSelected['+i+']=this.checked;updateMergeSummary()" style="cursor:pointer;accent-color:#8B5A2B;width:auto"></td>'
-         +  '<td style="padding:8px 4px"><div style="font-weight:600">'+esc(pr.mat)+'</div><div style="font-size:10px;color:#A09888">'+(pr.thick||'?')+'mm thick</div></td>'
-         +  '<td style="text-align:right;padding:8px 4px;font-family:monospace;font-weight:600">'+pr.longDim+' mm</td>'
-         +  '<td style="padding:8px 8px;font-family:monospace;font-size:11px;color:#6B6455">'+piecesText+'</td>'
-         +  '<td style="text-align:right;padding:8px 4px;font-family:monospace"><b>'+pr.combinedShort+' mm</b><div style="font-size:9px;color:#A09888">'+pr.parts.length+' pieces · '+pr.kerf+'mm kerf</div></td>'
-         +  '</tr>';
-  });
-  html += '</tbody></table></div>';
+  // Section 1: existing merged strips (allow un-merge from this dialog too)
+  var existing = parts.filter(function(p){ return p.__merged; });
+  var html = '';
+  if (existing.length){
+    html += '<div style="padding:10px 14px 4px 14px"><div style="font-size:10px;font-weight:600;color:#8B5A2B;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">🔗 Currently merged strips ('+existing.length+')</div>'
+         +  '<table style="width:100%;border-collapse:collapse;font-size:12px">'
+         +  '<thead><tr style="color:#A09888;font-size:10px;text-transform:uppercase;letter-spacing:.04em">'
+         +  '<th style="text-align:left;padding:6px 4px;border-bottom:1px solid #D4CFC2">Material</th>'
+         +  '<th style="text-align:right;padding:6px 4px;border-bottom:1px solid #D4CFC2">Dims</th>'
+         +  '<th style="text-align:left;padding:6px 8px;border-bottom:1px solid #D4CFC2">Pieces</th>'
+         +  '<th style="text-align:right;padding:6px 4px;border-bottom:1px solid #D4CFC2;width:80px"></th>'
+         +  '</tr></thead><tbody>';
+    existing.forEach(function(m){
+      var pieces = m.__mergedShorts ? m.__mergedShorts.join(' + ') + ' mm' : ((m.__mergedFrom||[]).length + ' pcs');
+      var n = (m.__mergedFrom||[]).length;
+      html += '<tr style="border-bottom:1px solid #EAE6DC">'
+           +  '<td style="padding:7px 4px"><div style="font-weight:600">'+esc(m.mat)+'</div><div style="font-size:10px;color:#A09888">'+(m.thick||'?')+'mm thick</div></td>'
+           +  '<td style="text-align:right;padding:7px 4px;font-family:monospace"><b>'+m.l+'×'+m.w+'</b><div style="font-size:9px;color:#A09888">'+n+' pieces</div></td>'
+           +  '<td style="padding:7px 8px;font-family:monospace;font-size:11px;color:#6B6455">'+esc(pieces)+'</td>'
+           +  '<td style="text-align:right;padding:7px 4px"><button class="btn bs" onclick="unmergePart(\''+m.id+'\');closeMergeDialog()" style="background:#fff;color:#8B5A2B;border-color:#8B5A2B;font-size:11px;padding:3px 9px;white-space:nowrap">↩ Unmerge</button></td>'
+           +  '</tr>';
+    });
+    html += '</tbody></table></div>';
+  }
+  // Section 2: new merge proposals
+  if (_mergeProposals.length){
+    html += '<div style="padding:'+(existing.length?'14px':'10px')+' 14px 0 14px;'+(existing.length?'border-top:1px solid #D4CFC2;margin-top:8px':'')+'">'
+         +  '<div style="font-size:10px;font-weight:600;color:#3D6B4F;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">+ New merge proposals ('+_mergeProposals.length+')</div>'
+         +  '<table style="width:100%;border-collapse:collapse;font-size:12px">'
+         +  '<thead><tr style="color:#A09888;font-size:10px;text-transform:uppercase;letter-spacing:.04em">'
+         +  '<th style="text-align:left;padding:6px 4px;border-bottom:1px solid #D4CFC2;width:30px"></th>'
+         +  '<th style="text-align:left;padding:6px 4px;border-bottom:1px solid #D4CFC2">Material</th>'
+         +  '<th style="text-align:right;padding:6px 4px;border-bottom:1px solid #D4CFC2">Length</th>'
+         +  '<th style="text-align:left;padding:6px 8px;border-bottom:1px solid #D4CFC2">Pieces</th>'
+         +  '<th style="text-align:right;padding:6px 4px;border-bottom:1px solid #D4CFC2">Combined</th>'
+         +  '</tr></thead><tbody>';
+    _mergeProposals.forEach(function(pr, i){
+      var checked = _mergeSelected[i] ? 'checked' : '';
+      var piecesText = pr.shortDims.join(' + ') + ' mm';
+      html += '<tr style="border-bottom:1px solid #EAE6DC">'
+           +  '<td style="padding:7px 4px"><input type="checkbox" '+checked+' onchange="_mergeSelected['+i+']=this.checked;updateMergeSummary()" style="cursor:pointer;accent-color:#8B5A2B;width:auto"></td>'
+           +  '<td style="padding:7px 4px"><div style="font-weight:600">'+esc(pr.mat)+'</div><div style="font-size:10px;color:#A09888">'+(pr.thick||'?')+'mm thick</div></td>'
+           +  '<td style="text-align:right;padding:7px 4px;font-family:monospace;font-weight:600">'+pr.longDim+' mm</td>'
+           +  '<td style="padding:7px 8px;font-family:monospace;font-size:11px;color:#6B6455">'+esc(piecesText)+'</td>'
+           +  '<td style="text-align:right;padding:7px 4px;font-family:monospace"><b>'+pr.combinedShort+' mm</b><div style="font-size:9px;color:#A09888">'+pr.parts.length+' pcs · '+pr.kerf+'mm kerf</div></td>'
+           +  '</tr>';
+    });
+    html += '</tbody></table></div>';
+  }
+  // Empty state — only when BOTH sections are empty
+  if (!existing.length && !_mergeProposals.length){
+    html = '<div style="padding:30px;text-align:center;color:#A09888;font-size:13px">'
+         + 'No merged strips yet, and no mergeable parts found.<br><br>'
+         + '<span style="font-size:11px">Candidates need: one dimension ≤ ' + MERGE_NARROW_THRESHOLD + 'mm, '
+         + 'matching length, material, and thickness, and at least one other partner.</span></div>';
+  }
   body.innerHTML = html;
+  // Toggle apply-button state based on whether there are proposals
+  var applyBtn = document.getElementById('merge-apply-btn');
+  if (applyBtn){
+    var hasProps = _mergeProposals.length > 0;
+    applyBtn.disabled = !hasProps;
+    applyBtn.style.opacity = hasProps ? '1' : '0.4';
+    applyBtn.style.display = hasProps ? '' : 'none'; // hide button entirely if no proposals
+  }
   updateMergeSummary();
 }
 
@@ -4160,6 +4195,21 @@ function layoutsFingerprint(){
   return fp;
 }
 
+// Compute the same fingerprint shape directly from a snapshot's layouts.
+// Used by isCurrentDirty to compare against a saved version without having
+// to temporarily restore (which would mutate the global parts/layouts).
+function snapshotFingerprint(snapLayouts){
+  var fp=(snapLayouts?snapLayouts.length:0)+'/';
+  (snapLayouts||[]).forEach(function(l,i){
+    fp+=i+':'+l.matName+'['+(l.placements?l.placements.length:0)+']';
+    (l.placements||[]).forEach(function(p){
+      fp+=','+p.partId+'@'+p.x+','+p.y+(p.rot?'R':'');
+    });
+    fp+=';';
+  });
+  return fp;
+}
+
 // Deep-clone the current layouts array into a standalone snapshot.
 // Placements store partId rather than part reference so the snapshot is
 // JSON-safe (same shape as what save/load uses).
@@ -4180,9 +4230,31 @@ function snapshotLayouts(){
   });
 }
 
+// Deep-clone the current parts array as part of a version snapshot.
+// Without this, restoring a version after the parts list has changed (parts
+// deleted, merged, added) silently drops placements whose original parts no
+// longer exist — making the restored layout look empty or "from another project".
+// JSON-clone handles shape/holes arrays correctly and is fully JSON-safe.
+function snapshotParts(){
+  try { return JSON.parse(JSON.stringify(parts)); }
+  catch(e){ return parts.slice(); } // fallback (cyclic refs shouldn't occur, but just in case)
+}
+
 // Restore a snapshot — reconnects placement partId → live part object.
-// Parts that no longer exist (deleted since snapshot) are silently dropped.
-function restoreSnapshot(snap, restoreCurSheet){
+// If `snapParts` is provided (newer versions), the parts list is replaced
+// with the snapshot's parts FIRST so all placements can resolve their refs.
+// Older versions without snapParts fall back to the current parts list
+// (the previous buggy behavior, but no worse than before).
+function restoreSnapshot(snap, restoreCurSheet, snapParts){
+  if (snapParts && Array.isArray(snapParts)){
+    // Replace the current parts list with the snapshot's. This is the key
+    // fix: ensures every placement.partId has a corresponding part object
+    // even if the user has merged/deleted/added parts since the version
+    // was saved.
+    parts = snapParts.map(function(p){ return Object.assign({}, p); });
+    // Refresh the parts panel to reflect restored parts
+    if (typeof renderParts === 'function') renderParts();
+  }
   var partById={};
   parts.forEach(function(p){ partById[String(p.id)]=p; });
   layouts=(snap||[]).map(function(l){
@@ -4203,21 +4275,35 @@ function restoreSnapshot(snap, restoreCurSheet){
 }
 
 // Add a version entry. isAuto=true means it was created by optimize().
+// Auto-versions collapse: if the previous version is also auto, we REPLACE it
+// instead of appending. This prevents the version list from growing every time
+// the user clicks Optimize (or every time merge/un-merge triggers Optimize).
+// Manual saves (isAuto=false) always create a new entry — they're user-intent.
 function addVersion(name, isAuto){
-  var v={
+  var snap = {
     id: vId++,
     name: name || ('Version ' + (versions.length+1)),
     createdAt: new Date().toISOString(),
+    parts: snapshotParts(),       // ← KEY FIX: store the parts that go with this layout
     layouts: snapshotLayouts(),
     curSheet: curSheet,
     isAuto: !!isAuto
   };
-  versions.push(v);
-  activeVersionId=v.id;
+  // Auto-version collapse: replace the last entry if it was also auto.
+  // Active version id is updated to match the replacement so the dropdown
+  // stays in sync.
+  if (isAuto && versions.length && versions[versions.length-1].isAuto){
+    var oldId = versions[versions.length-1].id;
+    versions[versions.length-1] = snap;
+    if (activeVersionId === oldId) activeVersionId = snap.id;
+  } else {
+    versions.push(snap);
+  }
+  activeVersionId = snap.id;
   if(isAuto) _autoVersionFp=layoutsFingerprint();
   renderVersionBar();
   scheduleSave();
-  return v;
+  return snap;
 }
 
 // Operator-triggered: "Save as version…" button
@@ -4231,7 +4317,7 @@ function saveAsVersion(){
   addVersion(name, false);
 }
 
-// Operator picks a version from the dropdown — restore its layouts.
+// Operator picks a version from the dropdown — restore its layouts AND parts.
 function restoreVersion(id){
   id=parseInt(id,10);
   if(!id) return;
@@ -4245,8 +4331,13 @@ function restoreVersion(id){
       return;
     }
   }
-  restoreSnapshot(v.layouts, v.curSheet);
+  // Pass v.parts so the parts list is replaced with the version's snapshot.
+  // Older versions saved before this fix have no v.parts → falls back to
+  // the previous behavior (works only when parts list hasn't changed).
+  restoreSnapshot(v.layouts, v.curSheet, v.parts);
   activeVersionId=v.id;
+  // Reset the drift fingerprint so the next Optimize doesn't ask "manual changes"
+  _autoVersionFp = layoutsFingerprint();
   // Refresh UI to reflect restored layouts
   _refreshStats && _refreshStats();
   buildTabs(); activateTab(curSheet);
@@ -4269,19 +4360,12 @@ function deleteVersion(id){
 
 // "Is the current layout different from the version it was loaded from?"
 // Used to disable the confirm-dialog when no changes exist.
+// Computes both fingerprints directly — no temporary mutation of globals.
 function isCurrentDirty(){
   if(!activeVersionId) return layouts.length>0;
   var v=versions.find(function(x){return x.id===activeVersionId;});
   if(!v) return true;
-  // Compare fingerprints
-  var curFp=layoutsFingerprint();
-  // Temporarily restore snapshot to compute its fingerprint, then restore current
-  // (This is ugly but avoids maintaining two parallel codepaths.)
-  var savedLayouts=layouts, savedCur=curSheet;
-  restoreSnapshot(v.layouts, v.curSheet);
-  var verFp=layoutsFingerprint();
-  layouts=savedLayouts; curSheet=savedCur;
-  return curFp!==verFp;
+  return layoutsFingerprint() !== snapshotFingerprint(v.layouts);
 }
 
 // Repaint the version bar (dropdown + hint).
@@ -5364,6 +5448,42 @@ function draw(lay){
   ctx.fillStyle='#EDE9DF';ctx.fillRect(tx,ty,uw,uh);
   if(lay.trim>0){ctx.strokeStyle='#B0A898';ctx.lineWidth=1;ctx.setLineDash([4,4]);ctx.strokeRect(tx+.5,ty+.5,uw-1,uh-1);ctx.setLineDash([]);ctx.fillStyle='rgba(0,0,0,.25)';ctx.font='9px monospace';ctx.textAlign='left';ctx.textBaseline='top';ctx.fillText('trim '+lay.trim+'mm',3,2);}
   ctx.strokeStyle='#888';ctx.lineWidth=1.5;ctx.strokeRect(.75,.75,W-1.5,H-1.5);
+  // ── REGISTER POINT (0,0) — bottom-left corner of usable area ──────
+  // Matches the typical CNC / beam-saw convention where the work-coordinate
+  // origin sits at the bottom-left of the sheet (Y axis points up from there).
+  // Drawn as an L-corner + filled dot + "(0,0)" label so the operator has a
+  // clear visual cue of where to align stock on the machine.
+  (function drawRegisterPoint(){
+    var rx = tx,                  // canvas x of usable-area left edge
+        ry = ty + uh;             // canvas y of usable-area BOTTOM edge
+    var armLen = 16;
+    ctx.save();
+    ctx.strokeStyle = '#1C1A14';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(rx, ry - armLen);   // up
+    ctx.lineTo(rx, ry);
+    ctx.lineTo(rx + armLen, ry);   // right
+    ctx.stroke();
+    // Filled dot at the exact origin
+    ctx.fillStyle = '#1C1A14';
+    ctx.beginPath();
+    ctx.arc(rx, ry, 3.2, 0, Math.PI * 2);
+    ctx.fill();
+    // White ring around the dot for contrast on dark fills
+    ctx.strokeStyle = '#FDFCF9';
+    ctx.lineWidth = 1.25;
+    ctx.beginPath();
+    ctx.arc(rx, ry, 3.2, 0, Math.PI * 2);
+    ctx.stroke();
+    // "(0,0)" label tucked above-right of the origin so it doesn't overlap parts
+    ctx.fillStyle = '#1C1A14';
+    ctx.font = 'bold 9px monospace';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'bottom';
+    ctx.fillText('(0,0)', rx + 5, ry - 4);
+    ctx.restore();
+  })();
   if(lay.trimWarning){ctx.fillStyle='rgba(184,64,64,.82)';ctx.fillRect(0,0,W,17);ctx.fillStyle='#fff';ctx.font='bold 10px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('⚠ NO TRIM — cut edge-to-edge',W/2,8.5);}
   if(lay.grainLocked){
     ctx.fillStyle='rgba(61,107,79,.15)';ctx.fillRect(tx,ty,uw,uh);
@@ -5423,10 +5543,15 @@ function draw(lay){
     var isPrinted=!!(p.part&&p.part.printed);
     var hasShape=!!(p.part&&p.part.shape&&p.part.shape.length>=3);
     var holes=(p.part&&p.part.holes)||[];
+    // Merged-strip flag: distinct color + internal saw-cut markers drawn later
+    var isMerged=!!(p.part&&p.part.__merged);
     // Group color ring
     var grp=p.part.groupId?partGroups.find(function(g){return g.id===p.part.groupId;}):null;
     var fillAlpha=isSel?'FF':isHov?'EE':'BB';
-    ctx.fillStyle=p.color+fillAlpha;
+    // For merged strips, override the per-part tint with a recognisable
+    // brown/amber so the operator can spot them at a glance on the sheet.
+    var fillColor = isMerged ? '#C28F5E' : p.color;
+    ctx.fillStyle=fillColor+fillAlpha;
     if(hasShape){
       // Faint bbox fill so the nested area is still visible
       ctx.fillStyle=p.color+'22';
@@ -5459,6 +5584,53 @@ function draw(lay){
       if(grp){ctx.strokeStyle=grp.color;ctx.lineWidth=isSel?3:2;ctx.strokeRect(x+1,y+1,w-2,h-2);}
       ctx.strokeStyle=isSel?'#1C1A14':isDragged?'#3D6B4F':'rgba(0,0,0,.3)';
       ctx.lineWidth=isSel?2.5:isDragged?2:1;ctx.strokeRect(x+.5,y+.5,w-1,h-1);
+    }
+    // ── MERGED STRIP: internal saw-cut markers ────────────────────
+    // Draw a dashed line where the operator should saw between each
+    // piece, plus a small ✂ label. Cut positions are derived from the
+    // stored __mergedShorts widths + __mergedKerf gap.
+    if (isMerged && p.part.__mergedShorts && p.part.__mergedShorts.length > 1){
+      var shorts = p.part.__mergedShorts;
+      var k = p.part.__mergedKerf || 0;
+      // Compute cumulative cut positions in mm (along the combined "W" axis)
+      var cutPositions = [];
+      var offset = 0;
+      for (var ms = 0; ms < shorts.length - 1; ms++){
+        offset += shorts[ms];
+        cutPositions.push(offset + k/2);  // middle of the kerf gap
+        offset += k;
+      }
+      // Rotation: when not rotated, pw=merged.l, ph=merged.w → cuts are
+      // HORIZONTAL at varying Y. When rotated, cuts are VERTICAL at varying X.
+      ctx.save();
+      ctx.strokeStyle = '#5C3A1A';  // dark brown — high contrast on the merged fill
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([5, 4]);
+      cutPositions.forEach(function(cp){
+        var cpx = cp * SC;
+        ctx.beginPath();
+        if (p.rot){
+          // W axis = canvas X
+          ctx.moveTo(x + cpx, y + 2);
+          ctx.lineTo(x + cpx, y + h - 2);
+        } else {
+          // W axis = canvas Y
+          ctx.moveTo(x + 2,     y + cpx);
+          ctx.lineTo(x + w - 2, y + cpx);
+        }
+        ctx.stroke();
+      });
+      ctx.setLineDash([]);
+      // Tiny scissor glyph at the first cut so the meaning is obvious
+      if (cutPositions.length && Math.min(w, h) > 30){
+        var first = cutPositions[0] * SC;
+        ctx.fillStyle = '#5C3A1A';
+        ctx.font = 'bold 10px sans-serif';
+        ctx.textBaseline = 'middle';
+        if (p.rot){ ctx.textAlign='center'; ctx.fillText('✂', x + first, y + 8); }
+        else      { ctx.textAlign='left';   ctx.fillText('✂', x + 4,     y + first); }
+      }
+      ctx.restore();
     }
     // ── PRINTED STATE: green tint overlay + corner checkmark badge ──
     if(isPrinted){
@@ -7296,13 +7468,36 @@ function openModal(p,lay){
   var pst=document.getElementById('pst');
   var modal=document.getElementById('modal');
   if(!modal){console.warn('openModal: #modal element missing');return;}
-  if(mname)mname.textContent=p.part.origName||'';
-  try{buildLabel(p,lay);}catch(e){console.error('buildLabel failed:',e);}
+  // ── Merged-strip indicator + preview-of-first-constituent ─────────────
+  // When the user clicks Print on a merged strip, we actually print N labels
+  // (one per constituent). Show a banner so they know. The preview uses the
+  // FIRST constituent's data — that's a real cuttable piece with a proper
+  // label, instead of the merged-strip "MERGED ×3" placeholder.
+  var mbanner = document.getElementById('mmerged');
+  var mbannertxt = document.getElementById('mmerged-txt');
+  var previewP = p; // default: preview the placement itself
+  if (p.part.__merged && p.part.__mergedFrom && p.part.__mergedFrom.length){
+    var n = p.part.__mergedFrom.length;
+    if (mbanner) mbanner.style.display = '';
+    if (mbannertxt) mbannertxt.textContent = 'MERGED STRIP — clicking Print will produce ' + n + ' separate labels';
+    // Build a virtual placement for the first constituent for preview only.
+    var first = p.part.__mergedFrom[0];
+    previewP = {
+      part: first,
+      pw: first.l || 0, ph: first.w || 0,
+      rot: false, x: p.x, y: p.y, color: p.color
+    };
+    if (mname) mname.textContent = '🔗 ' + (p.part.origName || '');
+  } else {
+    if (mbanner) mbanner.style.display = 'none';
+    if (mname) mname.textContent = p.part.origName||'';
+  }
+  try{buildLabel(previewP,lay);}catch(e){console.error('buildLabel failed:',e);}
   // buildZPL is now async (returns a Promise). Resolve into hidden #zpl for saveZPL.
   if (zpl) {
     zpl.textContent = '';
     try {
-      var prom = buildZPL(p, lay);
+      var prom = buildZPL(previewP, lay);
       if (prom && typeof prom.then === 'function') {
         prom.then(function(s){ zpl.textContent = s; }).catch(function(e){ console.error('buildZPL failed:', e); });
       } else {
@@ -7881,6 +8076,11 @@ function doPrint(){
     return;
   }
 
+  // ── PATH 0: merged strip → print one label per constituent ────────────
+  if (p.part.__merged && p.part.__mergedFrom && p.part.__mergedFrom.length){
+    return doPrintMergedBatch(p, pst);
+  }
+
   // ── PATH 1: part has a SWOOD label range → print via Excel ─────────────
   if (p.part.labelRange) {
     doPrintViaExcel(p, pst);
@@ -7889,6 +8089,62 @@ function doPrint(){
 
   // ── PATH 2: no xlsm / no label range → print via Browser Print + ZPL ──
   doPrintViaBrowserPrint(p, pst);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// MERGED STRIP — batch print one label per constituent part
+// ═══════════════════════════════════════════════════════════════
+// When the user clicks Print on a merged strip, each original piece needs
+// its own label. We iterate through __mergedFrom, build a virtual placement
+// for each constituent (so the existing print pipeline can reuse its label
+// generation), and dispatch via printLabelPromise (which handles both Excel
+// and Browser Print paths). Constituent parts inherit their full original
+// data (labelRange, shape, eb…) — they're stored verbatim during merge.
+function doPrintMergedBatch(p, pst){
+  var members = p.part.__mergedFrom;
+  if (!members || !members.length){
+    pst.innerHTML = '<b style="color:#B84040">No constituent parts found</b>';
+    return;
+  }
+  var lay = layouts[curSheet];
+  var total = members.length;
+  var ok = 0, failed = [];
+
+  pst.innerHTML = '<span style="color:#6B6455">Printing 1 of '+total+'\u2026</span>';
+
+  function nextLabel(i){
+    if (i >= total){
+      if (failed.length){
+        pst.innerHTML = '<b style="color:#B84040">'+ok+' of '+total+' printed</b><br>' +
+                       '<span style="font-size:11px;color:#6B6455">Failed: '+esc(failed.join(', '))+'</span>';
+      } else {
+        pst.innerHTML = '<b style="color:#3D6B4F">\u2713 Printed all '+total+' labels</b>';
+        // Mark the merged strip itself as printed once all members succeeded.
+        // skipModalClose=false → standard auto-close behaviour after the success flash.
+        markPartPrinted(p, false);
+      }
+      return;
+    }
+    var member = members[i];
+    var label = member.origName || member.name || ('Piece '+(i+1));
+    pst.innerHTML = '<span style="color:#6B6455">Printing '+(i+1)+' of '+total+': '+esc(label)+'\u2026</span>';
+    // Build a virtual placement so the print pipeline gets a familiar shape.
+    // Position fields are placeholders — labels don't actually use sheet xy.
+    var virtPl = {
+      part: member,
+      pw: member.l || 0, ph: member.w || 0,
+      rot: false,
+      x: p.x, y: p.y,
+      color: p.color
+    };
+    printLabelPromise(virtPl, lay).then(function(res){
+      if (res && res.ok) ok++;
+      else failed.push(label);
+      // Small delay so the printer can buffer between jobs
+      setTimeout(function(){ nextLabel(i+1); }, 200);
+    });
+  }
+  nextLabel(0);
 }
 
 // ── Print-status tracking ─────────────────────────────────────────
