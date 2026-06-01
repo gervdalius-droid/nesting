@@ -3896,75 +3896,111 @@ function applyGAPanel(){closeGAPanel();}
 // then makes one saw cut along each gap to separate the strip back into the
 // original parts.
 // ═══════════════════════════════════════════════════════════════
-var MERGE_NARROW_THRESHOLD = 150;   // mm — parts with min(l,w) ≤ this are candidates
-var MERGE_MAX_WIDTH        = 800;   // mm — merged block can't exceed this on the narrow axis
+var MERGE_NARROW_THRESHOLD = 150;   // mm — width-merge: short side ≤ this qualifies
+var MERGE_STRIP_MAX        = 400;   // mm — length-merge: shared width ≤ this counts as a "strip"
+var MERGE_MAX_WIDTH        = 800;   // mm — width-merge combined width cap
 var _mergeProposals = [];            // populated by openMergeDialog, consumed by applyMerges
 var _mergeSelected   = {};           // proposal index → boolean (user toggles)
 
-// Identify candidate blocks. A "narrow" part has min(l,w) ≤ threshold.
-// Group candidates by (mat, thick, longDim) where longDim is the dimension that
-// is NOT short (rounded to nearest 5mm so 600 ≈ 601 merges). Then greedy-fit
-// candidates into blocks of total width ≤ MERGE_MAX_WIDTH.
+// Find merge candidates in TWO modes:
+//  • WIDTH merge  — parts that share the same LENGTH and have a narrow width
+//                   are stacked side-by-side into a wider strip (combined width
+//                   ≤ MERGE_MAX_WIDTH). Cut apart along the length.
+//  • LENGTH merge — parts that share the same WIDTH (a "strip", ≤ MERGE_STRIP_MAX)
+//                   but have different lengths are joined end-to-end into a longer
+//                   strip (combined length ≤ the sheet's longest dimension).
+//                   Cross-cut apart to recover each piece.
+// A part is consumed by at most one proposal (width-merge is attempted first).
 function findMergeCandidates(){
-  // Eligible parts: must have a short side ≤ threshold AND not already merged
-  // (no nested merges) AND not currently in a group (groups have explicit user
-  // intent — don't break them silently).
   var eligible = parts.filter(function(p){
-    if (p.__merged || p.groupId) return false;
-    return Math.min(p.l, p.w) <= MERGE_NARROW_THRESHOLD && Math.max(p.l, p.w) > 0;
+    return !p.__merged && !p.groupId && Math.max(p.l, p.w) > 0;
   });
-
-  // Bucket by (mat, thick, longDim rounded)
   var kerf = parseInt((document.getElementById('kerf')||{}).value) || 3;
-  var buckets = {};
-  eligible.forEach(function(p){
-    var longDim  = Math.max(p.l, p.w);
-    var shortDim = Math.min(p.l, p.w);
-    // Round longDim to nearest 5mm so very-slight differences still group
-    var longKey = Math.round(longDim / 5) * 5;
-    var bk = p.mat + '|' + (p.thick||0) + '|' + longKey;
-    if (!buckets[bk]) buckets[bk] = {mat:p.mat, thick:p.thick, longDim:longKey, items:[]};
-    buckets[bk].items.push({part:p, longDim:longDim, shortDim:shortDim});
-  });
-
-  // Within each bucket, sort by shortDim descending and greedy-fit blocks.
-  // We want at least 2 parts per block (a single part doesn't merge into anything).
+  var used = {};            // part id → consumed by a proposal already
   var proposals = [];
-  Object.keys(buckets).forEach(function(bk){
-    var b = buckets[bk];
-    var items = b.items.slice().sort(function(a, c){ return c.shortDim - a.shortDim; });
-    while (items.length >= 2){
-      var block = [];
-      var totalW = 0;
-      for (var i = 0; i < items.length; ){
-        var it = items[i];
-        var added = totalW + (block.length ? kerf : 0) + it.shortDim;
-        if (added <= MERGE_MAX_WIDTH){
-          block.push(it);
-          totalW = added;
-          items.splice(i, 1);
-        } else {
-          i++; // try next item
-        }
+
+  function boardLongDim(mat){
+    var bd = (typeof matchBoard === 'function') ? matchBoard(mat) : null;
+    return bd ? Math.max(bd.w, bd.h) : 3000;
+  }
+
+  // Greedy bin-fill: given items sorted desc by `dimKey`, pack into blocks
+  // whose summed dim (+ kerf gaps) stays ≤ cap. Returns array of blocks.
+  function greedyBlocks(items, dimKey, cap){
+    var blocks = [];
+    var pool = items.slice();
+    while (pool.length >= 2){
+      var block = [], total = 0;
+      for (var i = 0; i < pool.length; ){
+        var it = pool[i];
+        var add = total + (block.length ? kerf : 0) + it[dimKey];
+        if (add <= cap){ block.push(it); total = add; pool.splice(i, 1); }
+        else i++;
       }
-      if (block.length >= 2){
-        proposals.push({
-          mat: b.mat, thick: b.thick,
-          longDim: block[0].longDim,            // use first item's exact longDim
-          parts: block.map(function(it){return it.part;}),
-          shortDims: block.map(function(it){return it.shortDim;}),
-          combinedShort: totalW,                // sum + kerfs
-          kerf: kerf
-        });
-      } else {
-        break; // leftover singletons; can't merge
-      }
+      if (block.length >= 2){ blocks.push({items: block, total: total}); }
+      else break;
     }
-  });
-  // Sort proposals by material then longDim for stable display
+    return blocks;
+  }
+
+  // ── Mode A: WIDTH merge (share LONG side, combine narrow sides) ──
+  (function widthMerge(){
+    var buckets = {};
+    eligible.forEach(function(p){
+      if (used[p.id]) return;
+      var L = Math.max(p.l, p.w), W = Math.min(p.l, p.w);
+      if (W > MERGE_NARROW_THRESHOLD) return;       // only narrow parts
+      var key = p.mat + '|' + (p.thick||0) + '|' + (Math.round(L/5)*5);
+      (buckets[key] = buckets[key] || {mat:p.mat, thick:p.thick, shared:Math.round(L/5)*5, items:[]})
+        .items.push({part:p, longDim:L, shortDim:W});
+    });
+    Object.keys(buckets).forEach(function(k){
+      var b = buckets[k];
+      var sorted = b.items.slice().sort(function(a,c){ return c.shortDim - a.shortDim; });
+      greedyBlocks(sorted, 'shortDim', MERGE_MAX_WIDTH).forEach(function(blk){
+        blk.items.forEach(function(it){ used[it.part.id] = true; });
+        proposals.push({
+          mode: 'width', mat: b.mat, thick: b.thick,
+          shared: b.shared, sharedLabel: 'L ' + b.shared + 'mm',
+          parts: blk.items.map(function(it){ return it.part; }),
+          dims:  blk.items.map(function(it){ return it.shortDim; }),
+          combined: blk.total, kerf: kerf
+        });
+      });
+    });
+  })();
+
+  // ── Mode B: LENGTH merge (share narrow WIDTH, combine long sides) ──
+  (function lengthMerge(){
+    var buckets = {};
+    eligible.forEach(function(p){
+      if (used[p.id]) return;
+      var L = Math.max(p.l, p.w), W = Math.min(p.l, p.w);
+      if (W > MERGE_STRIP_MAX) return;              // only strip-width parts
+      var key = p.mat + '|' + (p.thick||0) + '|' + (Math.round(W/5)*5);
+      (buckets[key] = buckets[key] || {mat:p.mat, thick:p.thick, shared:Math.round(W/5)*5, items:[]})
+        .items.push({part:p, longDim:L, shortDim:W});
+    });
+    Object.keys(buckets).forEach(function(k){
+      var b = buckets[k];
+      var cap = boardLongDim(b.mat);
+      var sorted = b.items.slice().sort(function(a,c){ return c.longDim - a.longDim; });
+      greedyBlocks(sorted, 'longDim', cap).forEach(function(blk){
+        blk.items.forEach(function(it){ used[it.part.id] = true; });
+        proposals.push({
+          mode: 'length', mat: b.mat, thick: b.thick,
+          shared: b.shared, sharedLabel: 'W ' + b.shared + 'mm',
+          parts: blk.items.map(function(it){ return it.part; }),
+          dims:  blk.items.map(function(it){ return it.longDim; }),
+          combined: blk.total, kerf: kerf
+        });
+      });
+    });
+  })();
+
   proposals.sort(function(a, c){
     if (a.mat !== c.mat) return a.mat < c.mat ? -1 : 1;
-    return c.longDim - a.longDim;
+    return c.combined - a.combined;
   });
   return proposals;
 }
@@ -4014,19 +4050,26 @@ function renderMergeBody(){
          +  '<thead><tr style="color:#A09888;font-size:10px;text-transform:uppercase;letter-spacing:.04em">'
          +  '<th style="text-align:left;padding:6px 4px;border-bottom:1px solid #D4CFC2;width:30px"></th>'
          +  '<th style="text-align:left;padding:6px 4px;border-bottom:1px solid #D4CFC2">Material</th>'
-         +  '<th style="text-align:right;padding:6px 4px;border-bottom:1px solid #D4CFC2">Length</th>'
+         +  '<th style="text-align:left;padding:6px 4px;border-bottom:1px solid #D4CFC2">Shared</th>'
          +  '<th style="text-align:left;padding:6px 8px;border-bottom:1px solid #D4CFC2">Pieces</th>'
-         +  '<th style="text-align:right;padding:6px 4px;border-bottom:1px solid #D4CFC2">Combined</th>'
+         +  '<th style="text-align:right;padding:6px 4px;border-bottom:1px solid #D4CFC2">Result</th>'
          +  '</tr></thead><tbody>';
     _mergeProposals.forEach(function(pr, i){
       var checked = _mergeSelected[i] ? 'checked' : '';
-      var piecesText = pr.shortDims.join(' + ') + ' mm';
+      var piecesText = pr.dims.join(' + ') + ' mm';
+      // Mode badge: ↔ widthwise (side-by-side), ↕ lengthwise (end-to-end)
+      var isLen = pr.mode === 'length';
+      var badge = isLen
+        ? '<span title="Joined end-to-end (same width, different lengths)" style="font-size:9px;background:#E2EDE5;color:#2C5640;padding:1px 5px;border-radius:3px;white-space:nowrap">↕ length</span>'
+        : '<span title="Stacked side-by-side (same length, narrow widths)" style="font-size:9px;background:#FCE6CE;color:#5C3A1A;padding:1px 5px;border-radius:3px;white-space:nowrap">↔ width</span>';
+      // Result dims: width-mode → shared(L) × combined(W); length-mode → combined(L) × shared(W)
+      var resultDims = isLen ? (pr.combined + '×' + pr.shared) : (pr.shared + '×' + pr.combined);
       html += '<tr style="border-bottom:1px solid #EAE6DC">'
            +  '<td style="padding:7px 4px"><input type="checkbox" '+checked+' onchange="_mergeSelected['+i+']=this.checked;updateMergeSummary()" style="cursor:pointer;accent-color:#8B5A2B;width:auto"></td>'
-           +  '<td style="padding:7px 4px"><div style="font-weight:600">'+esc(pr.mat)+'</div><div style="font-size:10px;color:#A09888">'+(pr.thick||'?')+'mm thick</div></td>'
-           +  '<td style="text-align:right;padding:7px 4px;font-family:monospace;font-weight:600">'+pr.longDim+' mm</td>'
+           +  '<td style="padding:7px 4px"><div style="font-weight:600">'+esc(pr.mat)+'</div><div style="font-size:10px;color:#A09888">'+(pr.thick||'?')+'mm · '+badge+'</div></td>'
+           +  '<td style="padding:7px 4px;font-family:monospace;font-size:11px">'+esc(pr.sharedLabel)+'</td>'
            +  '<td style="padding:7px 8px;font-family:monospace;font-size:11px;color:#6B6455">'+esc(piecesText)+'</td>'
-           +  '<td style="text-align:right;padding:7px 4px;font-family:monospace"><b>'+pr.combinedShort+' mm</b><div style="font-size:9px;color:#A09888">'+pr.parts.length+' pcs · '+pr.kerf+'mm kerf</div></td>'
+           +  '<td style="text-align:right;padding:7px 4px;font-family:monospace"><b>'+resultDims+'</b><div style="font-size:9px;color:#A09888">'+pr.parts.length+' pcs · '+pr.kerf+'mm kerf</div></td>'
            +  '</tr>';
     });
     html += '</tbody></table></div>';
@@ -4035,8 +4078,9 @@ function renderMergeBody(){
   if (!existing.length && !_mergeProposals.length){
     html = '<div style="padding:30px;text-align:center;color:#A09888;font-size:13px">'
          + 'No merged strips yet, and no mergeable parts found.<br><br>'
-         + '<span style="font-size:11px">Candidates need: one dimension ≤ ' + MERGE_NARROW_THRESHOLD + 'mm, '
-         + 'matching length, material, and thickness, and at least one other partner.</span></div>';
+         + '<span style="font-size:11px">Width-merge needs narrow parts (≤' + MERGE_NARROW_THRESHOLD + 'mm) sharing a length. '
+         + 'Length-merge needs strip parts (≤' + MERGE_STRIP_MAX + 'mm wide) sharing a width. '
+         + 'Same material &amp; thickness, ≥2 parts.</span></div>';
   }
   body.innerHTML = html;
   // Toggle apply-button state based on whether there are proposals
@@ -4071,21 +4115,28 @@ function applyMerges(){
   _mergeProposals.forEach(function(pr, i){
     if (!_mergeSelected[i]) return;
     // Build a single merged "virtual" part replacing the constituents.
-    var sumShort = pr.combinedShort;   // sum of widths + kerf*(n-1)
-    var longDim  = pr.parts.reduce(function(m, p){ return Math.max(m, Math.max(p.l, p.w)); }, 0);
-    // Use the longer dimension as L (length) and the combined as W (width).
-    // This matches the natural cutting orientation: the operator rips along
-    // the length to separate the strips.
+    // Dimensions depend on the merge mode:
+    //   • width  — parts share length (pr.shared), widths summed (pr.combined).
+    //              Result: l = shared length, w = combined width.
+    //              Segments run along the W axis → __mergedAxis = 'w'.
+    //   • length — parts share width (pr.shared), lengths summed (pr.combined).
+    //              Result: l = combined length, w = shared width.
+    //              Segments run along the L axis → __mergedAxis = 'l'.
+    var isLen = pr.mode === 'length';
+    var mergedL = isLen ? pr.combined : pr.shared;
+    var mergedW = isLen ? pr.shared   : pr.combined;
     var merged = {
       id: 'merged_' + Date.now() + '_' + i,
       __merged: true,
       __mergedFrom: pr.parts.slice(),         // keep references for un-merge
       __mergedKerf: pr.kerf,
-      __mergedShorts: pr.shortDims.slice(),
+      __mergedShorts: pr.dims.slice(),        // segment sizes along the merge axis
+      __mergedAxis: isLen ? 'l' : 'w',        // which local axis the cuts run along
+      __mergedMode: pr.mode,
       name: 'MERGED ×' + pr.parts.length,
       origName: pr.parts.map(function(p){return p.origName||p.name;}).join(' + '),
-      l: longDim,
-      w: sumShort,
+      l: mergedL,
+      w: mergedW,
       mat: pr.mat,
       thick: pr.thick,
       eb: {eb1:'',eb2:'',eb3:'',eb4:''},   // merged strip itself has no edgeband
@@ -4523,14 +4574,14 @@ function optimize(){
   // Total runs per strategy: 5 → ~30 runs total per material. Still fast (<1s
   // for typical sheets), and consistently better packing on mixed orientations.
   function tryAllStrategies(partsList, uw, uh, kerf, color, usedTrim, grainLocked){
-    var bestLayouts=null, bestEff=-1, bestPlacedIds=null;
+    var bestLayouts=null, bestEff=-1, bestPlacedIds=null, bestBboxArea=Infinity;
     // Build id→original-part map once so we can re-link placements after
     // packing on cloned-with-swapped-dims lists (otherwise the placement's
     // .part references a temporary clone, which breaks rendering / labels).
     var originalById = {};
     partsList.forEach(function(p){ originalById[String(p.id)] = p; });
-    function evaluate(input){
-      var res=pack(uw, uh, input, kerf, color, 0, usedTrim, grainLocked);
+    function evaluate(input, placeMode){
+      var res=pack(uw, uh, input, kerf, color, 0, usedTrim, grainLocked, placeMode);
       // Re-link placements to original part objects (same id, different reference)
       res.forEach(function(l){
         l.placements.forEach(function(pl){
@@ -4544,9 +4595,27 @@ function optimize(){
       var tot=res.reduce(function(a,l){return a+l.uw*l.uh;},0);
       var e=tot>0?used/tot:0;
       var placedCount=res.reduce(function(a,l){return a+l.placements.length;},0);
+      // Consolidation score: total bounding-box area of placed parts across all
+      // sheets. A tighter packing (waste collected into one clean strip) has a
+      // SMALLER bbox. Used only as a tiebreaker when sheet count and efficiency
+      // are equal, so it never sacrifices fit — just picks the cleaner layout.
+      var bboxArea=0;
+      res.forEach(function(l){
+        if(!l.placements.length) return;
+        var minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+        l.placements.forEach(function(p){
+          if(p.x<minX)minX=p.x; if(p.y<minY)minY=p.y;
+          if(p.x+p.pw>maxX)maxX=p.x+p.pw; if(p.y+p.ph>maxY)maxY=p.y+p.ph;
+        });
+        bboxArea += (maxX-minX)*(maxY-minY);
+      });
       var bestPlacedCount=bestLayouts?bestLayouts.reduce(function(a,l){return a+l.placements.length;},0):-1;
-      if((placedCount>bestPlacedCount) || (placedCount===bestPlacedCount && e>bestEff)){
-        bestEff=e; bestLayouts=res;
+      var EPS=1e-6;
+      var better = (placedCount>bestPlacedCount)
+                || (placedCount===bestPlacedCount && e>bestEff+EPS)
+                || (placedCount===bestPlacedCount && Math.abs(e-bestEff)<=EPS && bboxArea < (typeof bestBboxArea==='undefined'?Infinity:bestBboxArea));
+      if(better){
+        bestEff=e; bestLayouts=res; bestBboxArea=bboxArea;
         var ids={};
         res.forEach(function(l){l.placements.forEach(function(pl){ids[pl.part.id]=true;});});
         bestPlacedIds=ids;
@@ -4587,17 +4656,23 @@ function optimize(){
         return clone;
       });
     }
+    // Try every ordering strategy under BOTH placement heuristics (BSSF and
+    // Bottom-Left). The best-scoring result across all combinations wins, so
+    // adding BL only ever helps. To keep runtime reasonable we run the full
+    // orientation sweep under BSSF, and the most useful orientation seeds
+    // under BL (as-is + horizontal + vertical).
     strategies.forEach(function(sfn){
-      // v0: as-is
-      evaluate(partsList.slice().sort(sfn));
-      // v1: all-horizontal seed
-      evaluate(reorient(partsList, 'h').sort(sfn));
-      // v2: all-vertical seed
-      evaluate(reorient(partsList, 'v').sort(sfn));
-      // vR1, vR2, vR3: random seeds (deterministic — same project always packs same way)
-      evaluate(reorient(partsList, 'rand', 1).sort(sfn));
-      evaluate(reorient(partsList, 'rand', 31337).sort(sfn));
-      evaluate(reorient(partsList, 'rand', 987654321).sort(sfn));
+      // BSSF (default): full orientation sweep
+      evaluate(partsList.slice().sort(sfn), 'bssf');
+      evaluate(reorient(partsList, 'h').sort(sfn), 'bssf');
+      evaluate(reorient(partsList, 'v').sort(sfn), 'bssf');
+      evaluate(reorient(partsList, 'rand', 1).sort(sfn), 'bssf');
+      evaluate(reorient(partsList, 'rand', 31337).sort(sfn), 'bssf');
+      evaluate(reorient(partsList, 'rand', 987654321).sort(sfn), 'bssf');
+      // Bottom-Left fill: tends to consolidate waste into one clean region
+      evaluate(partsList.slice().sort(sfn), 'bl');
+      evaluate(reorient(partsList, 'h').sort(sfn), 'bl');
+      evaluate(reorient(partsList, 'v').sort(sfn), 'bl');
     });
     // Grid-fill strategy: explicitly tries "split board into bands of identical
     // parts" pattern. Only runs when there are 1-3 distinct part sizes (otherwise
@@ -4973,7 +5048,8 @@ function _packGroupTight(members, kerf){
   });
 }
 
-function pack(UW, UH, partsIn, kerf, color, _ignoredMaxSheets, trim, grainLocked){
+function pack(UW, UH, partsIn, kerf, color, _ignoredMaxSheets, trim, grainLocked, placeMode){
+  placeMode = placeMode || 'bssf';
   // ── GROUP COHESION (super-parts) ────────────────────────────────────
   // Each group is pre-packed into a tight rectangle and treated as a single
   // unit during the main packing. After packing finishes we expand super-parts
@@ -5071,13 +5147,24 @@ function pack(UW, UH, partsIn, kerf, color, _ignoredMaxSheets, trim, grainLocked
         for (var fi = 0; fi < free.length; fi++){
           var fr = free[fi];
           if (pw <= fr.w && ph <= fr.h){
-            // Best-Short-Side-Fit: primary score is shorter leftover side;
-            // secondary is longer leftover side (tiebreak)
             var leftW = fr.w - pw, leftH = fr.h - ph;
-            var shortSide = Math.min(leftW, leftH);
-            var longSide  = Math.max(leftW, leftH);
+            // Two placement heuristics (chosen via placeMode):
+            //  • 'bl'   Bottom-Left-Fill — primary score is the candidate's
+            //           position (lowest y, then lowest x). Dense, clean packing
+            //           that consolidates waste into one region.
+            //  • 'bssf' Best-Short-Side-Fit (default) — primary score is the
+            //           smaller leftover side; good at squeezing odd gaps.
+            // The optimizer runs BOTH and keeps whichever wastes less, so adding
+            // BL can only improve results.
+            var score1, score2;
+            if (placeMode === 'bl'){
+              score1 = fr.y;
+              score2 = fr.x;
+            } else {
+              score1 = Math.min(leftW, leftH);
+              score2 = Math.max(leftW, leftH);
+            }
             // Tertiary tiebreaker: prefer bottom-left placement (lower x+y).
-            // Forces tight packing along board origin instead of "floating" center placements.
             var positionTiebreak = fr.x + fr.y;
             // Group bonus: parts in the same group prefer to stay adjacent
             if (p.groupId){
@@ -5092,25 +5179,22 @@ function pack(UW, UH, partsIn, kerf, color, _ignoredMaxSheets, trim, grainLocked
                                  && !(plR < fr.x || frR < pl.x);
                 return horizTouch || vertTouch;
               });
-              if (adj) shortSide -= 10000; // strong preference to stay together
+              if (adj) score1 -= 10000; // strong preference to stay together
               // Even when not edge-adjacent, prefer positions closer to the
-              // group's centroid. This catches the case where the BSSF "best
-              // fit" rect is on the far side of the board — the proximity
-              // tiebreaker beats it back toward the cluster.
-              if (groupCentroid){
+              // group's centroid (BSSF mode only — BL already clusters tightly).
+              if (groupCentroid && placeMode !== 'bl'){
                 var dx = (fr.x + pw/2) - groupCentroid.x;
                 var dy = (fr.y + ph/2) - groupCentroid.y;
-                // Override positionTiebreak with group-distance for grouped parts
                 positionTiebreak = Math.sqrt(dx*dx + dy*dy);
               }
             }
             // Pick if score better OR tied scores but better position
-            var betterScore = shortSide < best.score1 || (shortSide === best.score1 && longSide < best.score2);
-            var sameScore = shortSide === best.score1 && longSide === best.score2;
+            var betterScore = score1 < best.score1 || (score1 === best.score1 && score2 < best.score2);
+            var sameScore = score1 === best.score1 && score2 === best.score2;
             var betterPosition = sameScore && positionTiebreak < (best.posTiebreak || Infinity);
             if (betterScore || betterPosition){
               best = {
-                score1: shortSide, score2: longSide, posTiebreak: positionTiebreak,
+                score1: score1, score2: score2, posTiebreak: positionTiebreak,
                 x: fr.x, y: fr.y,
                 pw: t[0], ph: t[1],
                 rot: t[2], found: true
@@ -5246,6 +5330,20 @@ function pack(UW, UH, partsIn, kerf, color, _ignoredMaxSheets, trim, grainLocked
       L.placements = expanded;
     });
   }
+  // ── BOTTOM-LEFT ORIGIN: mirror Y so parts settle at the bottom ──────
+  // The Maximal-Rectangles packer fills from the top-left, leaving any
+  // partial/empty area toward the bottom. We mirror every placement's Y so
+  // the dense cluster ends up at the BOTTOM-left (matching the (0,0) register
+  // point / CNC convention) and the leftover space collects at the TOP as a
+  // clean full-length strip — the most reusable offcut shape. All downstream
+  // code (render, drag, DXF export, labels) reads the mirrored Y uniformly,
+  // so this single transform keeps everything consistent.
+  out.forEach(function(L){
+    var H = L.uh;
+    L.placements.forEach(function(pl){
+      pl.y = H - pl.y - pl.ph;
+    });
+  });
   return out;
 }
 
@@ -5586,13 +5684,12 @@ function draw(lay){
       ctx.lineWidth=isSel?2.5:isDragged?2:1;ctx.strokeRect(x+.5,y+.5,w-1,h-1);
     }
     // ── MERGED STRIP: internal saw-cut markers ────────────────────
-    // Draw a dashed line where the operator should saw between each
-    // piece, plus a small ✂ label. Cut positions are derived from the
-    // stored __mergedShorts widths + __mergedKerf gap.
+    // Draw a dashed line where the operator should saw between each piece,
+    // plus a small ✂ label. Positions come from __mergedShorts (+ kerf).
+    // Cuts run perpendicular to the merge axis (__mergedAxis: 'w' or 'l').
     if (isMerged && p.part.__mergedShorts && p.part.__mergedShorts.length > 1){
       var shorts = p.part.__mergedShorts;
       var k = p.part.__mergedKerf || 0;
-      // Compute cumulative cut positions in mm (along the combined "W" axis)
       var cutPositions = [];
       var offset = 0;
       for (var ms = 0; ms < shorts.length - 1; ms++){
@@ -5600,23 +5697,24 @@ function draw(lay){
         cutPositions.push(offset + k/2);  // middle of the kerf gap
         offset += k;
       }
-      // Rotation: when not rotated, pw=merged.l, ph=merged.w → cuts are
-      // HORIZONTAL at varying Y. When rotated, cuts are VERTICAL at varying X.
+      // Determine orientation. A cut along the 'w' axis is horizontal when the
+      // part is NOT rotated; rotation flips it. Same logic inverted for 'l'.
+      // horizontal iff (axis is 'w') XOR (placement rotated).
+      var isW = (p.part.__mergedAxis !== 'l');   // default 'w' (back-compat)
+      var horizontal = (isW !== !!p.rot);
       ctx.save();
-      ctx.strokeStyle = '#5C3A1A';  // dark brown — high contrast on the merged fill
+      ctx.strokeStyle = '#5C3A1A';
       ctx.lineWidth = 1.5;
       ctx.setLineDash([5, 4]);
       cutPositions.forEach(function(cp){
         var cpx = cp * SC;
         ctx.beginPath();
-        if (p.rot){
-          // W axis = canvas X
-          ctx.moveTo(x + cpx, y + 2);
-          ctx.lineTo(x + cpx, y + h - 2);
-        } else {
-          // W axis = canvas Y
+        if (horizontal){
           ctx.moveTo(x + 2,     y + cpx);
           ctx.lineTo(x + w - 2, y + cpx);
+        } else {
+          ctx.moveTo(x + cpx, y + 2);
+          ctx.lineTo(x + cpx, y + h - 2);
         }
         ctx.stroke();
       });
@@ -5627,8 +5725,8 @@ function draw(lay){
         ctx.fillStyle = '#5C3A1A';
         ctx.font = 'bold 10px sans-serif';
         ctx.textBaseline = 'middle';
-        if (p.rot){ ctx.textAlign='center'; ctx.fillText('✂', x + first, y + 8); }
-        else      { ctx.textAlign='left';   ctx.fillText('✂', x + 4,     y + first); }
+        if (horizontal){ ctx.textAlign='left';   ctx.fillText('✂', x + 4,     y + first); }
+        else           { ctx.textAlign='center'; ctx.fillText('✂', x + first, y + 8); }
       }
       ctx.restore();
     }
