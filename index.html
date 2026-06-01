@@ -4070,6 +4070,15 @@ function applyMerges(){
     renderParts();
     scheduleSave();
     setStatus && setStatus('ok', '✓ Merged ' + applied + ' block(s)');
+    // Auto re-run Optimize so the merged strips appear on their material's
+    // sheet immediately. Without this, the existing layout still references
+    // the original (now-removed) constituents and looks "empty" or broken.
+    // Bypass optimize()'s drift-confirmation prompt since merging is itself
+    // a destructive parts-list change — the user already opted into it.
+    if (layouts.length){
+      _autoVersionFp = null;  // suppress "manual changes" confirm
+      setTimeout(function(){ optimize(); }, 30);
+    }
   }
 }
 
@@ -4088,6 +4097,12 @@ function unmergePart(id){
   });
   renderParts();
   scheduleSave();
+  // If there's an existing layout, re-run Optimize so the restored individual
+  // parts appear on the sheet (the layout no longer references the merged strip).
+  if (layouts.length){
+    _autoVersionFp = null;
+    setTimeout(function(){ optimize(); }, 30);
+  }
 }
 
 function renderGroups(){
