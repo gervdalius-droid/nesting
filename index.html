@@ -447,8 +447,12 @@ body.print-mode{background:#fff}
   <div>
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px">
       <div class="sec" data-i18n="materialBoards" style="margin:0">Material Boards</div>
-      <button class="sec-add-board" onclick="addBoard()"><span style="font-size:14px">＋</span> <span data-i18n="addBoardBtn">Add board</span></button>
+      <div style="display:flex;gap:4px">
+        <button class="sec-add-board" onclick="document.getElementById('scrapBoardIn').click()" title="Import a scrap/offcut DXF and use it as a board for nesting" style="color:#8B5A2B;border-color:#8B5A2B">♻ Scrap</button>
+        <button class="sec-add-board" onclick="addBoard()"><span style="font-size:14px">＋</span> <span data-i18n="addBoardBtn">Add board</span></button>
+      </div>
     </div>
+    <input type="file" id="scrapBoardIn" accept=".dxf,.DXF" style="display:none" onchange="loadScrapBoard(this)">
     <div id="blist"></div>
     <div id="bempty" data-i18n="importHint" style="font-size:11px;color:#A09888;text-align:center;padding:10px;border:1px dashed #D4CFC2;border-radius:8px">Import parts → boards auto-created</div>
   </div>
@@ -674,6 +678,7 @@ body.print-mode{background:#fff}
   <div class="pw-foot">
     <span id="pw-sel-count" style="font-size:11px;color:#6B6455;font-family:monospace"></span>
     <button class="btn bs" onclick="pwSwapSelected()" title="Swap L and W for all selected parts (also rotates DXF shapes 90°)">⇆ Swap L/W</button>
+    <button class="btn bs" onclick="pwMergeSelected()" title="Merge the selected parts into one strip (they must share a width or a length)" style="color:#8B5A2B;border-color:#8B5A2B">🔗 Merge selected</button>
     <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
       <span style="font-size:11px;color:#6B6455">Assign selected to group:</span>
       <select id="pw-grp-assign" style="font-size:11px;padding:3px 6px;width:auto"><option value="">— choose —</option></select>
@@ -2857,6 +2862,7 @@ function parseDXFText(text){
       idx++;continue;
     }
     if(!cur){idx++;continue;}
+    if(c===8){cur.layer=v;idx++;continue;}  // layer name — common to all entity types
     if(cur.type==='LINE'){
       if(c===10)cur.x1=parseFloat(v);
       else if(c===20)cur.y1=parseFloat(v);
@@ -3618,36 +3624,36 @@ function pwToggleAll(checked){
   else filteredPwParts().forEach(function(p){pwSel.delete(String(p.id));});
   renderPartsWindow();
 }
-function filteredPwParts(){
-  // Refresh the materials dropdown so it always reflects the current set of
-  // materials in parts AND in boards (in case a board was added but no part uses it yet).
-  // Materials are normalized (whitespace collapsed) so subtle "X Y" vs "X  Y"
-  // entries can't cause duplicates or filter mismatches.
-  var matSet={};
-  parts.forEach(function(p){
-    var n=normalizeMat(p.mat);
-    if(n) matSet[n]=true;
-  });
-  boards.forEach(function(b){
-    var n=normalizeMat(b.mat);
-    if(n) matSet[n]=true;
-  });
-  var mats=Object.keys(matSet).sort();
+// Rebuild the material filter dropdown from current parts + boards, preserving
+// the user's current selection. Kept SEPARATE from filtering so a re-render
+// (e.g. on every search keystroke) can't silently reset the chosen material.
+function refreshPwMatDropdown(){
   var ms=document.getElementById('pw-mat');
-  if(ms){
-    var curMat=ms.value;
-    ms.innerHTML='<option value="">All materials</option>'+mats.map(function(m){return'<option value="'+esc(m)+'">'+esc(m)+'</option>';}).join('');
-    // Restore previous selection if it still exists; otherwise reset to All
-    if(curMat && mats.indexOf(curMat)>=0) ms.value=curMat;
-    else ms.value='';
-  }
-  var search=(document.getElementById('pw-search').value||'').toLowerCase();
-  var matF=document.getElementById('pw-mat').value;       // already normalized (it came from matSet)
+  if(!ms) return;
+  var matSet={};
+  parts.forEach(function(p){ var n=normalizeMat(p.mat); if(n) matSet[n]=true; });
+  boards.forEach(function(b){ var n=normalizeMat(b.mat); if(n) matSet[n]=true; });
+  var mats=Object.keys(matSet).sort();
+  var curMat=ms.value;
+  ms.innerHTML='<option value="">All materials</option>'+mats.map(function(m){return'<option value="'+esc(m)+'">'+esc(m)+'</option>';}).join('');
+  ms.value=(curMat && mats.indexOf(curMat)>=0) ? curMat : '';
+}
+function filteredPwParts(){
+  // Pure filter — reads the current filter inputs and returns matching parts.
+  // (The material dropdown is refreshed separately in renderPartsWindow.)
+  var search=(document.getElementById('pw-search').value||'').trim().toLowerCase();
+  var matF=document.getElementById('pw-mat').value;       // normalized (built from matSet)
   var grpF=document.getElementById('pw-grp').value;
   var grpOnly=document.getElementById('pw-grouped').checked;
+  // Allow multi-word search: every term must appear somewhere in the part's
+  // name / material (so "oak 600" matches a 600-long oak part).
+  var terms=search?search.split(/\s+/):[];
   var filtered=parts.filter(function(p){
-    if(search&&p.origName.toLowerCase().indexOf(search)<0)return false;
-    // Compare normalized to avoid whitespace mismatches between dropdown value and stored part.mat
+    if(terms.length){
+      var hay=((p.origName||p.name||'')+' '+(p.mat||'')+' '+p.l+'x'+p.w+' '+(p.thick||'')).toLowerCase();
+      for(var t=0;t<terms.length;t++){ if(hay.indexOf(terms[t])<0) return false; }
+    }
+    // Normalized material comparison avoids whitespace mismatches.
     if(matF && normalizeMat(p.mat)!==matF) return false;
     if(grpF==='__none__'&&p.groupId)return false;
     if(grpF&&grpF!=='__none__'&&String(p.groupId)!==grpF)return false;
@@ -3658,12 +3664,13 @@ function filteredPwParts(){
     if(_pwSort==='l')return b.l-a.l;
     if(_pwSort==='w')return b.w-a.w;
     if(_pwSort==='area')return(b.l*b.w)-(a.l*a.w);
-    if(_pwSort==='mat')return a.mat.localeCompare(b.mat);
-    return a.origName.localeCompare(b.origName);
+    if(_pwSort==='mat')return String(a.mat||'').localeCompare(String(b.mat||''));
+    return String(a.origName||a.name||'').localeCompare(String(b.origName||b.name||''));
   });
   return filtered;
 }
 function renderPartsWindow(){
+  refreshPwMatDropdown();
   var filteredAll=filteredPwParts();
   // Deduplicate by group key so identical parts show as ONE row
   // (Qty column reflects how many copies exist). Keep the first occurrence
@@ -4157,12 +4164,17 @@ function findMergeCandidates(){
 function openMergeDialog(){
   if (!parts.length){ alert('No parts loaded.'); return; }
   _mergeProposals = findMergeCandidates();
-  _mergeSelected  = {};
-  _mergeProposals.forEach(function(_, i){ _mergeSelected[i] = true; }); // pre-select all
+  _mergeSelected  = {};   // start with NOTHING selected — user opts in via checkboxes / Select all
   // The dialog always opens — even when there are no proposals — because
   // it now also shows existing merged strips for un-merge.
   renderMergeBody();
   document.getElementById('merge-panel').classList.add('open');
+}
+
+// Master toggle for the proposals list
+function mergeToggleAll(checked){
+  _mergeProposals.forEach(function(_, i){ _mergeSelected[i] = !!checked; });
+  renderMergeBody();
 }
 
 function renderMergeBody(){
@@ -4193,8 +4205,12 @@ function renderMergeBody(){
   }
   // Section 2: new merge proposals
   if (_mergeProposals.length){
+    var allChecked = _mergeProposals.length>0 && _mergeProposals.every(function(_, i){ return _mergeSelected[i]; });
     html += '<div style="padding:'+(existing.length?'14px':'10px')+' 14px 0 14px;'+(existing.length?'border-top:1px solid #D4CFC2;margin-top:8px':'')+'">'
-         +  '<div style="font-size:10px;font-weight:600;color:#3D6B4F;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">+ New merge proposals ('+_mergeProposals.length+')</div>'
+         +  '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">'
+         +    '<div style="font-size:10px;font-weight:600;color:#3D6B4F;text-transform:uppercase;letter-spacing:.05em">+ New merge proposals ('+_mergeProposals.length+')</div>'
+         +    '<label style="display:flex;align-items:center;gap:5px;font-size:11px;color:#6B6455;cursor:pointer"><input type="checkbox" '+(allChecked?'checked':'')+' onchange="mergeToggleAll(this.checked)" style="width:auto;accent-color:#8B5A2B;cursor:pointer"> Select all</label>'
+         +  '</div>'
          +  '<table style="width:100%;border-collapse:collapse;font-size:12px">'
          +  '<thead><tr style="color:#A09888;font-size:10px;text-transform:uppercase;letter-spacing:.04em">'
          +  '<th style="text-align:left;padding:6px 4px;border-bottom:1px solid #D4CFC2;width:30px"></th>'
@@ -4259,62 +4275,103 @@ function closeMergeDialog(){
   document.getElementById('merge-panel').classList.remove('open');
 }
 
+// Build a merged "virtual" part from a set of constituents along a given axis.
+// mode 'width'  → shared length, summed widths  (segments along W, cuts horizontal)
+// mode 'length' → shared width,  summed lengths (segments along L, cuts vertical)
+// Returns the merged part object (does NOT touch the parts array).
+function _buildMergedPart(constituents, mode, kerf, idSuffix){
+  var isLen = mode === 'length';
+  // Segment sizes along the merge axis + the shared (cross) dimension.
+  var dims = constituents.map(function(p){ return isLen ? Math.max(p.l,p.w) : Math.min(p.l,p.w); });
+  var shared = isLen
+    ? Math.max.apply(null, constituents.map(function(p){ return Math.min(p.l,p.w); }))  // widest strip width
+    : Math.max.apply(null, constituents.map(function(p){ return Math.max(p.l,p.w); })); // longest shared length
+  var combined = dims.reduce(function(a,d){ return a+d; }, 0) + kerf*(constituents.length-1);
+  var mergedL = isLen ? combined : shared;
+  var mergedW = isLen ? shared   : combined;
+  return {
+    id: 'merged_' + Date.now() + '_' + (idSuffix||0) + '_' + Math.random().toString(36).slice(2,6),
+    __merged: true,
+    __mergedFrom: constituents.slice(),
+    __mergedKerf: kerf,
+    __mergedShorts: dims.slice(),
+    __mergedAxis: isLen ? 'l' : 'w',
+    __mergedMode: mode,
+    name: 'MERGED ×' + constituents.length,
+    origName: constituents.map(function(p){return p.origName||p.name;}).join(' + '),
+    l: mergedL, w: mergedW,
+    mat: constituents[0].mat, thick: constituents[0].thick,
+    eb: {eb1:'',eb2:'',eb3:'',eb4:''}, op1:'', op2:'', hasCNC:false, labelRange:'', printed:false
+  };
+}
+
+// Shared post-merge: remove originals, add merged parts, re-render, re-optimize.
+function _commitMerges(mergedParts, removeIds){
+  parts = parts.filter(function(p){ return !removeIds[p.id]; });
+  mergedParts.forEach(function(m){ parts.push(m); });
+  renderParts();
+  scheduleSave();
+  if (layouts.length){
+    _autoVersionFp = null;  // suppress "manual changes" confirm
+    setTimeout(function(){ optimize(); }, 30);
+  }
+}
+
 function applyMerges(){
-  var applied = 0;
+  var anySelected = _mergeProposals.some(function(_, i){ return _mergeSelected[i]; });
+  if (!anySelected){ alert('Nothing selected. Tick the proposals you want to merge (or use "Select all").'); return; }
+  var mergedParts = [], removeIds = {}, applied = 0;
   _mergeProposals.forEach(function(pr, i){
     if (!_mergeSelected[i]) return;
-    // Build a single merged "virtual" part replacing the constituents.
-    // Dimensions depend on the merge mode:
-    //   • width  — parts share length (pr.shared), widths summed (pr.combined).
-    //              Result: l = shared length, w = combined width.
-    //              Segments run along the W axis → __mergedAxis = 'w'.
-    //   • length — parts share width (pr.shared), lengths summed (pr.combined).
-    //              Result: l = combined length, w = shared width.
-    //              Segments run along the L axis → __mergedAxis = 'l'.
-    var isLen = pr.mode === 'length';
-    var mergedL = isLen ? pr.combined : pr.shared;
-    var mergedW = isLen ? pr.shared   : pr.combined;
-    var merged = {
-      id: 'merged_' + Date.now() + '_' + i,
-      __merged: true,
-      __mergedFrom: pr.parts.slice(),         // keep references for un-merge
-      __mergedKerf: pr.kerf,
-      __mergedShorts: pr.dims.slice(),        // segment sizes along the merge axis
-      __mergedAxis: isLen ? 'l' : 'w',        // which local axis the cuts run along
-      __mergedMode: pr.mode,
-      name: 'MERGED ×' + pr.parts.length,
-      origName: pr.parts.map(function(p){return p.origName||p.name;}).join(' + '),
-      l: mergedL,
-      w: mergedW,
-      mat: pr.mat,
-      thick: pr.thick,
-      eb: {eb1:'',eb2:'',eb3:'',eb4:''},   // merged strip itself has no edgeband
-      op1: '', op2: '', hasCNC: false,
-      labelRange: '',
-      printed: false
-    };
-    // Remove constituents from parts list and add the merged part
-    var idsToRemove = {};
-    pr.parts.forEach(function(p){ idsToRemove[p.id] = true; });
-    parts = parts.filter(function(p){ return !idsToRemove[p.id]; });
-    parts.push(merged);
+    var merged = _buildMergedPart(pr.parts, pr.mode, pr.kerf, i);
+    pr.parts.forEach(function(p){ removeIds[p.id] = true; });
+    mergedParts.push(merged);
     applied++;
   });
   closeMergeDialog();
   if (applied > 0){
-    renderParts();
-    scheduleSave();
+    _commitMerges(mergedParts, removeIds);
     setStatus && setStatus('ok', '✓ Merged ' + applied + ' block(s)');
-    // Auto re-run Optimize so the merged strips appear on their material's
-    // sheet immediately. Without this, the existing layout still references
-    // the original (now-removed) constituents and looks "empty" or broken.
-    // Bypass optimize()'s drift-confirmation prompt since merging is itself
-    // a destructive parts-list change — the user already opted into it.
-    if (layouts.length){
-      _autoVersionFp = null;  // suppress "manual changes" confirm
-      setTimeout(function(){ optimize(); }, 30);
-    }
   }
+}
+
+// ── Manual merge from the Parts Manager: merge the currently-checked parts ──
+// The selected parts must share material + thickness, and share ONE dimension
+// (all same width → join lengthwise; all same length → join widthwise) so the
+// result is a clean strip. Otherwise we explain what's needed.
+function pwMergeSelected(){
+  var sel = parts.filter(function(p){ return pwSel.has(String(p.id)) && !p.__merged; });
+  if (sel.length < 2){ alert('Select at least 2 parts to merge (merged strips and grouped parts are excluded).'); return; }
+  // Same material + thickness required
+  var mat0 = normalizeMat(sel[0].mat), th0 = sel[0].thick||0;
+  var sameMat = sel.every(function(p){ return normalizeMat(p.mat)===mat0 && (p.thick||0)===th0; });
+  if (!sameMat){ alert('All selected parts must share the same material and thickness to merge.'); return; }
+  var kerf = parseInt((document.getElementById('kerf')||{}).value) || 3;
+  var TOL = 5; // mm tolerance for "same" dimension
+  function maxd(p){ return Math.max(p.l,p.w); }
+  function mind(p){ return Math.min(p.l,p.w); }
+  // Do they all share a width (min dim)? → length-merge. Or a length (max dim)? → width-merge.
+  var w0 = mind(sel[0]), l0 = maxd(sel[0]);
+  var sameWidth  = sel.every(function(p){ return Math.abs(mind(p)-w0) <= TOL; });
+  var sameLength = sel.every(function(p){ return Math.abs(maxd(p)-l0) <= TOL; });
+  var mode;
+  if (sameWidth)       mode = 'length'; // same width, varying length → join end-to-end
+  else if (sameLength) mode = 'width';  // same length, varying width → join side-by-side
+  else { alert('Selected parts must share one dimension to merge:\n• same WIDTH → joined end-to-end (longer strip), or\n• same LENGTH → joined side-by-side (wider strip).\n\nThe parts you picked don\'t share a common width or length (±'+TOL+'mm).'); return; }
+  // Cap check (sheet size for length-merge, 800mm for width-merge)
+  var combined = sel.reduce(function(a,p){ return a + (mode==='length'?maxd(p):mind(p)); }, 0) + kerf*(sel.length-1);
+  var cap = (mode==='length')
+    ? (function(){ var bd=matchBoard(sel[0].mat); return bd?Math.max(bd.w,bd.h):3000; })()
+    : MERGE_MAX_WIDTH;
+  if (combined > cap){
+    if (!confirm('The merged strip would be '+Math.round(combined)+'mm, which exceeds the usual limit of '+cap+'mm for this direction. Merge anyway?')) return;
+  }
+  var merged = _buildMergedPart(sel, mode, kerf, 'pw');
+  var removeIds = {}; sel.forEach(function(p){ removeIds[p.id] = true; });
+  pwSel.clear();
+  _commitMerges([merged], removeIds);
+  setStatus && setStatus('ok', '✓ Merged '+sel.length+' parts ('+(mode==='length'?'end-to-end':'side-by-side')+')');
+  if (document.getElementById('pw-overlay').classList.contains('open')) renderPartsWindow();
 }
 
 // Un-merge a single merged part back into its constituents.
@@ -4457,6 +4514,7 @@ function printScrapLabel(sheetIdx){
 
 function openScrapDialog(){
   if (!layouts.length){ alert('No layouts yet. Run Optimize first.'); return; }
+  _restoreScrapFoot();  // ensure export-mode header/footer (import flow reuses this panel)
   var body = document.getElementById('scrap-body');
   var rows = '';
   var grandArea = 0, sheetsWithScrap = 0;
@@ -4492,6 +4550,200 @@ function openScrapDialog(){
 
 function closeScrapDialog(){
   document.getElementById('scrap-panel').classList.remove('open');
+}
+
+// ═══════════════════════════════════════════════════════════════
+// IMPORT SCRAP DXF AS A BOARD
+// ═══════════════════════════════════════════════════════════════
+// Reads a DXF offcut outline and turns it into one or more rectangular boards
+// that parts can be nested onto. Rectilinear shapes (rectangles, L-shapes —
+// the usual offcut forms) are decomposed exactly into the largest usable
+// axis-aligned rectangles, so nested parts never overhang the real material.
+function loadScrapBoard(el){
+  if(!el.files||!el.files.length) return;
+  var file=el.files[0];
+  var reader=new FileReader();
+  reader.onload=function(){
+    try{ _ingestScrapDXF(String(reader.result||''), file.name); }
+    catch(e){ console.error(e); alert('Could not read that DXF: '+e.message); }
+    el.value=''; // allow re-importing the same file
+  };
+  reader.readAsText(file);
+}
+
+// Point-in-polygon (ray casting). poly = [{x,y},...]
+function _pointInPoly(x, y, poly){
+  var inside=false;
+  for(var i=0,j=poly.length-1;i<poly.length;j=i++){
+    var xi=poly[i].x, yi=poly[i].y, xj=poly[j].x, yj=poly[j].y;
+    var intersect=((yi>y)!==(yj>y)) && (x < (xj-xi)*(y-yi)/((yj-yi)||1e-9)+xi);
+    if(intersect) inside=!inside;
+  }
+  return inside;
+}
+
+// Decompose a closed polygon into usable axis-aligned rectangles. Exact for
+// rectilinear polygons; for shapes with diagonals it's a close grid approx.
+// Greedy "largest rectangle first" so we emit few, large boards.
+function _decomposeUsableRects(poly){
+  function uniq(arr){
+    var s=arr.slice().sort(function(a,b){return a-b;}), out=[];
+    s.forEach(function(v){ if(!out.length||Math.abs(v-out[out.length-1])>0.5) out.push(v); });
+    return out;
+  }
+  var xs=uniq(poly.map(function(p){return p.x;}));
+  var ys=uniq(poly.map(function(p){return p.y;}));
+  if(xs.length<2||ys.length<2) return [];
+  var nC=xs.length-1, nR=ys.length-1;
+  // inside[col][row]
+  var inside=[];
+  for(var c=0;c<nC;c++){
+    inside[c]=[];
+    for(var r=0;r<nR;r++){
+      var cx=(xs[c]+xs[c+1])/2, cy=(ys[r]+ys[r+1])/2;
+      inside[c][r]=_pointInPoly(cx,cy,poly);
+    }
+  }
+  var rects=[];
+  function cellArea(c0,r0,c1,r1){ return (xs[c1+1]-xs[c0])*(ys[r1+1]-ys[r0]); }
+  while(true){
+    // Find the largest all-inside, all-unused rectangle of cells
+    var best=null, bestA=0;
+    for(var c0=0;c0<nC;c0++){
+      for(var r0=0;r0<nR;r0++){
+        if(!inside[c0][r0]) continue;
+        // expand columns
+        var maxC=c0;
+        while(maxC+1<nC && inside[maxC+1][r0]) maxC++;
+        for(var c1=c0;c1<=maxC;c1++){
+          // expand rows for the column band [c0..c1]
+          var r1=r0;
+          outer: while(r1+1<nR){
+            for(var cc=c0;cc<=c1;cc++){ if(!inside[cc][r1+1]) break outer; }
+            r1++;
+          }
+          var a=cellArea(c0,r0,c1,r1);
+          if(a>bestA){ bestA=a; best={c0:c0,r0:r0,c1:c1,r1:r1}; }
+        }
+      }
+    }
+    if(!best) break;
+    // Emit rectangle, mark its cells used
+    for(var c=best.c0;c<=best.c1;c++) for(var r=best.r0;r<=best.r1;r++) inside[c][r]=false;
+    var rx=xs[best.c0], ry=ys[best.r0];
+    var rw=xs[best.c1+1]-rx, rh=ys[best.r1+1]-ry;
+    if(rw>=50 && rh>=50) rects.push({x:rx,y:ry,w:rw,h:rh}); // ignore slivers <50mm
+  }
+  return rects;
+}
+
+function _ingestScrapDXF(text, fileName){
+  var ents=parseDXFText(text);
+  if(!ents||!ents.length){ alert('No geometry found in that DXF.'); return; }
+  // Collect candidate rectangles: prefer closed polylines on an OFFCUT layer
+  // (from our own scrap export); otherwise use every closed polyline; otherwise
+  // fall back to the overall bounding box of all geometry.
+  var rects=[];
+  var offcutPolys=[], allPolys=[];
+  var minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+  ents.forEach(function(e){
+    var pts=null;
+    if((e.type==='LWPOLYLINE'||e.type==='POLYLINE') && e.vertices && e.vertices.length>=3){
+      pts=e.vertices.map(function(v){return {x:v.x,y:v.y};});
+    } else if(e.type==='LINE'){
+      [[e.x1,e.y1],[e.x2,e.y2]].forEach(function(p){ if(p[0]<minX)minX=p[0]; if(p[0]>maxX)maxX=p[0]; if(p[1]<minY)minY=p[1]; if(p[1]>maxY)maxY=p[1]; });
+    }
+    if(pts){
+      pts.forEach(function(p){ if(p.x<minX)minX=p.x; if(p.x>maxX)maxX=p.x; if(p.y<minY)minY=p.y; if(p.y>maxY)maxY=p.y; });
+      allPolys.push({pts:pts, layer:e.layer||''});
+      if(String(e.layer||'').toUpperCase()==='OFFCUT') offcutPolys.push(pts);
+    }
+  });
+  var usePolys = offcutPolys.length ? offcutPolys : allPolys.map(function(p){return p.pts;});
+  // If polygons present, decompose each into usable rectangles.
+  if(usePolys.length){
+    usePolys.forEach(function(poly){
+      // Normalise to origin so board coords start at 0
+      var pminX=Infinity,pminY=Infinity;
+      poly.forEach(function(p){ if(p.x<pminX)pminX=p.x; if(p.y<pminY)pminY=p.y; });
+      var norm=poly.map(function(p){return {x:p.x-pminX,y:p.y-pminY};});
+      var dec=_decomposeUsableRects(norm);
+      dec.forEach(function(r){ rects.push({w:Math.round(r.w), h:Math.round(r.h)}); });
+    });
+  }
+  // Fallback: overall bbox
+  if(!rects.length && isFinite(minX) && maxX>minX && maxY>minY){
+    rects.push({w:Math.round(maxX-minX), h:Math.round(maxY-minY)});
+  }
+  // Filter usable sizes & sort largest-first
+  rects=rects.filter(function(r){return r.w>=50 && r.h>=50;}).sort(function(a,b){return b.w*b.h-a.w*a.h;});
+  if(!rects.length){ alert('No usable rectangle ≥50mm found in that DXF.'); return; }
+  _openScrapBoardDialog(rects, fileName);
+}
+
+var _pendingScrapRects=null;
+function _openScrapBoardDialog(rects, fileName){
+  _pendingScrapRects=rects;
+  // Build a material dropdown from existing boards + a "new" option
+  var mats={}; boards.forEach(function(b){ mats[b.mat]=1; });
+  var matOpts=Object.keys(mats).map(function(m){return '<option value="'+esc(m)+'">'+esc(m)+'</option>';}).join('');
+  var rectList=rects.map(function(r,i){return '<div style="font-family:monospace;font-size:12px;padding:3px 0">'+(i+1)+'. '+r.w+' × '+r.h+' mm</div>';}).join('');
+  var body=document.getElementById('scrap-body');
+  // Reuse the scrap panel shell for the import confirm
+  document.getElementById('scrap-panel').classList.add('open');
+  document.querySelector('#scrap-panel .ga-head h3').textContent='Import scrap as board';
+  body.innerHTML='<div style="padding:12px 16px">'
+    +'<div style="font-size:12px;color:#6B6455;margin-bottom:10px">From <b>'+esc(fileName||'DXF')+'</b> — '+rects.length+' usable piece'+(rects.length>1?'s':'')+':</div>'
+    +'<div style="background:#FCFAF4;border:1px solid #EAE6DC;border-radius:8px;padding:8px 12px;margin-bottom:12px;max-height:120px;overflow-y:auto">'+rectList+'</div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'
+    +'<div><label class="fl">Material</label>'
+      +'<select id="scrapMatSel" style="width:100%" onchange="document.getElementById(\'scrapMatNew\').style.display=this.value===\'__new__\'?\'block\':\'none\'">'
+      + matOpts + '<option value="__new__">+ New material…</option></select>'
+      +'<input id="scrapMatNew" placeholder="New material name" style="width:100%;margin-top:5px;display:'+(matOpts?'none':'block')+'"></div>'
+    +'<div><label class="fl">Thickness mm</label><input id="scrapThick" type="number" value="18" min="1" style="width:100%"></div>'
+    +'</div></div>';
+  var foot=document.querySelector('#scrap-panel .ga-foot');
+  foot.innerHTML='<div style="flex:1;font-size:11px;color:#6B6455">Each piece becomes a board (qty 1) you can nest onto.</div>'
+    +'<button class="btn bp" onclick="confirmScrapBoard()" style="background:#8B5A2B;border-color:#8B5A2B">✓ Add board'+(rects.length>1?'s':'')+'</button>'
+    +'<button class="btn bs" onclick="closeScrapDialog();_restoreScrapFoot()">Cancel</button>';
+  if(!matOpts) document.getElementById('scrapMatSel').style.display='none';
+}
+
+function _restoreScrapFoot(){
+  // Restore the export-dialog footer/header after an import confirm/cancel
+  var head=document.querySelector('#scrap-panel .ga-head h3'); if(head) head.textContent='Reusable offcuts (scrap)';
+  var foot=document.querySelector('#scrap-panel .ga-foot');
+  if(foot) foot.innerHTML='<div style="flex:1;font-size:11px;color:#6B6455" id="scrap-summary"></div>'
+    +'<button class="btn bs" onclick="downloadScrapDXF(true)" title="DXF of offcuts on every sheet">⬇ DXF — all sheets</button>'
+    +'<button class="btn bs" onclick="closeScrapDialog()">Close</button>';
+}
+
+function confirmScrapBoard(){
+  if(!_pendingScrapRects||!_pendingScrapRects.length){ closeScrapDialog(); return; }
+  var sel=document.getElementById('scrapMatSel');
+  var mat;
+  if(!sel || sel.style.display==='none' || sel.value==='__new__'){
+    mat=(document.getElementById('scrapMatNew').value||'').trim();
+  } else {
+    mat=sel.value;
+  }
+  if(!mat){ mat='Scrap'; }
+  var thick=parseInt(document.getElementById('scrapThick').value,10)||18;
+  var added=0;
+  _pendingScrapRects.forEach(function(r,i){
+    boards.push({
+      id:bId++, mat:mat, w:r.w, h:r.h, qty:1,
+      color:COLORS[boards.length%COLORS.length], grain:false,
+      priceM2:0, priceMatMarkup:0, priceCutM:0, pricePart:0, priceEdge:0,
+      __scrap:true   // marks this board as a reclaimed offcut
+    });
+    added++;
+  });
+  _pendingScrapRects=null;
+  closeScrapDialog();
+  _restoreScrapFoot();
+  renderBoards(); refreshSel(); scheduleSave();
+  setStatus && setStatus('ok','✓ Added '+added+' scrap board'+(added>1?'s':''));
 }
 
 function renderGroups(){
