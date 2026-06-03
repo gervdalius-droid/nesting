@@ -307,6 +307,31 @@ input[type=color]{padding:2px 3px;height:27px;cursor:pointer}
 /* Group assign panel — inside side panel, not modal */
 .ga-panel{display:none;position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:300;backdrop-filter:blur(2px)}
 .ga-panel.open{display:flex;align-items:flex-start;justify-content:center;padding-top:60px}
+/* Startup project picker */
+.startup-overlay{display:none;position:fixed;inset:0;background:rgba(28,26,20,.55);z-index:500;backdrop-filter:blur(4px);align-items:center;justify-content:center}
+.startup-overlay.open{display:flex}
+.startup-box{background:#FDFCF9;border-radius:16px;border:1px solid #D4CFC2;width:440px;max-width:94vw;box-shadow:0 24px 64px rgba(0,0,0,.3);overflow:hidden;animation:startupIn .22s ease}
+@keyframes startupIn{from{opacity:0;transform:translateY(10px) scale(.98)}to{opacity:1;transform:none}}
+.startup-brand{display:flex;align-items:center;gap:12px;padding:22px 24px 16px}
+.startup-logo{width:44px;height:44px;border-radius:11px;background:#3D6B4F;color:#fff;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0}
+.startup-title{font-size:19px;font-weight:700;letter-spacing:-.3px;color:#1C1A14}
+.startup-sub{font-size:12px;color:#8A8472;margin-top:1px}
+.startup-choices{padding:4px 16px 18px}
+.startup-card{display:flex;align-items:center;gap:12px;width:100%;text-align:left;padding:13px 14px;border:1px solid #D4CFC2;border-radius:10px;background:#fff;cursor:pointer;margin:8px 0;transition:border-color .12s,background .12s,box-shadow .12s}
+.startup-card:hover{border-color:#3D6B4F;background:#F7FAF8;box-shadow:0 2px 10px rgba(61,107,79,.1)}
+.startup-card.primary{border-color:#3D6B4F;background:#F2F7F4}
+.startup-card.primary:hover{box-shadow:0 4px 14px rgba(61,107,79,.16)}
+.startup-ic{width:34px;height:34px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0}
+.startup-ct{flex:1;min-width:0}
+.startup-ct .ct-t{font-size:14px;font-weight:600;color:#1C1A14;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.startup-ct .ct-s{font-size:11px;color:#8A8472;margin-top:1px}
+.startup-arrow{color:#A09888;font-size:16px;flex-shrink:0}
+.startup-divider{font-size:10px;color:#A09888;text-transform:uppercase;letter-spacing:.06em;text-align:center;margin:14px 0 4px;position:relative}
+.startup-more{max-height:148px;overflow-y:auto;margin-top:2px}
+.startup-more-row{display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:8px;cursor:pointer;font-size:13px}
+.startup-more-row:hover{background:#F2EFE8}
+.startup-more-row .mr-n{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#1C1A14}
+.startup-more-row .mr-t{font-size:10px;color:#A09888;flex-shrink:0}
 .ga-box{background:#FDFCF9;border-radius:10px;border:1px solid #D4CFC2;width:500px;max-width:94vw;max-height:76vh;display:flex;flex-direction:column;box-shadow:0 12px 40px rgba(0,0,0,.18)}
 .ga-head{display:flex;align-items:center;gap:8px;padding:12px 14px;border-bottom:1px solid #D4CFC2;flex-shrink:0}
 .ga-body{flex:1;overflow-y:auto}
@@ -578,6 +603,7 @@ body.print-mode{background:#fff}
         <button class="rot-btn" id="pr-btn" onclick="printSel()" data-i18n-title="printTip" title="Print label for selected part (P key)" style="display:none;color:#3D6B4F;border-color:#3D6B4F"><span data-i18n="printBtn">🏷 Print (P)</span></button>
         <button class="btn bs" onclick="openBatchPrint()" data-i18n-title="printAllTip" title="Print labels for every part on this sheet (or all sheets)" style="margin-left:auto;font-size:10px;padding:3px 8px;color:#3D6B4F;border-color:#3D6B4F"><span data-i18n="printAllBtn">🏷 Print all labels</span></button>
         <button class="btn bs" onclick="consolidateSheets()" data-i18n-title="consolidateTip" title="Repack current placements — merge nearly-empty sheets" style="font-size:10px;padding:3px 8px"><span data-i18n="consolidateBtn">✨ Consolidate sheets</span></button>
+        <button class="btn bs" onclick="openScrapDialog()" title="Find the largest reusable offcut on each sheet — export its label and DXF for tracking/reuse" style="font-size:10px;padding:3px 8px;color:#8B5A2B;border-color:#8B5A2B">♻ Export scrap</button>
         <span data-i18n="canvasHint" style="font-size:10px;color:#A09888">Drag · R = rotate · P = print label</span>
       </div>
       <canvas id="cv"></canvas>
@@ -724,6 +750,42 @@ body.print-mode{background:#fff}
   <div class="hist-foot">
     <span id="hist-status" style="font-size:10px;color:#A09888;font-family:monospace;flex:1"></span>
     <button class="btn bs" onclick="closeHistory()">Close</button>
+  </div>
+</div>
+</div>
+
+<!-- STARTUP PROJECT PICKER -->
+<div class="startup-overlay" id="startup-overlay">
+  <div class="startup-box">
+    <div class="startup-brand">
+      <div class="startup-logo">🪵</div>
+      <div>
+        <div class="startup-title">Dėdės Baldai</div>
+        <div class="startup-sub">Nesting &amp; cut optimization</div>
+      </div>
+    </div>
+    <div class="startup-choices" id="startup-choices">
+      <!-- populated by showStartupModal() -->
+    </div>
+  </div>
+</div>
+
+<!-- SCRAP / OFFCUT EXPORT DIALOG -->
+<div class="ga-panel" id="scrap-panel" onclick="if(event.target===this)closeScrapDialog()">
+<div class="ga-box" style="max-width:720px">
+  <div class="ga-head">
+    <div style="width:18px;height:18px;background:#8B5A2B;color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;border-radius:4px;flex-shrink:0">♻</div>
+    <h3 style="flex:1;font-size:13px">Reusable offcuts (scrap)</h3>
+    <button class="btn bs br" onclick="closeScrapDialog()">✕</button>
+  </div>
+  <div style="padding:9px 14px;background:#FCFAF4;font-size:11px;color:#6B6455;border-bottom:1px solid #D4CFC2;line-height:1.5">
+    The largest clean rectangle left on each sheet, after all parts and saw kerf. Export a <strong>label</strong> to stick on the offcut, and a <strong>DXF</strong> of its position &amp; size for tracking or re-nesting later.
+  </div>
+  <div class="ga-body" id="scrap-body" style="padding:0"></div>
+  <div class="ga-foot">
+    <div style="flex:1;font-size:11px;color:#6B6455" id="scrap-summary"></div>
+    <button class="btn bs" onclick="downloadScrapDXF(true)" title="DXF of offcuts on every sheet">⬇ DXF — all sheets</button>
+    <button class="btn bs" onclick="closeScrapDialog()">Close</button>
   </div>
 </div>
 </div>
@@ -2320,26 +2382,113 @@ document.addEventListener('DOMContentLoaded',function(){
   try { window.activeXlsmName = localStorage.getItem('fabflow_xlsm_name') || ''; } catch(e) {}
   // Apply initial machine mode (default 'cnc' hides the saw kerf input)
   if(typeof onMachineModeChange==='function') onMachineModeChange();
-  // URL override: ?project=NAME
+  // URL override: ?project=NAME → deep-link straight in, skip the picker.
   var urlName=null;
   try{var u=new URLSearchParams(location.search);urlName=u.get('project');}catch(e){}
-  var fallbackName=null;
-  try{fallbackName=localStorage.getItem(LS_LAST_PROJECT);}catch(e){}
-  var targetName=urlName||fallbackName;
-  if(targetName){
-    loadProjectByName(targetName).then(function(ok){
-      if(!ok){newProject();}
+  if(urlName){
+    loadProjectByName(urlName).then(function(ok){
+      if(!ok){startupNew(true);}
       if(typeof resetHistory==='function') resetHistory();
     });
-  } else {
-    // Fresh start
-    currentProjectName='Untitled';
-    document.getElementById('projName').value='Untitled';
-    _lastSavedHash=hashProjectState();
-    setStatus('','');
-    if(typeof resetHistory==='function') resetHistory();
+    return;
   }
+  // Otherwise show the startup picker: New Project vs. continue latest.
+  showStartupModal();
 });
+
+// ── STARTUP PROJECT PICKER ─────────────────────────────────────────
+// Shows on launch: "New Project" or "Continue" the most recently-opened
+// project, plus a short list of other recent projects for quick switching.
+function _relTime(iso){
+  if(!iso) return '';
+  var then=new Date(iso).getTime(); if(isNaN(then)) return '';
+  var s=Math.max(0,Math.floor((Date.now()-then)/1000));
+  if(s<60) return 'just now';
+  var m=Math.floor(s/60); if(m<60) return m+' min ago';
+  var h=Math.floor(m/60); if(h<24) return h+(h===1?' hour ago':' hours ago');
+  var d=Math.floor(h/24); if(d<7) return d+(d===1?' day ago':' days ago');
+  return new Date(iso).toISOString().slice(0,10);
+}
+function showStartupModal(){
+  var box=document.getElementById('startup-choices');
+  var lastName='';
+  try{lastName=localStorage.getItem(LS_LAST_PROJECT)||'';}catch(e){}
+  // Build immediately from local info so the picker appears with no network wait.
+  function render(continueName, continueSub, others){
+    var html='';
+    if(continueName){
+      html+='<button class="startup-card primary" onclick="startupContinue('+JSON.stringify(continueName).replace(/"/g,'&quot;')+')">'
+        +'<div class="startup-ic" style="background:#3D6B4F;color:#fff">↩</div>'
+        +'<div class="startup-ct"><div class="ct-t">Continue '+esc(continueName)+'</div><div class="ct-s">'+esc(continueSub||'pick up where you left off')+'</div></div>'
+        +'<div class="startup-arrow">→</div></button>';
+    }
+    html+='<button class="startup-card" onclick="startupNew()">'
+      +'<div class="startup-ic" style="background:#F2EFE8;color:#3D6B4F">＋</div>'
+      +'<div class="startup-ct"><div class="ct-t">New Project</div><div class="ct-s">start from a blank sheet</div></div>'
+      +'<div class="startup-arrow">→</div></button>';
+    if(others&&others.length){
+      html+='<div class="startup-divider">Other recent projects</div><div class="startup-more">';
+      others.forEach(function(p){
+        html+='<div class="startup-more-row" onclick="startupContinue('+JSON.stringify(p.name).replace(/"/g,'&quot;')+')">'
+          +'<span style="color:#A09888">📁</span>'
+          +'<span class="mr-n">'+esc(p.name)+'</span>'
+          +'<span class="mr-t">'+esc(_relTime(p.updated_at))+'</span></div>';
+      });
+      html+='</div>';
+    }
+    box.innerHTML=html;
+  }
+  // First paint (synchronous, from localStorage last-project name)
+  render(lastName, lastName?'pick up where you left off':'', null);
+  document.getElementById('startup-overlay').classList.add('open');
+  // Enrich asynchronously with the full project list (cloud + local).
+  try{
+    listProjects().then(function(list){
+      if(!list||!list.length){
+        // No saved projects at all → keep just "New Project"
+        if(!lastName) render('', '', null);
+        return;
+      }
+      // Latest = the last-opened name if it still exists, else the most-recent.
+      var latest=null;
+      if(lastName) latest=list.find(function(p){return p.name===lastName;});
+      if(!latest) latest=list[0];
+      var others=list.filter(function(p){return p.name!==latest.name;}).slice(0,5);
+      render(latest.name, 'last opened · '+(_relTime(latest.updated_at)||'recently'), others);
+    }).catch(function(){ /* keep the synchronous fallback */ });
+  }catch(e){}
+}
+function hideStartupModal(){
+  var o=document.getElementById('startup-overlay');
+  if(o) o.classList.remove('open');
+}
+function startupContinue(name){
+  hideStartupModal();
+  loadProjectByName(name).then(function(ok){
+    if(!ok){ startupNew(true); }
+    if(typeof resetHistory==='function') resetHistory();
+  });
+}
+// Start a fresh, blank project. `silent` skips the modal-close (used on deep-link failure).
+function startupNew(silent){
+  if(!silent) hideStartupModal();
+  // Fresh blank state — mirror the "Fresh start" branch of the old boot.
+  _suppressSave=true;
+  try{
+    parts=[];layouts=[];boards=[];partGroups=[];opIdMap={};curSheet=0;selP=null;hovP=null;bId=1;gId=1;
+    if(typeof renderBoards==='function'){renderBoards();refreshSel();renderParts();renderGroups();}
+    var st=document.getElementById('stats'); if(st) st.style.display='none';
+    var ep=document.getElementById('ep'); if(ep) ep.style.display='none';
+    var qp=document.getElementById('qp'); if(qp) qp.style.display='none';
+    var tb=document.getElementById('tabs'); if(tb) tb.innerHTML='';
+    var cvc=document.getElementById('cvc'); if(cvc) cvc.style.display='none';
+  }catch(e){}finally{_suppressSave=false;}
+  currentProjectName='Untitled';
+  var pn=document.getElementById('projName'); if(pn) pn.value='Untitled';
+  _lastSavedHash=hashProjectState();
+  setStatus('','');
+  if(typeof resetHistory==='function') resetHistory();
+}
 
 // ═══════════════════════════════════════════════════════════════
 // UTILS
@@ -4189,6 +4338,160 @@ function unmergePart(id){
     _autoVersionFp = null;
     setTimeout(function(){ optimize(); }, 30);
   }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SCRAP / OFFCUT EXPORT
+// ═══════════════════════════════════════════════════════════════
+// After packing, each sheet has leftover material. We find the maximal empty
+// rectangles (reusing the Maximal-Rectangles machinery), pick the largest
+// non-overlapping set, and let the operator export a LABEL (to stick on the
+// offcut) and a DXF (offcut position + size, for tracking or re-nesting).
+var SCRAP_MIN_DIM = 80;   // mm — ignore slivers smaller than this on either side
+
+// Compute reusable offcut rectangles for a layout (in usable-area coords,
+// i.e. relative to the trim origin — same space as placement x/y).
+function computeScrapRects(lay){
+  if (!lay) return {usable:[], totalArea:0, largest:null};
+  var free = [{x:0, y:0, w:lay.uw, h:lay.uh}];
+  (lay.placements||[]).forEach(function(p){
+    free = subtractRectFromFreeList(free, {x:p.x, y:p.y, w:p.pw, h:p.ph});
+  });
+  // Keep only rectangles big enough to be worth reclaiming
+  var big = free.filter(function(r){ return r.w >= SCRAP_MIN_DIM && r.h >= SCRAP_MIN_DIM; });
+  // Maximal rects overlap each other; pick the largest disjoint set greedily
+  // so each reported offcut is a distinct physical piece.
+  big.sort(function(a,b){ return b.w*b.h - a.w*a.h; });
+  var picked = [];
+  big.forEach(function(r){
+    if (!picked.some(function(q){ return rectsOverlap(r, q); })) picked.push(r);
+  });
+  var totalArea = picked.reduce(function(a,r){ return a + r.w*r.h; }, 0);
+  return { usable: picked, totalArea: totalArea, largest: picked[0] || null };
+}
+
+// Build a DXF (y-up, origin at sheet bottom-left — same convention as the part
+// export) containing the sheet outline plus each offcut rectangle with a size
+// label. `lays` is an array of layouts; multiple sheets are tiled left→right.
+function makeScrapDXF(lays){
+  var L = ['0','SECTION','2','HEADER','9','$INSUNITS','70','4','9','$MEASUREMENT','70','1','0','ENDSEC',
+    '0','SECTION','2','TABLES','0','TABLE','2','LAYER','70','3',
+    '0','LAYER','2','SHEET','70','0','62','8','6','CONTINUOUS',
+    '0','LAYER','2','OFFCUT','70','0','62','3','6','CONTINUOUS',
+    '0','LAYER','2','TEXT','70','0','62','1','6','CONTINUOUS',
+    '0','ENDTAB','0','ENDSEC',
+    '0','SECTION','2','ENTITIES'];
+  function rect(layer, x, y, w, h){
+    lwpoly(L, layer, [[x,y],[x+w,y],[x+w,y+h],[x,y+h]]);
+  }
+  function text(x, y, h, s){
+    L.push('0','TEXT','8','TEXT','10',x.toFixed(3),'20',y.toFixed(3),'40',h.toFixed(1),'1',s);
+  }
+  var GAP = 200, dx = 0;
+  lays.forEach(function(lay, si){
+    // Full sheet outline
+    rect('SHEET', dx, 0, lay.sw, lay.sh);
+    var scrap = computeScrapRects(lay);
+    scrap.usable.forEach(function(r){
+      // Convert usable-coords (top-left, y-down) → DXF (y-up, sheet bottom-left)
+      var x = dx + lay.trim + r.x;
+      var yBottom = lay.sh - (lay.trim + r.y) - r.h;
+      rect('OFFCUT', x, yBottom, r.w, r.h);
+      // Size label near the rectangle's bottom-left corner
+      text(x + 8, yBottom + 8, 24, Math.round(r.w) + ' x ' + Math.round(r.h));
+    });
+    // Sheet caption
+    text(dx + 8, lay.sh + 30, 30, 'Sheet ' + (si+1) + '  ' + (lay.matName||''));
+    dx += lay.sw + GAP;
+  });
+  L.push('0','ENDSEC','0','EOF');
+  return L.join('\r\n');
+}
+
+function downloadScrapDXF(all){
+  if (!layouts.length){ alert('No layouts yet. Run Optimize first.'); return; }
+  var lays = all ? layouts.slice() : [layouts[curSheet]];
+  var dxf = makeScrapDXF(lays);
+  var proj = (currentProjectName || 'nesting').replace(/[^\w\-]+/g,'_');
+  var name = all ? (proj + '_scrap_all.dxf') : (proj + '_scrap_sheet' + (curSheet+1) + '.dxf');
+  download(name, dxf);
+  setStatus && setStatus('ok', '⬇ Scrap DXF exported');
+}
+
+// Printable offcut label — opens a print window with material, dims, area, date.
+function printScrapLabel(sheetIdx){
+  var lay = layouts[sheetIdx];
+  if (!lay){ return; }
+  var scrap = computeScrapRects(lay);
+  if (!scrap.largest){ alert('No reusable offcut on this sheet (everything ≤ ' + SCRAP_MIN_DIM + 'mm).'); return; }
+  var lr = scrap.largest;
+  var dateStr = new Date().toISOString().slice(0,10);
+  var areaM2 = (scrap.totalArea / 1e6).toFixed(2);
+  var proj = currentProjectName || '';
+  var w = Math.round(lr.w), h = Math.round(lr.h);
+  var html = '<!doctype html><html><head><meta charset="utf-8"><title>Offcut '+w+'x'+h+'</title>'
+    + '<style>'
+    + '@page{size:99mm 50mm;margin:0}'
+    + 'body{font-family:-apple-system,Segoe UI,sans-serif;margin:0;padding:0}'
+    + '.lbl{width:99mm;height:50mm;box-sizing:border-box;padding:5mm;border:1px dashed #999;display:flex;flex-direction:column;justify-content:space-between}'
+    + '.top{display:flex;justify-content:space-between;align-items:flex-start}'
+    + '.mat{font-size:15px;font-weight:700;line-height:1.15;max-width:62mm;word-break:break-word}'
+    + '.tag{font-size:10px;background:#5C3A1A;color:#fff;padding:2px 6px;border-radius:4px;white-space:nowrap}'
+    + '.dim{font-size:30px;font-weight:800;font-family:monospace;letter-spacing:-1px}'
+    + '.meta{font-size:10px;color:#444;display:flex;justify-content:space-between}'
+    + '.no-print{position:fixed;top:8px;right:8px}'
+    + '@media print{.no-print{display:none}}'
+    + '</style></head><body>'
+    + '<div class="no-print"><button onclick="window.print()" style="padding:6px 12px">🖨 Print</button></div>'
+    + '<div class="lbl">'
+    + '<div class="top"><div class="mat">'+esc(lay.matName||'Material')+'</div><div class="tag">♻ OFFCUT</div></div>'
+    + '<div class="dim">'+w+' × '+h+' <span style="font-size:13px;font-weight:600">mm</span></div>'
+    + '<div class="meta"><span>'+(lay.thick?(lay.thick+'mm · '):'')+'usable '+areaM2+' m²'+(scrap.usable.length>1?(' · '+scrap.usable.length+' pieces'):'')+'</span><span>'+(proj?esc(proj)+' · ':'')+dateStr+'</span></div>'
+    + '</div>'
+    + '<scr'+'ipt>setTimeout(function(){window.print();},250);</scr'+'ipt>'
+    + '</body></html>';
+  var win = window.open('', '_blank', 'width=460,height=300');
+  if (!win){ alert('Pop-up blocked. Allow pop-ups to print the offcut label.'); return; }
+  win.document.write(html); win.document.close();
+}
+
+function openScrapDialog(){
+  if (!layouts.length){ alert('No layouts yet. Run Optimize first.'); return; }
+  var body = document.getElementById('scrap-body');
+  var rows = '';
+  var grandArea = 0, sheetsWithScrap = 0;
+  layouts.forEach(function(lay, si){
+    var scrap = computeScrapRects(lay);
+    grandArea += scrap.totalArea;
+    var lr = scrap.largest;
+    if (lr) sheetsWithScrap++;
+    var largestTxt = lr ? (Math.round(lr.w) + ' × ' + Math.round(lr.h) + ' mm') : '<span style="color:#A09888">— none ≥ '+SCRAP_MIN_DIM+'mm</span>';
+    var areaTxt = (scrap.totalArea/1e6).toFixed(2) + ' m²';
+    rows += '<tr style="border-bottom:1px solid #EAE6DC">'
+         +  '<td style="padding:8px 6px"><div style="font-weight:600">Sheet '+(si+1)+'</div><div style="font-size:10px;color:#A09888">'+esc(lay.matName||'')+'</div></td>'
+         +  '<td style="padding:8px 6px;font-family:monospace"><b>'+largestTxt+'</b><div style="font-size:9px;color:#A09888">largest offcut'+(scrap.usable.length>1?(' · '+scrap.usable.length+' pieces'):'')+'</div></td>'
+         +  '<td style="padding:8px 6px;text-align:right;font-family:monospace">'+areaTxt+'</td>'
+         +  '<td style="padding:8px 6px;text-align:right;white-space:nowrap">'
+         +    (lr ? '<button class="btn bs" onclick="printScrapLabel('+si+')" style="font-size:10px;padding:3px 8px;color:#8B5A2B;border-color:#8B5A2B">🏷 Label</button> '
+                  + '<button class="btn bs" onclick="curSheet='+si+';downloadScrapDXF(false)" style="font-size:10px;padding:3px 8px">⬇ DXF</button>'
+                  : '')
+         +  '</td>'
+         +  '</tr>';
+  });
+  body.innerHTML = '<div style="padding:6px 14px"><table style="width:100%;border-collapse:collapse;font-size:12px">'
+    + '<thead><tr style="color:#A09888;font-size:10px;text-transform:uppercase;letter-spacing:.04em">'
+    + '<th style="text-align:left;padding:6px">Sheet</th>'
+    + '<th style="text-align:left;padding:6px">Largest offcut</th>'
+    + '<th style="text-align:right;padding:6px">Reusable area</th>'
+    + '<th style="text-align:right;padding:6px"></th>'
+    + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
+  document.getElementById('scrap-summary').textContent =
+    sheetsWithScrap + ' sheet(s) with reusable offcuts · ' + (grandArea/1e6).toFixed(2) + ' m² total';
+  document.getElementById('scrap-panel').classList.add('open');
+}
+
+function closeScrapDialog(){
+  document.getElementById('scrap-panel').classList.remove('open');
 }
 
 function renderGroups(){
