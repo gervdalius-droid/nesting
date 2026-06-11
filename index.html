@@ -125,6 +125,11 @@ input[type=color]{padding:2px 3px;height:27px;cursor:pointer}
 .pli-qty{font-family:monospace;color:#3D6B4F;font-size:10px;font-weight:600;min-width:22px;text-align:right}
 .pli-x{border:none;background:transparent;color:#B84040;cursor:pointer;font-size:14px;padding:0 2px;line-height:1;opacity:.55}
 .pli-x:hover{opacity:1}
+/* Merged strips stand out: warm tint, brown left bar, brown italic name */
+.pli.pli-merged{background:#FBF1E4;border-left:3px solid #8B5A2B;border-color:#E6D2B8}
+.pli.pli-merged:hover{border-color:#C9A878}
+.pli.pli-merged .pli-name{color:#8B5A2B;font-weight:700;font-style:italic}
+.pli.pli-merged .pli-dim{color:#A06A2C}
 /* ─── Pricing / Quotation ─────────────────────────────────────── */
 .bprice{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:6px;padding-top:6px;border-top:1px solid #E8E4DB}
 .bprice .fl{font-size:9px}
@@ -288,6 +293,10 @@ input[type=color]{padding:2px 3px;height:27px;cursor:pointer}
 .pw-tbl td{padding:5px 10px;border-bottom:1px solid #EAE6DC;vertical-align:middle}
 .pw-tbl tr:hover td{background:#F5F2EC}
 .pw-tbl tr.sel td{background:#E8F4EC}
+.pw-tbl tr.pw-merged td{background:#FBF1E4}
+.pw-tbl tr.pw-merged.sel td{background:#F0E6D2}
+.pw-tbl tr.pw-merged td:first-child{box-shadow:inset 3px 0 0 #8B5A2B}
+.pw-name-merged{color:#8B5A2B !important;font-weight:700 !important;font-style:italic}
 .pw-tbl tr{cursor:pointer}
 .pw-edit{width:100%;padding:2px 4px;font-size:11px;border:1px solid transparent;background:transparent;border-radius:3px;outline:none;font-family:inherit;color:inherit}
 .pw-edit:hover{border-color:#D4CFC2;background:#fff}
@@ -2798,11 +2807,79 @@ async function processFile(f){
       }
     }
 
-    if(!added) throw new Error('No cuttable parts found. Check that file has PARTLIST or STOCK_CORE sheet.');
+    // ── Generic "Papildoma plokštė" / additional-panel cut list ──────
+    // A flat list with columns: ILGIS (length) · Plotis (width) · Kiekis (qty).
+    // Detected by a sheet named like "papildoma…", else by any sheet whose
+    // header row carries all three labels. Each row expands into `qty`
+    // rectangular parts for nesting. Optional "Laminuota pusių per ilgį/plotį"
+    // columns are read as edgeband counts (long edges / short edges).
+    var _panelSrc=null;
+    if(added===0){
+      var _stripDia=function(s){ return String(s==null?'':s).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim(); };
+      // Locate the header row inside a sheet's rows (array-of-arrays).
+      function _findPanelHeader(rows){
+        for(var r=0;r<Math.min(rows.length,20);r++){
+          var row=rows[r]||[]; var li=-1,wi=-1,qi=-1,lamL=-1,lamW=-1,hasGylis=false;
+          for(var c=0;c<row.length;c++){
+            var v=_stripDia(row[c]);
+            if(!v) continue;
+            if(li<0 && /\bilgis\b/.test(v)) li=c;
+            else if(wi<0 && /\bplotis\b/.test(v)) wi=c;
+            else if(qi<0 && /\bkiekis\b/.test(v)) qi=c;
+            if(/laminuota.*ilg/.test(v)) lamL=c;
+            else if(/laminuota.*plot/.test(v)) lamW=c;
+            if(/\bgylis\b/.test(v) || /\baukstis\b/.test(v)) hasGylis=true; // cabinet-def sheet, not a flat list
+          }
+          // Require ilgis+plotis+kiekis in one row, and NOT a 3-D cabinet sheet.
+          if(li>=0 && wi>=0 && qi>=0 && !hasGylis) return {row:r,len:li,wid:wi,qty:qi,lamL:lamL,lamW:lamW};
+        }
+        return null;
+      }
+      // Prefer a sheet named like "papildoma plokste"; else scan all sheets.
+      var _named=null;
+      for(var si=0; si<wb.SheetNames.length; si++){
+        if(_stripDia(wb.SheetNames[si]).indexOf('papildoma')>=0){ _named=wb.SheetNames[si]; break; }
+      }
+      var _trySheets = _named ? [_named] : wb.SheetNames.slice();
+      var _hdr=null,_rows=null,_sheet=null;
+      for(var ti=0; ti<_trySheets.length; ti++){
+        var rws=XLSX.utils.sheet_to_json(wb.Sheets[_trySheets[ti]]);
+        var h=_findPanelHeader(rws);
+        if(h){ _hdr=h; _rows=rws; _sheet=_trySheets[ti]; break; }
+      }
+      if(_hdr){
+        var _mat='Papildoma plokštė', _thick=18;
+        ensureBoard(_mat);
+        for(var i=_hdr.row+1;i<_rows.length;i++){
+          var row=_rows[i]||[];
+          var L=parseFloat(row[_hdr.len]), W=parseFloat(row[_hdr.wid]);
+          var qty=parseInt(row[_hdr.qty],10);
+          if(!(L>0)||!(W>0)) continue;        // skip blanks / total rows
+          if(!(qty>0)) qty=1;
+          // Optional edgebanding from laminated-side counts. "per ilgį" bands
+          // the two long edges; "per plotį" bands the two short edges.
+          var lamLen = _hdr.lamL>=0 ? (parseInt(row[_hdr.lamL],10)||0) : 0;
+          var lamWid = _hdr.lamW>=0 ? (parseInt(row[_hdr.lamW],10)||0) : 0;
+          var eb={eb1:'',eb2:'',eb3:'',eb4:''};
+          if(lamLen>=1) eb.eb1='PVC'; if(lamLen>=2) eb.eb3='PVC';   // long edges
+          if(lamWid>=1) eb.eb2='PVC'; if(lamWid>=2) eb.eb4='PVC';   // short edges
+          var nm='Plokštė '+Math.round(L)+'×'+Math.round(W);
+          for(var j=0;j<qty;j++){
+            parts.push({id:Date.now()+added, name:nm, origName:nm,
+              l:Math.round(L), w:Math.round(W), mat:_mat, thick:_thick,
+              eb:eb, op1:'', op2:'', hasCNC:false, labelRange:''});
+            added++;
+          }
+        }
+        if(added) _panelSrc=_sheet;
+      }
+    }
+
+    if(!added) throw new Error('No cuttable parts found. Expected a PARTLIST / STOCK_CORE sheet, or a panel list with ILGIS · Plotis · Kiekis columns (e.g. "Papildoma plokštė").');
     renderParts();
     document.getElementById('dropz').classList.add('ok');
     var opCount=Object.values(opIdMap).filter(function(o){return o.hasCNC;}).length;
-    var src=wb.SheetNames.indexOf('PARTLIST')>=0?'PARTLIST':'STOCK_CORE';
+    var src=_panelSrc || (wb.SheetNames.indexOf('PARTLIST')>=0?'PARTLIST':'STOCK_CORE');
     st.style.color='#3D6B4F';
     st.textContent='✓ '+added+' parts · '+boards.length+' materials · '+opCount+' CNC op IDs · from '+src;
   }catch(err){
@@ -3571,9 +3648,16 @@ function renderParts(){
     // since each merge has a unique combined origName)
     var mergedPart = (g.qty === 1) ? parts.find(function(pt){ return pt.id === g.partIds[0] && pt.__merged; }) : null;
     var mergedTag = '';
+    var nameHtml = esc(g.name);
     if (mergedPart){
+      rowCls += ' pli-merged';   // warm tint + brown italic name (see CSS)
       var pieces = mergedPart.__mergedShorts ? mergedPart.__mergedShorts.join('+') : (mergedPart.__mergedFrom ? mergedPart.__mergedFrom.length+' pcs' : '');
-      mergedTag = '<span title="Merged strip: '+pieces+' mm with '+(mergedPart.__mergedKerf||3)+'mm saw kerfs" style="font-size:10px;color:#8B5A2B;flex-shrink:0;font-weight:600">🔗</span>';
+      var nPcs = mergedPart.__mergedFrom ? mergedPart.__mergedFrom.length : (mergedPart.__mergedShorts ? mergedPart.__mergedShorts.length : 0);
+      var axisLbl = (mergedPart.__mergedMode === 'length') ? 'end-to-end' : 'side-by-side';
+      mergedTag = '<span title="Merged strip ('+axisLbl+'): '+pieces+' mm with '+(mergedPart.__mergedKerf||3)+'mm saw kerfs" style="font-size:10px;color:#8B5A2B;flex-shrink:0;font-weight:600">🔗</span>';
+      // Prefix the name with a small MERGED badge so it reads clearly even
+      // before noticing the colour/icon.
+      nameHtml = '<span style="font-size:8px;background:#8B5A2B;color:#fff;padding:1px 4px;border-radius:3px;margin-right:4px;font-style:normal;font-weight:700;letter-spacing:.03em;vertical-align:middle">MERGED ×'+nPcs+'</span>'+esc(g.name);
     }
     return '<div class="'+rowCls+'" title="'+esc(g.name)+' · '+esc(g.mat)+(g.hasShape?' · DXF shape':'')+(mergedPart?' · merged strip':'')+'">'
       +'<span class="pli-dot" style="background:'+color+'"></span>'
@@ -3581,7 +3665,7 @@ function renderParts(){
       +rotIcon
       +shapeTag
       +mergedTag
-      +'<span class="pli-name">'+esc(g.name)+'</span>'
+      +'<span class="pli-name">'+nameHtml+'</span>'
       +'<span class="pli-dim">'+g.l+'×'+g.w+'</span>'
       +'<span class="pli-qty">×'+g.qty+'</span>'
       +(mergedPart
@@ -3704,13 +3788,15 @@ function renderPartsWindow(){
     var isSel=pwSel.has(sid);
     var bd=matchBoard(p.mat);
     var dot=bd?'<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:'+bd.color+';margin-right:4px;flex-shrink:0;vertical-align:middle"></span>':'';
+    var isMerged=!!p.__merged;
+    var mergeIcon=isMerged?'<span title="Merged strip — '+(p.__mergedFrom?p.__mergedFrom.length:'?')+' pieces" style="font-size:10px;color:#8B5A2B;flex-shrink:0;font-weight:700">🔗</span>':'';
     // Build material select with current value preselected
     var matSel='<select class="pw-edit pw-edit-mat" data-id="'+sid+'" onchange="pwEditField(\''+sid+'\',\'mat\',this.value)">'
       +allMats.map(function(m){return'<option value="'+esc(m)+'"'+(m===p.mat?' selected':'')+'>'+esc(m)+'</option>';}).join('')
       +'</select>';
-    return'<tr class="'+(isSel?'sel':'')+'" data-id="'+sid+'">'
+    return'<tr class="'+(isSel?'sel':'')+(isMerged?' pw-merged':'')+'" data-id="'+sid+'">'
       +'<td><input type="checkbox" class="pw-row-chk" '+(isSel?'checked':'')+' data-id="'+sid+'" style="width:auto;cursor:pointer"></td>'
-      +'<td style="max-width:220px"><div style="display:flex;align-items:center;gap:4px">'+(p.shape?'<span title="DXF shape — L/W locked" style="font-size:10px;color:#3D6B4F;flex-shrink:0">📐</span>':'')+'<input class="pw-edit pw-edit-name" data-id="'+sid+'" value="'+esc(p.origName)+'" title="'+esc(p.origName)+'" onchange="pwEditField(\''+sid+'\',\'name\',this.value)"></div></td>'
+      +'<td style="max-width:220px"><div style="display:flex;align-items:center;gap:4px">'+mergeIcon+(p.shape?'<span title="DXF shape — L/W locked" style="font-size:10px;color:#3D6B4F;flex-shrink:0">📐</span>':'')+'<input class="pw-edit pw-edit-name'+(isMerged?' pw-name-merged':'')+'" data-id="'+sid+'" value="'+esc(p.origName)+'" title="'+esc(p.origName)+'" onchange="pwEditField(\''+sid+'\',\'name\',this.value)"></div></td>'
       +'<td><input class="pw-edit pw-edit-num pw-edit-l" data-id="'+sid+'" type="number" min="1" value="'+p.l+'" onchange="pwEditField(\''+sid+'\',\'l\',this.value)"></td>'
       +'<td><input class="pw-edit pw-edit-num pw-edit-w" data-id="'+sid+'" type="number" min="1" value="'+p.w+'" onchange="pwEditField(\''+sid+'\',\'w\',this.value)"></td>'
       +'<td style="text-align:center;padding:0"><button class="pw-swap-btn" title="Swap L and W for this part (also rotates DXF shape 90°)" onclick="pwSwapRow(\''+sid+'\')">⇆</button></td>'
@@ -7338,6 +7424,9 @@ function printSheetSVG(lay,widthMm){
   placements.forEach(function(p){
     var ax=trim+p.x, ay=trim+p.y; // sheet coords, y-down
     var pw=p.pw, ph=p.ph;
+    // A merged strip needs internal saw-cut guides so the operator knows where
+    // to cut it apart in the workshop (the strip prints as one rectangle).
+    var isMergedStrip = !!(p.part && p.part.__merged && p.part.__mergedShorts && p.part.__mergedShorts.length>1);
     var hasShape=!!(p.part&&p.part.shape&&p.part.shape.length>=3);
     if(hasShape){
       // Build polygon points (outline + holes as separate subpaths)
@@ -7364,7 +7453,7 @@ function printSheetSVG(lay,widthMm){
       // Dashed bbox so operator sees nesting footprint
       svg+='<rect x="'+ax+'" y="'+ay+'" width="'+pw+'" height="'+ph+'" fill="none" stroke="#6B6455" stroke-width=".6" stroke-dasharray="8 4"/>';
     } else {
-      svg+='<rect x="'+ax+'" y="'+ay+'" width="'+pw+'" height="'+ph+'" fill="'+p.color+'55" stroke="#1C1A14" stroke-width="1.2"/>';
+      svg+='<rect x="'+ax+'" y="'+ay+'" width="'+pw+'" height="'+ph+'" fill="'+(isMergedStrip?'#C28F5E55':(p.color+'55'))+'" stroke="#1C1A14" stroke-width="1.2"/>';
     }
     // Label: centered name + edge-placed dimensions. Font sizes are computed
     // to fit both the part's inner width AND height (so long names don't overflow).
@@ -7415,16 +7504,60 @@ function printSheetSVG(lay,widthMm){
       svg+='<rect x="'+wrX+'" y="'+wrY+'" width="'+wrW+'" height="'+wrH+'" fill="#FDFCF9" fill-opacity="0.92" stroke="#1C1A14" stroke-width="0.3" rx="1.5"/>';
       svg+='<text x="'+wx+'" y="'+cy+'" text-anchor="middle" dominant-baseline="middle" font-size="'+dimFs+'" font-family="monospace" font-weight="700" fill="#1C1A14" transform="rotate(-90 '+wx+' '+cy+')">'+wDimText+'</text>';
     }
-    // Centered name — drawn AFTER the dimension pills so it overlaps cleanly if ever needed
-    svg+='<g fill="#5A554A" font-family="sans-serif">';
-    if(showName){
-      svg+='<text x="'+cx+'" y="'+cy+'" text-anchor="middle" dominant-baseline="middle" font-size="'+fs.toFixed(1)+'">'+esc(displayName)+'</text>';
-    } else {
-      var idxFs=Math.min(innerW*0.7,innerH*0.8,22);
-      idxFs=Math.max(9,idxFs);
-      svg+='<text x="'+cx+'" y="'+cy+'" text-anchor="middle" dominant-baseline="middle" font-size="'+idxFs.toFixed(1)+'" fill="#8A8578">#'+labelIdx+'</text>';
+    // Centered name — drawn AFTER the dimension pills so it overlaps cleanly if ever needed.
+    // Skip for merged strips: they get per-piece labels + cut lines instead (below).
+    if(!isMergedStrip){
+      svg+='<g fill="#5A554A" font-family="sans-serif">';
+      if(showName){
+        svg+='<text x="'+cx+'" y="'+cy+'" text-anchor="middle" dominant-baseline="middle" font-size="'+fs.toFixed(1)+'">'+esc(displayName)+'</text>';
+      } else {
+        var idxFs=Math.min(innerW*0.7,innerH*0.8,22);
+        idxFs=Math.max(9,idxFs);
+        svg+='<text x="'+cx+'" y="'+cy+'" text-anchor="middle" dominant-baseline="middle" font-size="'+idxFs.toFixed(1)+'" fill="#8A8578">#'+labelIdx+'</text>';
+      }
+      svg+='</g>';
     }
-    svg+='</g>';
+    // ── MERGED STRIP: saw-cut guides for the workshop ─────────────────
+    // Dashed cut lines where the operator saws the strip apart, a ✂ at each
+    // line, and each finished piece's L×W printed inside its segment. The cut
+    // orientation matches the merge axis: 'w' (side-by-side) cuts run along the
+    // length; 'l' (end-to-end) cuts run across the width — flipped by rotation.
+    if(isMergedStrip){
+      var msShorts=p.part.__mergedShorts, msKerf=p.part.__mergedKerf||0;
+      var msAxisW=(p.part.__mergedAxis!=='l');
+      var msHorizontal=(msAxisW!==!!p.rot);     // cut-line orientation on the sheet
+      var cuts=[], centers=[], off=0;
+      for(var mi=0; mi<msShorts.length; mi++){
+        var segStart=off; off+=msShorts[mi];
+        centers.push((segStart+off)/2);
+        if(mi<msShorts.length-1){ cuts.push(off+msKerf/2); off+=msKerf; }
+      }
+      // Cut lines
+      cuts.forEach(function(cp){
+        if(msHorizontal) svg+='<line x1="'+ax+'" y1="'+(ay+cp)+'" x2="'+(ax+pw)+'" y2="'+(ay+cp)+'" stroke="#7A2E12" stroke-width="2.5" stroke-dasharray="16 8"/>';
+        else             svg+='<line x1="'+(ax+cp)+'" y1="'+ay+'" x2="'+(ax+cp)+'" y2="'+(ay+ph)+'" stroke="#7A2E12" stroke-width="2.5" stroke-dasharray="16 8"/>';
+      });
+      // ✂ marker at each cut line
+      var sciFs=Math.max(16,Math.min(34,Math.min(pw,ph)/5));
+      cuts.forEach(function(cp){
+        if(msHorizontal) svg+='<text x="'+(ax+6)+'" y="'+(ay+cp)+'" dominant-baseline="middle" font-size="'+sciFs+'" fill="#7A2E12">✂</text>';
+        else             svg+='<text x="'+(ax+cp)+'" y="'+(ay+sciFs*0.95)+'" text-anchor="middle" font-size="'+sciFs+'" fill="#7A2E12">✂</text>';
+      });
+      // Per-piece dimension label, sized to fit its segment
+      centers.forEach(function(ct, mi){
+        var fromP=p.part.__mergedFrom && p.part.__mergedFrom[mi];
+        var pieceDim=fromP?(Math.max(fromP.l,fromP.w)+'×'+Math.min(fromP.l,fromP.w)):String(Math.round(msShorts[mi]));
+        var segW=msHorizontal?pw:msShorts[mi];
+        var segH=msHorizontal?msShorts[mi]:ph;
+        var pfs=Math.max(9,Math.min(26,Math.min(segW/(pieceDim.length*0.62), segH*0.5)));
+        var lx=msHorizontal?(ax+pw/2):(ax+ct);
+        var ly=msHorizontal?(ay+ct):(ay+ph/2);
+        svg+='<text x="'+lx+'" y="'+ly+'" text-anchor="middle" dominant-baseline="middle" font-size="'+pfs.toFixed(1)+'" font-family="monospace" font-weight="700" fill="#7A2E12">'+esc(pieceDim)+'</text>';
+      });
+      // "MERGED ×N" tag in a corner so the strip is unmistakable
+      var tagFs=Math.max(10,Math.min(18,Math.min(pw,ph)/7));
+      svg+='<text x="'+(ax+pw-5)+'" y="'+(ay+tagFs+3)+'" text-anchor="end" font-size="'+tagFs+'" font-family="sans-serif" font-weight="700" fill="#7A2E12">🔗 MERGED ×'+msShorts.length+'</text>';
+    }
     // Grain arrow if this sheet is grain-locked
     if(lay.grainLocked){
       var ay1=ay+8, ay2=ay+Math.min(28,ph/3);
@@ -7573,6 +7706,7 @@ function buildPrintView(){
     +'<div>↻ — '+t('legendRot')+'</div>'
     +'<div>━━━ '+t('legendTrim')+'</div>'
     +'<div>┄┄┄ '+t('legendBBox')+'</div>'
+    +'<div style="color:#7A2E12">✂ ┄┄ saw line on 🔗 merged strips — cut apart into the marked pieces</div>'
     +'<div>↑ — '+t('legendGrain')+'</div>'
     +'</div>';
   html+=footer(pageNo++,totalPages)+'</div>';
@@ -7625,9 +7759,17 @@ function buildPrintView(){
     placements.forEach(function(p,idx){
       var eb=p.part.eb||{};
       var ebStr=[eb.eb1,eb.eb2,eb.eb3,eb.eb4].filter(Boolean).join(' / ')||'—';
-      html+='<tr>'
+      var isM=!!(p.part&&p.part.__merged&&p.part.__mergedShorts);
+      var nameCell=esc(p.part.origName);
+      if(isM){
+        var cutList=p.part.__mergedShorts.map(function(v){return Math.round(v);}).join(' | ');
+        var dir=(p.part.__mergedMode==='length')?'across width':'along length';
+        nameCell='<b style="color:#7A2E12">🔗 MERGED ×'+p.part.__mergedShorts.length+'</b>'
+          +'<div style="font-size:8px;color:#7A2E12">✂ saw '+dir+': '+esc(cutList)+' mm</div>';
+      }
+      html+='<tr'+(isM?' style="background:#FBF1E4"':'')+'>'
         +'<td class="num">'+(idx+1)+'</td>'
-        +'<td>'+esc(p.part.origName)+'</td>'
+        +'<td>'+nameCell+'</td>'
         +'<td class="num">'+p.pw+'</td>'
         +'<td class="num">'+p.ph+'</td>'
         +'<td class="num">'+(p.part.thick||18)+'</td>'
@@ -8971,7 +9113,27 @@ function _bpJobs(scope){
   var lays = (scope === 'all') ? layouts : (layouts[curSheet] ? [layouts[curSheet]] : []);
   var jobs = [];
   lays.forEach(function(l){
-    (l.placements || []).forEach(function(pl){ if (pl && pl.part) jobs.push({p:pl, lay:l}); });
+    (l.placements || []).forEach(function(pl){
+      if (!pl || !pl.part) return;
+      // A merged strip has no printable label of its own — it stands in for
+      // several original pieces. Expand it into one job per constituent so each
+      // prints with its OWN label range (Excel) / ZPL, exactly like single-part
+      // print does via doPrintMergedBatch. Without this, the batch tried to
+      // print the merged strip directly (no labelRange → Browser Print path),
+      // which fails for Excel/ZDesigner users.
+      if (pl.part.__merged && pl.part.__mergedFrom && pl.part.__mergedFrom.length){
+        pl.part.__mergedFrom.forEach(function(member){
+          var virtPl = {
+            part: member,
+            pw: member.l || 0, ph: member.w || 0,
+            rot: false, x: pl.x, y: pl.y, color: pl.color
+          };
+          jobs.push({ p: virtPl, lay: l, mergedStripId: pl.part.id });
+        });
+      } else {
+        jobs.push({ p: pl, lay: l });
+      }
+    });
   });
   return jobs;
 }
@@ -9034,6 +9196,10 @@ function runBatchPrint(){
   var log = document.getElementById('bp-log'); log.style.display = 'block'; log.innerHTML = '';
 
   var i = 0, okCount = 0, failCount = 0;
+  // Track per merged-strip completion so we can mark the strip printed once all
+  // of its constituent labels have succeeded.
+  var mergedNeed = {}, mergedOk = {};
+  jobs.forEach(function(j){ if (j.mergedStripId){ mergedNeed[j.mergedStripId] = (mergedNeed[j.mergedStripId]||0) + 1; } });
 
   function finish(state){
     _bpRunning = false;
@@ -9055,7 +9221,19 @@ function runBatchPrint(){
     status.innerHTML = '<span style="color:#6B6455">'+esc(t('batchPrinting', {i:i+1, n:jobs.length}))+' '+esc(nm)+'</span>';
     bar.style.width = Math.round((i/jobs.length)*100) + '%';
     printLabelPromise(job.p, job.lay).then(function(res){
-      if (res && res.ok){ okCount++; _bpLog(nm, true, res.msg); }
+      if (res && res.ok){
+        okCount++; _bpLog(nm, true, res.msg);
+        // When every label of a merged strip has printed, mark the strip itself
+        // printed (its constituents aren't in the parts list, so the per-label
+        // markPartPrinted is a no-op for them).
+        if (job.mergedStripId){
+          mergedOk[job.mergedStripId] = (mergedOk[job.mergedStripId]||0) + 1;
+          if (mergedOk[job.mergedStripId] >= mergedNeed[job.mergedStripId]){
+            var strip = parts.find(function(pp){ return pp.id === job.mergedStripId; });
+            if (strip){ strip.printed = true; try{ renderParts(); }catch(e){} }
+          }
+        }
+      }
       else { failCount++; _bpLog(nm, false, (res && res.msg) || 'failed'); }
     }).catch(function(e){
       failCount++; _bpLog(nm, false, String(e));
