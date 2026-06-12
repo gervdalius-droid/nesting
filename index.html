@@ -674,6 +674,7 @@ body.print-mode{background:#fff}
         <th onclick="pwSortBy('l')">L mm ↕</th>
         <th onclick="pwSortBy('w')">W mm ↕</th>
         <th style="width:30px" title="Swap L and W for this row"></th>
+        <th style="width:40px" title="Rotation — Auto / Allow / Lock. Click to cycle.">Rot</th>
         <th style="width:54px">Qty</th>
         <th onclick="pwSortBy('area')">Area m² ↕</th>
         <th>Thickness</th>
@@ -690,6 +691,12 @@ body.print-mode{background:#fff}
     <span id="pw-sel-count" style="font-size:11px;color:#6B6455;font-family:monospace"></span>
     <button class="btn bs" onclick="pwSwapSelected()" title="Swap L and W for all selected parts (also rotates DXF shapes 90°)">⇆ Swap L/W</button>
     <button class="btn bs" onclick="pwMergeSelected()" title="Merge the selected parts into one strip (they must share a width or a length)" style="color:#8B5A2B;border-color:#8B5A2B">🔗 Merge selected</button>
+    <div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap">
+      <span style="font-size:11px;color:#6B6455">Rotation:</span>
+      <button class="btn bs" onclick="pwSetRotation('auto')" title="Selected parts follow the material's grain setting (default)">⟳ Auto</button>
+      <button class="btn bs" onclick="pwSetRotation('rotate')" title="Force selected parts rotatable — packer may turn them 90° to save sheets" style="color:#3D6B4F;border-color:#3D6B4F">🔄 Allow</button>
+      <button class="btn bs" onclick="pwSetRotation('lock')" title="Lock selected parts — no rotation (preserve grain / face direction)" style="color:#8a6d1a;border-color:#8a6d1a">🔒 Lock</button>
+    </div>
     <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
       <span style="font-size:11px;color:#6B6455">Assign selected to group:</span>
       <select id="pw-grp-assign" style="font-size:11px;padding:3px 6px;width:auto"><option value="">— choose —</option></select>
@@ -3802,6 +3809,15 @@ function renderPartsWindow(){
       +'<td><input class="pw-edit pw-edit-num pw-edit-l" data-id="'+sid+'" type="number" min="1" value="'+p.l+'" onchange="pwEditField(\''+sid+'\',\'l\',this.value)"></td>'
       +'<td><input class="pw-edit pw-edit-num pw-edit-w" data-id="'+sid+'" type="number" min="1" value="'+p.w+'" onchange="pwEditField(\''+sid+'\',\'w\',this.value)"></td>'
       +'<td style="text-align:center;padding:0"><button class="pw-swap-btn" title="Swap L and W for this part (also rotates DXF shape 90°)" onclick="pwSwapRow(\''+sid+'\')">⇆</button></td>'
+      +'<td style="text-align:center;padding:0">'+(function(){
+          var st=p.allowRotate===true?'rotate':p.allowRotate===false?'lock':'auto';
+          var gl=st==='rotate'?'🔄':st==='lock'?'🔒':'⟳';
+          var cl=st==='rotate'?'#3D6B4F':st==='lock'?'#8a6d1a':'#A09888';
+          var ti=st==='rotate'?'Rotation: ALLOW (may turn 90°) — click → lock'
+                :st==='lock'?'Rotation: LOCKED (no turning) — click → auto'
+                :'Rotation: AUTO — follows material — click → allow';
+          return '<button class="pw-swap-btn" style="color:'+cl+'" title="'+ti+'" onclick="pwCycleRowRotation(\''+sid+'\')">'+gl+'</button>';
+        })()+'</td>'
       +'<td style="padding:0 2px"><input class="pw-edit pw-edit-num pw-edit-qty" data-id="'+sid+'" type="number" min="1" value="'+countGroupOf(p)+'" title="Total quantity of identical parts (same name + material + L×W + thickness). Editing clones or removes copies." onchange="pwSetQty(\''+sid+'\',this.value)"></td>'
       +'<td style="font-family:monospace;font-size:10px;color:#A09888" data-id="'+sid+'-area">'+((p.l*p.w)/1e6).toFixed(4)+'</td>'
       +'<td><input class="pw-edit pw-edit-num pw-edit-t" data-id="'+sid+'" type="number" min="1" value="'+p.thick+'" onchange="pwEditField(\''+sid+'\',\'thick\',this.value)"></td>'
@@ -4003,6 +4019,37 @@ function pwSwapSelected(){
   });
   renderParts();
   renderPartsWindow();
+}
+
+// Bulk rotation: apply a rotation setting to every selected part.
+//   'auto'   → allowRotate=null  (follow material grain)
+//   'rotate' → allowRotate=true  (force rotatable)
+//   'lock'   → allowRotate=false (no rotation)
+function pwSetRotation(mode){
+  var sel = parts.filter(function(p){ return pwSel.has(String(p.id)); });
+  if(!sel.length){ alert('Select one or more parts first, then choose a rotation setting.'); return; }
+  var val = mode==='rotate' ? true : (mode==='lock' ? false : null);
+  sel.forEach(function(p){ p.allowRotate = val; });
+  renderParts();
+  renderPartsWindow();
+  var label = mode==='rotate' ? 'allow rotation' : (mode==='lock' ? 'locked' : 'auto');
+  setStatus && setStatus('ok', '↻ Rotation → '+label+' for '+sel.length+' part'+(sel.length>1?'s':''));
+  _reoptimizeSoon();   // refresh the layout so the effect is immediate
+}
+
+// Cycle one manager row's rotation (applies to its whole identical group):
+//   AUTO → ALLOW → LOCK → AUTO
+function pwCycleRowRotation(id){
+  var rep = parts.find(function(p){ return String(p.id)===String(id); });
+  if(!rep) return;
+  var key = partGroupKey(rep);
+  var grp = parts.filter(function(p){ return partGroupKey(p)===key; });
+  var cur = rep.allowRotate;
+  var next = (cur===null||cur===undefined) ? true : (cur===true ? false : null);
+  grp.forEach(function(p){ p.allowRotate = next; });
+  renderParts();
+  renderPartsWindow();
+  _reoptimizeSoon();
 }
 
 function pwAssignToGroup(){
@@ -5633,7 +5680,10 @@ function optimize(){
         bestPlacedIds = ids;
       }
     }
-    return { layouts: bestLayouts || [], placedIds: bestPlacedIds || {} };
+    // Final pass: eliminate near-empty sheets by relocating their parts
+    // (rotating as needed) onto fuller sheets. Safe — only removes sheets.
+    var finalLayouts = _consolidateLayout(bestLayouts || [], kerf, grainLocked);
+    return { layouts: finalLayouts, placedIds: bestPlacedIds || {} };
   }
   boards.forEach(function(bd){
     var bp=byBoard[bd.id];if(!bp||!bp.length)return;
@@ -5978,6 +6028,142 @@ function _packGroupTight(members, kerf){
   return options.reduce(function(best, cur){
     return (cur.bboxW * cur.bboxH < best.bboxW * best.bboxH) ? cur : best;
   });
+}
+
+// ── Post-pack consolidation ────────────────────────────────────────────────
+// The per-sheet greedy fill never reconsiders a part once it spills to a later
+// sheet. This pass tries to EMPTY the least-full sheets by relocating their
+// parts onto free space in fuller sheets, trying BOTH orientations — the exact
+// "just rotate it and it fits on an earlier sheet" case the greedy pass misses.
+// It only ever removes sheets (never drops a part), so it's always safe.
+function _consolidateLayout(sheets, kerf, grainLocked){
+  if(!sheets || sheets.length < 2) return sheets;
+  var work = sheets.map(function(L){ var c=Object.assign({}, L); c.placements=L.placements.slice(); return c; });
+
+  function freeRectsOf(sheet){
+    var free=[{x:0,y:0,w:sheet.uw,h:sheet.uh}];
+    sheet.placements.forEach(function(pl){ free=subtractRectFromFreeList(free, {x:pl.x,y:pl.y,w:pl.pw+kerf,h:pl.ph+kerf}); });
+    return free;
+  }
+  function usedArea(s){ return s.placements.reduce(function(a,pl){return a+pl.pw*pl.ph;},0); }
+  function hasGroup(s){ return s.placements.some(function(pl){ return pl.part && pl.part.groupId; }); }
+  function noRotOf(p){
+    if(p.allowRotate===true) return false;
+    if(p.allowRotate===false) return true;
+    return grainLocked || (p.groupId?true:false);
+  }
+  function tryPlace(part, free){
+    var noRot=noRotOf(part);
+    var tries = noRot ? [[part.l,part.w,false]] : [[part.l,part.w,false],[part.w,part.l,true]];
+    var best={found:false,score:Infinity,score2:Infinity};
+    tries.forEach(function(t){
+      var pw=t[0]+kerf, ph=t[1]+kerf;
+      for(var i=0;i<free.length;i++){
+        var fr=free[i];
+        if(pw<=fr.w && ph<=fr.h){
+          var lw=fr.w-pw, lh=fr.h-ph, s1=Math.min(lw,lh), s2=Math.max(lw,lh);
+          if(s1<best.score || (s1===best.score && s2<best.score2)){
+            best={found:true,score:s1,score2:s2,x:fr.x,y:fr.y,pw:t[0],ph:t[1],rot:t[2]};
+          }
+        }
+      }
+    });
+    return best;
+  }
+
+  var safety=work.length+2, changed=true;
+  while(changed && work.length>1 && safety-->0){
+    changed=false;
+    // emptiest sheets first; never use a grouped sheet as the source (would split a group)
+    var cand=work.map(function(s,i){return {i:i,u:usedArea(s),grp:hasGroup(s)};})
+                 .filter(function(c){return !c.grp;})
+                 .sort(function(a,b){return a.u-b.u;});
+    for(var ci=0; ci<cand.length && !changed; ci++){
+      var srcIdx=cand[ci].i, src=work[srcIdx];
+      var others=[], oRef=[];
+      work.forEach(function(s,i){ if(i!==srcIdx){ others.push(s); oRef.push(i);} });
+      var freeLists=others.map(freeRectsOf);
+      var srcParts=src.placements.slice().sort(function(a,b){return (b.pw*b.ph)-(a.pw*a.ph);});
+      var reloc=[], ok=true;
+      for(var pi=0; pi<srcParts.length; pi++){
+        var pl=srcParts[pi], done=false;
+        // try fuller targets first so parts pack into the tightest gaps
+        var targOrder=others.map(function(s,i){return {i:i,u:usedArea(s)};}).sort(function(a,b){return b.u-a.u;});
+        for(var to=0; to<targOrder.length; to++){
+          var ti=targOrder[to].i;
+          var b=tryPlace(pl.part, freeLists[ti]);
+          if(b.found){
+            freeLists[ti]=subtractRectFromFreeList(freeLists[ti], {x:b.x,y:b.y,w:b.pw+kerf,h:b.ph+kerf});
+            reloc.push({ti:ti, place:{part:pl.part, x:b.x,y:b.y,pw:b.pw,ph:b.ph,rot:b.rot,color:pl.color}});
+            done=true; break;
+          }
+        }
+        if(!done){ ok=false; break; }
+      }
+      if(ok){
+        reloc.forEach(function(r){ others[r.ti].placements.push(r.place); });
+        work.splice(srcIdx,1);
+        changed=true;
+      }
+    }
+  }
+  work.forEach(function(s,i){ s.idx=i; });
+
+  // ── Stronger pass: MERGE two sheets by re-packing their combined parts ──
+  // The relocate-into-gaps loop above can't rearrange a target sheet. This pass
+  // takes two sheets and re-packs ALL their parts together onto one board; if
+  // they fit, the two sheets become one. This is the "compact this sheet, then
+  // the other sheet's parts drop in" case. Safe: only ever reduces sheet count.
+  if (typeof pack === 'function'){
+    function _tryPackOneSheet(partObjs, uw, uh, trim){
+      var sorts=[
+        function(a,b){return (Math.max(b.l,b.w)*Math.min(b.l,b.w))-(Math.max(a.l,a.w)*Math.min(a.l,a.w));},
+        function(a,b){return Math.max(b.l,b.w)-Math.max(a.l,a.w);},
+        function(a,b){return Math.min(b.l,b.w)-Math.min(a.l,a.w);}
+      ];
+      var modes=['bssf','bl'];
+      for(var s=0;s<sorts.length;s++){
+        for(var m=0;m<modes.length;m++){
+          var input=partObjs.slice().sort(sorts[s]);
+          var res=null;
+          try { res=pack(uw, uh, input, kerf, '#7E8AA2', 0, trim, grainLocked, modes[m]); }
+          catch(e){ res=null; }
+          if(res && res.length===1 && res[0].placements.length===partObjs.length){
+            return { uw:uw, uh:uh, trim:trim, grainLocked:grainLocked, placements:res[0].placements };
+          }
+        }
+      }
+      return null;
+    }
+    function areaParts(s){ return s.placements.reduce(function(z,pl){return z + (pl.part?Math.max(pl.part.l,pl.part.w)*Math.min(pl.part.l,pl.part.w):pl.pw*pl.ph);},0); }
+    function tryMergePair(){
+      var ord=work.map(function(s,i){return {i:i,u:usedArea(s),grp:hasGroup(s)};})
+                  .filter(function(c){return !c.grp;})
+                  .sort(function(a,b){return a.u-b.u;});
+      for(var a=0;a<ord.length;a++){
+        var si=ord[a].i, S=work[si];
+        for(var b=a+1;b<ord.length;b++){
+          var ti=ord[b].i, T=work[ti];
+          if(S.uw!==T.uw || S.uh!==T.uh) continue;            // same board size only
+          if(areaParts(S)+areaParts(T) > S.uw*S.uh) continue; // can't possibly fit
+          var union=S.placements.concat(T.placements).map(function(pl){return pl.part;}).filter(Boolean);
+          var packed=_tryPackOneSheet(union, S.uw, S.uh, S.trim);
+          if(packed){
+            var keep=[]; work.forEach(function(s,idx){ if(idx!==si && idx!==ti) keep.push(s); });
+            keep.push(packed);
+            work=keep;
+            return true;
+          }
+        }
+      }
+      return false;
+    }
+    var msafe=work.length*work.length+4;
+    while(work.length>1 && msafe-->0 && tryMergePair()){ /* keep merging */ }
+    work.forEach(function(s,i){ s.idx=i; });
+  }
+
+  return work;
 }
 
 function pack(UW, UH, partsIn, kerf, color, _ignoredMaxSheets, trim, grainLocked, placeMode){
@@ -7615,7 +7801,8 @@ function consolidateSheets(){
         bestPlacedIds = ids;
       }
     }
-    return { layouts: bestLayouts || [], placedIds: bestPlacedIds || {} };
+    var finalLayouts = _consolidateLayout(bestLayouts || [], kerf, grainLocked);
+    return { layouts: finalLayouts, placedIds: bestPlacedIds || {} };
   }
   boards.forEach(function(bd){
     var bp=byBoard[bd.id];if(!bp||!bp.length)return;
