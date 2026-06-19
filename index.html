@@ -1773,6 +1773,73 @@ function boardPickStock(id,name){
   renderBoards(); refreshSel();
 }
 
+// ── Custom material dropdown (click to open · filter as you type · pick or type your own) ──
+var WH_COMBO_BOARD=null, WH_COMBO_INPUT=null;
+function whComboPanel(){
+  var p=document.getElementById('wh-dd');
+  if(!p){
+    p=document.createElement('div'); p.id='wh-dd';
+    p.style.cssText='position:fixed;z-index:99999;background:#fff;border:1px solid #D8D2C6;border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.14);max-height:280px;overflow:auto;display:none';
+    document.body.appendChild(p);
+    // pick an option (mousedown fires before the input blurs)
+    p.addEventListener('mousedown',function(e){
+      var opt=e.target.closest('.wh-opt'); if(!opt)return;
+      e.preventDefault(); whComboPick(opt.getAttribute('data-mat'));
+    });
+    // close when clicking elsewhere
+    document.addEventListener('mousedown',function(e){
+      var pn=document.getElementById('wh-dd'); if(!pn||pn.style.display==='none')return;
+      if(pn.contains(e.target))return;
+      if(WH_COMBO_INPUT&&e.target===WH_COMBO_INPUT)return;
+      whComboClose();
+    });
+    document.addEventListener('keydown',function(e){ if(e.key==='Escape')whComboClose(); });
+    window.addEventListener('scroll',function(e){
+      var pn=document.getElementById('wh-dd'); if(!pn||pn.style.display==='none')return;
+      if(pn.contains(e.target))return; whComboClose();
+    },true);
+  }
+  return p;
+}
+function whComboOpen(id,el){
+  WH_COMBO_BOARD=id; WH_COMBO_INPUT=el;
+  var p=whComboPanel(), r=el.getBoundingClientRect();
+  p.style.left=r.left+'px'; p.style.top=(r.bottom+3)+'px'; p.style.minWidth=r.width+'px';
+  whComboRender(el.value);
+  p.style.display='block';
+}
+function whComboRender(filter){
+  var p=whComboPanel(), f=String(filter||'').trim(), fl=f.toLowerCase(), std=whStdSheetArea();
+  var list=WH_STOCK.filter(function(s){ return !fl||String(s.material||'').toLowerCase().indexOf(fl)>=0; });
+  var exact=WH_STOCK.some(function(s){ return String(s.material||'').toLowerCase()===fl; });
+  var html='';
+  if(f&&!exact){
+    html+='<div class="wh-opt" data-mat="'+esc(f)+'" style="padding:9px 12px;cursor:pointer;border-bottom:1px solid #F0ECE3;background:#FAF8F3">'
+      +'<div style="font-weight:600;color:#3D6B4F">➕ Naudoti „'+esc(f)+'" (rankinis įvedimas)</div></div>';
+  }
+  html+=list.map(function(s){
+    var sheets=(s.available>0&&std)?Math.floor(s.available/std):0;
+    var sub=[(s.thickness!=null?s.thickness+'mm':''),sheets+' lakšt.'].filter(Boolean).join(' · ');
+    return '<div class="wh-opt" data-mat="'+esc(s.material)+'" style="padding:9px 12px;cursor:pointer;border-bottom:1px solid #F0ECE3">'
+      +'<div style="font-weight:600;color:#3a352c">'+esc(s.material)+'</div>'
+      +'<div style="font-size:11px;color:#A09888">'+esc(sub)+'</div></div>';
+  }).join('');
+  if(!list.length&&!f) html='<div style="padding:10px 12px;color:#A09888;font-size:12px">Sandėlio likučių nėra (rašykite ranka)</div>';
+  p.innerHTML=html;
+}
+function whComboPick(material){
+  var id=WH_COMBO_BOARD; whComboClose(); if(id==null)return;
+  var b=boards.filter(function(x){return x.id===id;})[0]; if(!b)return;
+  var s=whFindStock(material);
+  b.mat = s?s.material:material;
+  if(s){ b.sku=s.sku; if(s.thickness!=null)b.thickness=s.thickness;
+    var area=(b.w&&b.h)?(b.w*b.h/1e6):whStdSheetArea();
+    if(area>0&&s.available>0)b.qty=Math.floor(s.available/area);
+  }
+  renderBoards(); refreshSel();
+}
+function whComboClose(){ var p=document.getElementById('wh-dd'); if(p)p.style.display='none'; WH_COMBO_BOARD=null; WH_COMBO_INPUT=null; }
+
 function collectProjectState(){
   // Snapshot everything the app needs to fully restore a project.
   // NOTE: returned references are live — JSON.stringify will make its own copy when serializing.
@@ -2626,7 +2693,7 @@ function renderBoards(){
     var pOpen=(b.priceM2||b.priceMatMarkup||b.priceCutM||b.pricePart||b.priceEdge)?' open':'';
     var d=document.createElement('div');d.className='bc';
     d.innerHTML='<div class="bh"><div class="bd" style="background:'+b.color+'"></div>'
-      +'<input class="bn" list="wh-materials" value="'+esc(b.mat)+'" oninput="updateBoard('+b.id+',\'mat\',this.value)" onchange="boardPickStock('+b.id+',this.value)">'
+      +'<input class="bn" autocomplete="off" value="'+esc(b.mat)+'" onfocus="whComboOpen('+b.id+',this)" onclick="whComboOpen('+b.id+',this)" oninput="updateBoard('+b.id+',\'mat\',this.value);whComboRender(this.value)">'
       +'<button class="btn bs br" onclick="removeBoard('+b.id+')">×</button></div>'
       +'<div class="bg2">'
       +'<div><label class="fl">W (mm)</label><input type="number" value="'+b.w+'" onchange="updateBoard('+b.id+',\'w\',this.value)"></div>'
