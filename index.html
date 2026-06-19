@@ -1685,7 +1685,7 @@ function detectLanguage(){
 }
 // Initialize language as early as possible (before DOMContentLoaded renders static HTML)
 _lang=detectLanguage();
-document.addEventListener('DOMContentLoaded',function(){translateAll();});
+document.addEventListener('DOMContentLoaded',function(){translateAll();whLoadStock();});
 
 // ═══════════════════════════════════════════════════════════════
 // PROJECT PERSISTENCE — Supabase with localStorage fallback
@@ -1715,6 +1715,62 @@ function supaHeaders(){
 }
 function supaConfigured(){
   return !!(SUPABASE_URL&&SUPABASE_ANON_KEY&&SUPABASE_URL.indexOf('YOUR_')<0);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SHARED WAREHOUSE — read live stock that GVS publishes (project byvtqycd).
+// This is a SECOND Supabase target, separate from this app's own project.
+// It powers the "type-or-pick" material field on each board.
+// ═══════════════════════════════════════════════════════════════
+var WH_SB_URL='https://byvtqycdgboqbmpoysyt.supabase.co';
+var WH_SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ5dnRxeWNkZ2JvcWJtcG95c3l0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU3ODA0MzAsImV4cCI6MjA5MTM1NjQzMH0.IoQRxA4m45--5fQ9U40ChNVCwsBPmxTM4p8sM1-3AUo';
+var WH_STOCK=[], WH_OFFCUTS=[], WH_WS='';
+function whHeaders(){return {'apikey':WH_SB_KEY,'Authorization':'Bearer '+WH_SB_KEY,'Content-Type':'application/json'};}
+function whStdSheetArea(){return 2800*2070/1e6;} // standard full sheet m² (for the count hint)
+
+// Pull live stock + offcuts and refresh the dropdown. Called on load and on addBoard.
+async function whLoadStock(){
+  try{
+    var r=await fetch(WH_SB_URL+'/rest/v1/fabflow_stock?archived=eq.false&select=workspace_code,sku,material,thickness,unit,qty,reserved,available&order=material.asc',{headers:whHeaders()});
+    if(r.ok){WH_STOCK=await r.json(); if(WH_STOCK.length)WH_WS=WH_STOCK[0].workspace_code||'';}
+  }catch(e){console.warn('whLoadStock',e&&e.message);}
+  try{
+    var r2=await fetch(WH_SB_URL+'/rest/v1/fabflow_offcuts?archived=eq.false&status=eq.available&select=id,material,thickness,w,h,shape',{headers:whHeaders()});
+    if(r2.ok)WH_OFFCUTS=await r2.json();
+  }catch(e){console.warn('whLoadOffcuts',e&&e.message);}
+  renderMaterialDatalist();
+  return {stock:WH_STOCK,offcuts:WH_OFFCUTS};
+}
+
+// Build/refresh the shared <datalist> the material fields point at.
+function renderMaterialDatalist(){
+  var dl=document.getElementById('wh-materials');
+  if(!dl){dl=document.createElement('datalist');dl.id='wh-materials';document.body.appendChild(dl);}
+  var std=whStdSheetArea();
+  dl.innerHTML=WH_STOCK.map(function(s){
+    var sheets=(s.available>0&&std)?Math.floor(s.available/std):0;
+    var th=(s.thickness!=null)?(s.thickness+'mm'):'';
+    var label=[th,sheets+' lakšt.'].filter(Boolean).join(' · ');
+    return '<option value="'+esc(s.material)+'">'+esc(label)+'</option>';
+  }).join('');
+}
+
+function whFindStock(name){
+  var k=String(name||'').trim().toLowerCase();
+  return WH_STOCK.filter(function(s){return String(s.material||'').trim().toLowerCase()===k;})[0]||null;
+}
+
+// Fired when a board's material field changes. If the typed/picked name matches
+// warehouse stock, fill sku + thickness + available sheet count. If it doesn't
+// match (a name you typed yourself), leave it exactly as typed — that's manual entry.
+function boardPickStock(id,name){
+  var b=boards.filter(function(x){return x.id===id;})[0]; if(!b)return;
+  var s=whFindStock(name); if(!s)return;
+  b.mat=s.material; b.sku=s.sku;
+  if(s.thickness!=null)b.thickness=s.thickness;
+  var area=(b.w&&b.h)?(b.w*b.h/1e6):whStdSheetArea();
+  if(area>0&&s.available>0)b.qty=Math.floor(s.available/area);
+  renderBoards(); refreshSel();
 }
 
 function collectProjectState(){
@@ -2546,7 +2602,7 @@ function normalizeMat(s){
   // Collapse all whitespace runs (including non-breaking space, tabs) to single space, then trim
   return String(s).replace(/\s+/g, ' ').trim();
 }
-function addBoard(){boards.push({id:bId++,mat:'New Material',w:2800,h:2070,qty:15,color:COLORS[boards.length%COLORS.length],grain:false,priceM2:0,priceMatMarkup:0,priceCutM:0,pricePart:0,priceEdge:0});renderBoards();refreshSel();}
+function addBoard(){boards.push({id:bId++,mat:'New Material',w:2800,h:2070,qty:15,color:COLORS[boards.length%COLORS.length],grain:false,priceM2:0,priceMatMarkup:0,priceCutM:0,pricePart:0,priceEdge:0});renderBoards();refreshSel();whLoadStock();}
 function removeBoard(id){boards=boards.filter(function(b){return b.id!==id;});renderBoards();refreshSel();renderQuote();}
 function updateBoard(id,f,v){
   var b=boards.find(function(b){return b.id===id;});if(!b)return;
@@ -2570,7 +2626,7 @@ function renderBoards(){
     var pOpen=(b.priceM2||b.priceMatMarkup||b.priceCutM||b.pricePart||b.priceEdge)?' open':'';
     var d=document.createElement('div');d.className='bc';
     d.innerHTML='<div class="bh"><div class="bd" style="background:'+b.color+'"></div>'
-      +'<input class="bn" value="'+esc(b.mat)+'" oninput="updateBoard('+b.id+',\'mat\',this.value)">'
+      +'<input class="bn" list="wh-materials" value="'+esc(b.mat)+'" oninput="updateBoard('+b.id+',\'mat\',this.value)" onchange="boardPickStock('+b.id+',this.value)">'
       +'<button class="btn bs br" onclick="removeBoard('+b.id+')">×</button></div>'
       +'<div class="bg2">'
       +'<div><label class="fl">W (mm)</label><input type="number" value="'+b.w+'" onchange="updateBoard('+b.id+',\'w\',this.value)"></div>'
