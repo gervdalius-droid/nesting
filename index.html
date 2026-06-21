@@ -1807,7 +1807,7 @@ function whComboOpen(id,el){
   WH_COMBO_BOARD=id; WH_COMBO_INPUT=el;
   var p=whComboPanel(), r=el.getBoundingClientRect();
   p.style.left=r.left+'px'; p.style.top=(r.bottom+3)+'px'; p.style.minWidth=r.width+'px';
-  whComboRender(el.value);
+  whComboRender('');          // open shows the whole list; typing filters it
   p.style.display='block';
 }
 function whComboRender(filter){
