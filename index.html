@@ -29,7 +29,7 @@ input[type=color]{padding:2px 3px;height:27px;cursor:pointer}
 .bh{display:flex;align-items:center;gap:6px;margin-bottom:7px}
 .bd{width:10px;height:10px;border-radius:50%}
 .bn{font-size:12px;font-weight:600;border:none;background:transparent;padding:0;outline:none;flex:1;color:#1C1A14;min-width:0;width:0}
-.bg2{display:grid;grid-template-columns:1fr 1fr 28px;gap:4px;align-items:flex-end}
+.bg2{display:grid;grid-template-columns:1fr 1fr 1fr 28px;gap:4px;align-items:flex-end}
 .fl{font-size:10px;color:#A09888;display:block;margin-bottom:2px}
 .tbl{width:100%;border-collapse:collapse;font-size:11px}
 .tbl th{text-align:left;padding:3px 5px;border-bottom:1px solid #D4CFC2;color:#A09888;font-weight:500;font-size:10px}
@@ -1727,11 +1727,13 @@ var WH_SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJl
 var WH_STOCK=[], WH_OFFCUTS=[], WH_WS='';
 function whHeaders(){return {'apikey':WH_SB_KEY,'Authorization':'Bearer '+WH_SB_KEY,'Content-Type':'application/json'};}
 function whStdSheetArea(){return 2800*2070/1e6;} // standard full sheet m² (for the count hint)
+// Real board area for a stock row — uses the warehouse dimensions, falls back to standard.
+function whStockArea(s){ return (s&&s.sheet_w&&s.sheet_h)?(s.sheet_w*s.sheet_h/1e6):whStdSheetArea(); }
 
 // Pull live stock + offcuts and refresh the dropdown. Called on load and on addBoard.
 async function whLoadStock(){
   try{
-    var r=await fetch(WH_SB_URL+'/rest/v1/fabflow_stock?archived=eq.false&select=workspace_code,sku,material,thickness,unit,qty,reserved,available&order=material.asc',{headers:whHeaders()});
+    var r=await fetch(WH_SB_URL+'/rest/v1/fabflow_stock?archived=eq.false&select=workspace_code,sku,material,thickness,unit,qty,reserved,available,sheet_w,sheet_h&order=material.asc',{headers:whHeaders()});
     if(r.ok){WH_STOCK=await r.json(); if(WH_STOCK.length)WH_WS=WH_STOCK[0].workspace_code||'';}
   }catch(e){console.warn('whLoadStock',e&&e.message);}
   try{
@@ -1784,7 +1786,7 @@ function whComboPanel(){
     // pick an option (mousedown fires before the input blurs)
     p.addEventListener('mousedown',function(e){
       var opt=e.target.closest('.wh-opt'); if(!opt)return;
-      e.preventDefault(); whComboPick(opt.getAttribute('data-mat'));
+      e.preventDefault(); whComboPick(opt.getAttribute('data-sku')||'', opt.getAttribute('data-mat')||'');
     });
     // close when clicking elsewhere
     document.addEventListener('mousedown',function(e){
@@ -1818,22 +1820,29 @@ function whComboRender(filter){
       +'<div style="font-weight:600;color:#3D6B4F">➕ Naudoti „'+esc(f)+'" (rankinis įvedimas)</div></div>';
   }
   html+=list.map(function(s){
-    var sheets=(s.available>0&&std)?Math.floor(s.available/std):0;
-    var sub=[(s.thickness!=null?s.thickness+'mm':''),sheets+' lakšt.'].filter(Boolean).join(' · ');
-    return '<div class="wh-opt" data-mat="'+esc(s.material)+'" style="padding:9px 12px;cursor:pointer;border-bottom:1px solid #F0ECE3">'
+    var area=whStockArea(s);
+    var sheets=(s.available>0&&area)?Math.floor(s.available/area):0;
+    var dim=(s.sheet_w&&s.sheet_h)?(s.sheet_w+'×'+s.sheet_h):'';
+    var sub=[(s.thickness!=null?s.thickness+'mm':''),dim,sheets+' lakšt.'].filter(Boolean).join(' · ');
+    return '<div class="wh-opt" data-sku="'+esc(s.sku)+'" data-mat="'+esc(s.material)+'" style="padding:9px 12px;cursor:pointer;border-bottom:1px solid #F0ECE3">'
       +'<div style="font-weight:600;color:#3a352c">'+esc(s.material)+'</div>'
       +'<div style="font-size:11px;color:#A09888">'+esc(sub)+'</div></div>';
   }).join('');
   if(!list.length&&!f) html='<div style="padding:10px 12px;color:#A09888;font-size:12px">Sandėlio likučių nėra (rašykite ranka)</div>';
   p.innerHTML=html;
 }
-function whComboPick(material){
+function whFindStockBySku(sku){ return WH_STOCK.filter(function(s){return String(s.sku)===String(sku);})[0]||null; }
+function whComboPick(sku, material){
   var id=WH_COMBO_BOARD; whComboClose(); if(id==null)return;
   var b=boards.filter(function(x){return x.id===id;})[0]; if(!b)return;
-  var s=whFindStock(material);
-  b.mat = s?s.material:material;
-  if(s){ b.sku=s.sku; if(s.thickness!=null)b.thickness=s.thickness;
-    var area=(b.w&&b.h)?(b.w*b.h/1e6):whStdSheetArea();
+  var s=sku?whFindStockBySku(sku):null;
+  b.mat = s?s.material:(material||'');
+  if(s){
+    b.sku=s.sku;
+    if(s.thickness!=null)b.thickness=s.thickness;
+    if(s.sheet_w)b.w=s.sheet_w;        // default board size comes from warehouse stock
+    if(s.sheet_h)b.h=s.sheet_h;
+    var area=whStockArea(s);
     if(area>0&&s.available>0)b.qty=Math.floor(s.available/area);
   }
   renderBoards(); refreshSel();
@@ -2673,7 +2682,7 @@ function addBoard(){boards.push({id:bId++,mat:'New Material',w:2800,h:2070,qty:1
 function removeBoard(id){boards=boards.filter(function(b){return b.id!==id;});renderBoards();refreshSel();renderQuote();}
 function updateBoard(id,f,v){
   var b=boards.find(function(b){return b.id===id;});if(!b)return;
-  if(f==='w'||f==='h'||f==='qty')v=parseInt(v)||0;
+  if(f==='w'||f==='h'||f==='qty'||f==='thickness')v=parseInt(v)||0;
   else if(f==='priceM2'||f==='priceMatMarkup'||f==='priceCutM'||f==='pricePart'||f==='priceEdge')v=parseFloat(v)||0;
   b[f]=v;if(f==='color')renderBoards();refreshSel();
   // Pricing changes -> live-update the quote
@@ -2698,6 +2707,7 @@ function renderBoards(){
       +'<div class="bg2">'
       +'<div><label class="fl">W (mm)</label><input type="number" value="'+b.w+'" onchange="updateBoard('+b.id+',\'w\',this.value)"></div>'
       +'<div><label class="fl">H (mm)</label><input type="number" value="'+b.h+'" onchange="updateBoard('+b.id+',\'h\',this.value)"></div>'
+      +'<div><label class="fl">Storis (mm)</label><input type="number" value="'+(b.thickness!=null?b.thickness:18)+'" onchange="updateBoard('+b.id+',\'thickness\',this.value)"></div>'
       +'<div><label class="fl">Color</label><input type="color" value="'+b.color+'" onchange="updateBoard('+b.id+',\'color\',this.value)"></div>'
       +'</div>'
       +'<label style="display:flex;align-items:center;gap:6px;font-size:11px;color:#6B6455;cursor:pointer;margin-top:6px;padding-top:5px;border-top:1px solid #E8E4DB">'
