@@ -4,198 +4,199 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Dėdės Baldai — Nesting</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#F2EFE8;color:#1C1A14;height:100vh;overflow:hidden;font-size:13px}
-.hdr{display:flex;align-items:center;gap:10px;padding:10px 16px;background:#FDFCF9;border-bottom:1px solid #D4CFC2}
-.ht{font-size:14px;font-weight:600;letter-spacing:-.01em}
-.hs{font-size:10px;color:#A09888;font-family:monospace}
+body{font-family:"Inter",-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#eceef2;color:#1b1e26;height:100vh;overflow:hidden;font-size:13px}
+.hdr{display:flex;align-items:center;gap:10px;padding:10px 16px;background:#1b1e26;border-bottom:3px solid #2f54eb}
+.ht{font-size:14px;font-weight:600;letter-spacing:-.01em;color:#e8ebf0}
+.hs{font-size:10px;color:#9aa3b2;font-family:monospace}
 .app{display:grid;grid-template-columns:290px 1fr;height:calc(100vh - 48px);overflow:hidden}
-.side{background:#FDFCF9;border-right:1px solid #D4CFC2;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:10px}
-.main{overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:8px;background:#F2EFE8}
-.sec{font-size:10px;font-weight:600;color:#A09888;text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px;font-family:monospace}
-input,select{width:100%;padding:5px 8px;border:1px solid #D4CFC2;border-radius:6px;font-size:12px;background:#F2EFE8;color:#1C1A14;outline:none}
-input:focus,select:focus{border-color:#3D6B4F;background:#fff}
+.side{background:#ffffff;border-right:1px solid #e6e8ed;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:10px}
+.main{overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:8px;background:#eceef2}
+.sec{font-size:10px;font-weight:600;color:#1e3aa8;text-transform:uppercase;letter-spacing:.12em;margin-bottom:4px;font-family:monospace}
+input,select{width:100%;padding:5px 8px;border:1px solid #e6e8ed;border-radius:6px;font-size:12px;background:#eceef2;color:#1b1e26;outline:none}
+input:focus,select:focus{border-color:#2f54eb;background:#fff;outline:2px solid #b9c5f5}
 input[type=color]{padding:2px 3px;height:27px;cursor:pointer}
-.btn{padding:5px 11px;border:1px solid #C0BAA8;border-radius:6px;font-size:12px;cursor:pointer;background:#FDFCF9;color:#1C1A14}
-.btn:hover{background:#EAE6DC}
-.bp{background:#3D6B4F;color:#fff;border-color:#3D6B4F;font-weight:500}.bp:hover{background:#2D5040}
+.btn{padding:5px 11px;border:1px solid #d2d7df;border-radius:6px;font-size:12px;cursor:pointer;background:#ffffff;color:#1b1e26}
+.btn:hover{background:#e9edf3}
+.bp{background:#2f54eb;color:#fff;border-color:#2f54eb;font-weight:500}.bp:hover{background:#1e3aa8}
 .bs{padding:3px 8px;font-size:11px}
 .br{color:#B84040;border-color:#e0b0b0}.br:hover{background:#fdf0f0}
-.drop{border:1.5px dashed #C0BAA8;border-radius:8px;padding:14px 10px;text-align:center;cursor:pointer;color:#6B6455;font-size:12px;line-height:1.7}
-.drop:hover,.drop.ov{background:#EAE6DC;border-color:#3D6B4F}
-.drop.ok{border-color:#3D6B4F;color:#3D6B4F;background:#eef4f0}
-.bc{background:#F2EFE8;border:1px solid #D4CFC2;border-radius:10px;padding:9px;margin-bottom:6px}
+.drop{border:1.5px dashed #d2d7df;border-radius:8px;padding:14px 10px;text-align:center;cursor:pointer;color:#667085;font-size:12px;line-height:1.7}
+.drop:hover,.drop.ov{background:#e9edf3;border-color:#2f54eb}
+.drop.ok{border-color:#2f54eb;color:#2f54eb;background:#eef1ff}
+.bc{background:#ffffff;border:1px solid #e6e8ed;border-radius:11px;padding:9px;margin-bottom:6px;box-shadow:0 1px 2px rgba(20,24,33,.05)}
 .bh{display:flex;align-items:center;gap:6px;margin-bottom:7px}
 .bd{width:10px;height:10px;border-radius:50%}
-.bn{font-size:12px;font-weight:600;border:none;background:transparent;padding:0;outline:none;flex:1;color:#1C1A14;min-width:0;width:0}
+.bn{font-size:12px;font-weight:600;border:none;background:transparent;padding:0;outline:none;flex:1;color:#1b1e26;min-width:0;width:0}
 .bg2{display:grid;grid-template-columns:1fr 1fr 1fr 28px;gap:4px;align-items:flex-end}
-.fl{font-size:10px;color:#A09888;display:block;margin-bottom:2px}
+.fl{font-size:10px;color:#667085;display:block;margin-bottom:2px}
 .tbl{width:100%;border-collapse:collapse;font-size:11px}
-.tbl th{text-align:left;padding:3px 5px;border-bottom:1px solid #D4CFC2;color:#A09888;font-weight:500;font-size:10px}
-.tbl td{padding:3px 5px;border-bottom:1px solid #D4CFC2;vertical-align:middle}
+.tbl th{text-align:left;padding:3px 5px;border-bottom:1px solid #e6e8ed;color:#667085;font-weight:500;font-size:10px}
+.tbl td{padding:3px 5px;border-bottom:1px solid #e6e8ed;vertical-align:middle}
 .tbl tr:last-child td{border:none}
 .bdg{display:inline-block;padding:1px 6px;border-radius:99px;font-size:10px;background:#dde8f5;color:#3B6B9E;font-family:monospace}
 .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
-.stat{background:#FDFCF9;border:1px solid #D4CFC2;border-radius:10px;padding:9px;text-align:center}
+.stat{background:#ffffff;border:1px solid #e6e8ed;border-radius:11px;padding:9px;text-align:center;box-shadow:0 1px 2px rgba(20,24,33,.05)}
 .sv{font-size:19px;font-weight:600;font-family:monospace}
-.sl{font-size:10px;color:#A09888;margin-top:2px;text-transform:uppercase;letter-spacing:.05em}
-.efb{height:3px;background:#D4CFC2;border-radius:2px;overflow:hidden;margin-top:3px}
-.eff{height:100%;background:#3D6B4F;transition:width .4s}
+.sl{font-size:10px;color:#667085;margin-top:2px;text-transform:uppercase;letter-spacing:.05em}
+.efb{height:3px;background:#e6e8ed;border-radius:2px;overflow:hidden;margin-top:3px}
+.eff{height:100%;background:#2f54eb;transition:width .4s}
 .tabs{display:flex;gap:4px;flex-wrap:wrap}
-.tab{padding:4px 10px;border:1px solid #D4CFC2;border-radius:6px;font-size:11px;cursor:pointer;background:#FDFCF9;white-space:nowrap;display:flex;align-items:center;gap:4px}
-.tab:hover{background:#EAE6DC}
-.tab.active{background:#1C1A14;color:#F2EFE8;border-color:#1C1A14}
-.cvw{border:1px solid #D4CFC2;border-radius:10px;overflow:hidden;background:#FDFCF9;position:relative}
-.cvb{display:flex;align-items:center;gap:8px;padding:6px 10px;background:#FDFCF9;border-bottom:1px solid #D4CFC2;flex-wrap:wrap}
-.cvb label{font-size:11px;color:#6B6455;display:flex;align-items:center;gap:4px;cursor:pointer}
+.tab{padding:4px 10px;border:1px solid #e6e8ed;border-radius:6px;font-size:11px;cursor:pointer;background:#ffffff;white-space:nowrap;display:flex;align-items:center;gap:4px}
+.tab:hover{background:#e9edf3}
+.tab.active{background:#1b1e26;color:#eceef2;border-color:#1b1e26}
+.cvw{border:1px solid #e6e8ed;border-radius:10px;overflow:hidden;background:#ffffff;position:relative}
+.cvb{display:flex;align-items:center;gap:8px;padding:6px 10px;background:#ffffff;border-bottom:1px solid #e6e8ed;flex-wrap:wrap}
+.cvb label{font-size:11px;color:#667085;display:flex;align-items:center;gap:4px;cursor:pointer}
 #cv{display:block;cursor:crosshair}
 .tip{position:absolute;background:rgba(28,26,20,.88);color:#fff;font-size:11px;padding:5px 9px;border-radius:6px;pointer-events:none;display:none;white-space:nowrap;z-index:50;line-height:1.6}
-.ep{background:#FDFCF9;border:1px solid #D4CFC2;border-radius:10px;padding:11px}
-.er{display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid #D4CFC2}
+.ep{background:#ffffff;border:1px solid #e6e8ed;border-radius:10px;padding:11px}
+.er{display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid #e6e8ed}
 .er:last-child{border:none;padding-bottom:0}
 .en{flex:1;font-size:11px;font-family:monospace}
-.ez{font-size:10px;color:#A09888;font-family:monospace;min-width:36px;text-align:right}
-.bdl{padding:4px 11px;border:1px solid #3D6B4F;border-radius:6px;cursor:pointer;font-size:11px;background:#FDFCF9;color:#3D6B4F;font-weight:500}
-.bdl:hover{background:#eef4f0}
-.gc{background:#F2EFE8;border:1px solid #D4CFC2;border-radius:8px;padding:8px;margin-bottom:6px}
+.ez{font-size:10px;color:#667085;font-family:monospace;min-width:36px;text-align:right}
+.bdl{padding:4px 11px;border:1px solid #2f54eb;border-radius:6px;cursor:pointer;font-size:11px;background:#ffffff;color:#2f54eb;font-weight:500}
+.bdl:hover{background:#eef1ff}
+.gc{background:#eceef2;border:1px solid #e6e8ed;border-radius:8px;padding:8px;margin-bottom:6px}
 .gh{display:flex;align-items:center;gap:5px;margin-bottom:5px}
-.gn{font-size:11px;font-weight:600;border:none;background:transparent;padding:0;outline:none;flex:1;color:#1C1A14;min-width:0}
-.gparts{display:flex;flex-wrap:wrap;gap:3px;min-height:22px;border:1px dashed #C0BAA8;border-radius:4px;padding:3px;background:#fff}
+.gn{font-size:11px;font-weight:600;border:none;background:transparent;padding:0;outline:none;flex:1;color:#1b1e26;min-width:0}
+.gparts{display:flex;flex-wrap:wrap;gap:3px;min-height:22px;border:1px dashed #d2d7df;border-radius:4px;padding:3px;background:#fff}
 .gtag{display:inline-flex;align-items:center;gap:3px;padding:1px 5px;border-radius:3px;font-size:9px;font-family:monospace;cursor:pointer}
 .gtag:hover{opacity:.75}
-.ginfo{font-size:10px;color:#A09888;margin-top:4px}
+.ginfo{font-size:10px;color:#667085;margin-top:4px}
 .dxf-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:300;backdrop-filter:blur(2px)}
 .dxf-overlay.open{display:flex;align-items:flex-start;justify-content:center;padding-top:50px}
-.dxf-box{background:#FDFCF9;border-radius:12px;border:1px solid #D4CFC2;width:540px;max-width:96vw;max-height:85vh;display:flex;flex-direction:column;box-shadow:0 16px 48px rgba(0,0,0,.18)}
-.dxf-head{display:flex;align-items:center;gap:8px;padding:12px 16px;border-bottom:1px solid #D4CFC2;flex-shrink:0}
+.dxf-box{background:#ffffff;border-radius:12px;border:1px solid #e6e8ed;width:540px;max-width:96vw;max-height:85vh;display:flex;flex-direction:column;box-shadow:0 16px 48px rgba(0,0,0,.18)}
+.dxf-head{display:flex;align-items:center;gap:8px;padding:12px 16px;border-bottom:1px solid #e6e8ed;flex-shrink:0}
 .dxf-body{flex:1;overflow-y:auto;padding:8px 14px}
-.dxf-foot{display:flex;gap:8px;padding:10px 14px;border-top:1px solid #D4CFC2;background:#F7F5F0;flex-shrink:0}
-.dxf-row{display:flex;align-items:center;gap:10px;padding:8px 4px;border-bottom:1px solid #EAE6DC}
+.dxf-foot{display:flex;gap:8px;padding:10px 14px;border-top:1px solid #e6e8ed;background:#F7F5F0;flex-shrink:0}
+.dxf-row{display:flex;align-items:center;gap:10px;padding:8px 4px;border-bottom:1px solid #e9edf3}
 .dxf-row:last-child{border:none}
-.dxf-prev{width:48px;height:48px;background:#F2EFE8;border:1px solid #D4CFC2;border-radius:4px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.dxf-prev{width:48px;height:48px;background:#eceef2;border:1px solid #e6e8ed;border-radius:4px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
 .dxf-prev svg{display:block}
 .dxf-name{border:1px solid transparent;padding:2px 4px;border-radius:3px;background:transparent}
-.dxf-name:hover{border-color:#D4CFC2;background:#fff}
-.dxf-name:focus{border-color:#3D6B4F;background:#fff;outline:none}
-.csv-mat-row{display:flex;align-items:center;gap:8px;padding:4px 6px;border-radius:4px;background:#F2EFE8}
+.dxf-name:hover{border-color:#e6e8ed;background:#fff}
+.dxf-name:focus{border-color:#2f54eb;background:#fff;outline:none}
+.csv-mat-row{display:flex;align-items:center;gap:8px;padding:4px 6px;border-radius:4px;background:#eceef2}
 .csv-mat-row .csv-mat-map{width:auto;min-width:150px;font-size:11px;padding:3px 6px}
 /* Project save status */
-.save-status{font-size:10px;font-family:monospace;padding:3px 8px;border-radius:12px;background:#EAE6DC;color:#6B6455;min-width:80px;text-align:center;white-space:nowrap}
+.save-status{font-size:10px;font-family:monospace;padding:3px 8px;border-radius:12px;background:#e9edf3;color:#667085;min-width:80px;text-align:center;white-space:nowrap}
 .save-status.saving{background:#FFF6CC;color:#8B6F1A}
-.save-status.saved{background:#E8F4EC;color:#3D6B4F}
+.save-status.saved{background:#E8F4EC;color:#2f54eb}
 .save-status.error{background:#FCE4E4;color:#B84040}
 .save-status.offline{background:#FCF0DA;color:#A36A1A}
 /* History modal */
 .hist-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:300;backdrop-filter:blur(2px)}
 .hist-overlay.open{display:flex;align-items:flex-start;justify-content:center;padding-top:50px}
-.hist-box{background:#FDFCF9;border-radius:12px;border:1px solid #D4CFC2;width:620px;max-width:96vw;max-height:85vh;display:flex;flex-direction:column;box-shadow:0 16px 48px rgba(0,0,0,.18)}
-.hist-head{display:flex;align-items:center;gap:8px;padding:12px 16px;border-bottom:1px solid #D4CFC2;flex-shrink:0}
+.hist-box{background:#ffffff;border-radius:12px;border:1px solid #e6e8ed;width:620px;max-width:96vw;max-height:85vh;display:flex;flex-direction:column;box-shadow:0 16px 48px rgba(0,0,0,.18)}
+.hist-head{display:flex;align-items:center;gap:8px;padding:12px 16px;border-bottom:1px solid #e6e8ed;flex-shrink:0}
 .hist-body{flex:1;overflow-y:auto;padding:4px 4px}
-.hist-foot{display:flex;gap:8px;padding:10px 14px;border-top:1px solid #D4CFC2;background:#F7F5F0;flex-shrink:0}
-.hist-row{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid #EAE6DC;cursor:pointer}
+.hist-foot{display:flex;gap:8px;padding:10px 14px;border-top:1px solid #e6e8ed;background:#F7F5F0;flex-shrink:0}
+.hist-row{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid #e9edf3;cursor:pointer}
 .hist-row:hover{background:#F5F2EC}
 .hist-row.current{background:#EEF7EE}
 .hist-row .hname{flex:1;font-size:12px;font-weight:500;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.hist-row .hmeta{font-size:10px;color:#A09888;font-family:monospace;white-space:nowrap}
+.hist-row .hmeta{font-size:10px;color:#667085;font-family:monospace;white-space:nowrap}
 .hist-row .hacts{display:flex;gap:3px;opacity:0;transition:opacity .1s}
 .hist-row:hover .hacts{opacity:1}
-.hist-row .hbtn{padding:2px 7px;font-size:10px;border:1px solid #D4CFC2;background:#fff;border-radius:4px;cursor:pointer;color:#6B6455}
-.hist-row .hbtn:hover{background:#EAE6DC;color:#1C1A14}
+.hist-row .hbtn{padding:2px 7px;font-size:10px;border:1px solid #e6e8ed;background:#fff;border-radius:4px;cursor:pointer;color:#667085}
+.hist-row .hbtn:hover{background:#e9edf3;color:#1b1e26}
 .hist-row .hbtn.hdel:hover{background:#FCE4E4;color:#B84040;border-color:#e0b0b0}
 /* Move-to-sheet popover */
-.mv-pop{display:none;position:absolute;top:36px;right:12px;background:#FDFCF9;border:1px solid #D4CFC2;border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.15);z-index:150;min-width:240px;max-height:340px;overflow-y:auto}
+.mv-pop{display:none;position:absolute;top:36px;right:12px;background:#ffffff;border:1px solid #e6e8ed;border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.15);z-index:150;min-width:240px;max-height:340px;overflow-y:auto}
 .mv-pop.open{display:block}
-.mv-pop .mv-hdr{padding:8px 12px;font-size:10px;color:#A09888;text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid #EAE6DC;font-family:monospace}
-.mv-pop .mv-row{display:flex;align-items:center;gap:8px;padding:7px 12px;cursor:pointer;border-bottom:1px solid #F2EFE8;font-size:12px}
+.mv-pop .mv-hdr{padding:8px 12px;font-size:10px;color:#667085;text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid #e9edf3;font-family:monospace}
+.mv-pop .mv-row{display:flex;align-items:center;gap:8px;padding:7px 12px;cursor:pointer;border-bottom:1px solid #eceef2;font-size:12px}
 .mv-pop .mv-row:hover{background:#F5F2EC}
 .mv-pop .mv-row.current{background:#EEF7EE;cursor:default}
 .mv-pop .mv-row.full{opacity:.45;cursor:not-allowed}
 .mv-pop .mv-row.full:hover{background:transparent}
 .mv-pop .mv-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
 .mv-pop .mv-label{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.mv-pop .mv-free{font-family:monospace;font-size:10px;color:#6B6455;white-space:nowrap}
-.mv-pop .mv-new{padding:9px 12px;font-size:11px;color:#3D6B4F;font-weight:500;cursor:pointer;border-top:1px solid #EAE6DC;background:#F7F5F0}
+.mv-pop .mv-free{font-family:monospace;font-size:10px;color:#667085;white-space:nowrap}
+.mv-pop .mv-new{padding:9px 12px;font-size:11px;color:#2f54eb;font-weight:500;cursor:pointer;border-top:1px solid #e9edf3;background:#F7F5F0}
 .mv-pop .mv-new:hover{background:#EEF7EE}
-.pli{display:flex;align-items:center;gap:5px;padding:4px 5px;border-radius:4px;font-size:11px;background:#FDFCF9;border:1px solid transparent;margin-bottom:2px}
-.pli:hover{border-color:#D4CFC2}
+.pli{display:flex;align-items:center;gap:5px;padding:4px 5px;border-radius:4px;font-size:11px;background:#ffffff;border:1px solid transparent;margin-bottom:2px}
+.pli:hover{border-color:#e6e8ed}
 .pli-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
 .pli-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500}
-.pli-dim{font-family:monospace;color:#6B6455;font-size:10px;white-space:nowrap}
-.pli-qty{font-family:monospace;color:#3D6B4F;font-size:10px;font-weight:600;min-width:22px;text-align:right}
+.pli-dim{font-family:monospace;color:#667085;font-size:10px;white-space:nowrap}
+.pli-qty{font-family:monospace;color:#2f54eb;font-size:10px;font-weight:600;min-width:22px;text-align:right}
 .pli-x{border:none;background:transparent;color:#B84040;cursor:pointer;font-size:14px;padding:0 2px;line-height:1;opacity:.55}
 .pli-x:hover{opacity:1}
 /* Merged strips stand out: warm tint, brown left bar, brown italic name */
-.pli.pli-merged{background:#FBF1E4;border-left:3px solid #8B5A2B;border-color:#E6D2B8}
+.pli.pli-merged{background:#FBF1E4;border-left:3px solid #647488;border-color:#E6D2B8}
 .pli.pli-merged:hover{border-color:#C9A878}
-.pli.pli-merged .pli-name{color:#8B5A2B;font-weight:700;font-style:italic}
+.pli.pli-merged .pli-name{color:#647488;font-weight:700;font-style:italic}
 .pli.pli-merged .pli-dim{color:#A06A2C}
 /* ─── Pricing / Quotation ─────────────────────────────────────── */
-.bprice{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:6px;padding-top:6px;border-top:1px solid #E8E4DB}
+.bprice{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:6px;padding-top:6px;border-top:1px solid #e6e8ed}
 .bprice .fl{font-size:9px}
 .bprice input{font-size:11px;padding:3px 5px}
-.bprice-toggle{font-size:10px;color:#3D6B4F;cursor:pointer;user-select:none;margin-top:6px;padding-top:5px;border-top:1px solid #E8E4DB;display:flex;align-items:center;gap:4px}
-.bprice-toggle:hover{color:#2D5040}
+.bprice-toggle{font-size:10px;color:#2f54eb;cursor:pointer;user-select:none;margin-top:6px;padding-top:5px;border-top:1px solid #e6e8ed;display:flex;align-items:center;gap:4px}
+.bprice-toggle:hover{color:#1e3aa8}
 .bprice-wrap{display:none}
 .bprice-wrap.open{display:block}
 /* ─── Prominent "add" controls (parts / materials) ─────────────── */
 .add-card{background:#EEF4F0;border:1.5px solid #B7D2C0;border-radius:10px;padding:10px;box-shadow:0 1px 2px rgba(61,107,79,.06)}
-.add-card .add-hd{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;color:#2D5040;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;font-family:monospace}
+.add-card .add-hd{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;color:#1e3aa8;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;font-family:monospace}
 .add-card .add-hd .add-ico{font-size:14px}
 .add-card .fl{color:#5C7A66}
 .add-card input,.add-card select{background:#fff;border-color:#C2D8C9}
-.add-card input:focus,.add-card select:focus{border-color:#3D6B4F}
-.btn-add-prom{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;padding:9px;font-size:13px;font-weight:600;background:#3D6B4F;color:#fff;border:1px solid #3D6B4F;border-radius:8px;cursor:pointer}
-.btn-add-prom:hover{background:#2D5040}
-.sec-add-board{display:flex;align-items:center;gap:5px;padding:4px 10px;font-size:12px;font-weight:600;background:#3D6B4F;color:#fff;border:1px solid #3D6B4F;border-radius:7px;cursor:pointer}
-.sec-add-board:hover{background:#2D5040}
+.add-card input:focus,.add-card select:focus{border-color:#2f54eb}
+.btn-add-prom{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;padding:9px;font-size:13px;font-weight:600;background:#2f54eb;color:#fff;border:1px solid #2f54eb;border-radius:8px;cursor:pointer}
+.btn-add-prom:hover{background:#1e3aa8}
+.sec-add-board{display:flex;align-items:center;gap:5px;padding:4px 10px;font-size:12px;font-weight:600;background:#2f54eb;color:#fff;border:1px solid #2f54eb;border-radius:7px;cursor:pointer}
+.sec-add-board:hover{background:#1e3aa8}
 /* ─── Undo / Redo header buttons ───────────────────────────────── */
-.urbtn{padding:4px 9px;border:1px solid #D4CFC2;border-radius:6px;background:#FDFCF9;cursor:pointer;font-size:13px;line-height:1;color:#1C1A14}
-.urbtn:hover:not(:disabled){background:#EAE6DC}
+.urbtn{padding:4px 9px;border:1px solid #e6e8ed;border-radius:6px;background:#ffffff;cursor:pointer;font-size:13px;line-height:1;color:#1b1e26}
+.urbtn:hover:not(:disabled){background:#e9edf3}
 .urbtn:disabled{opacity:.35;cursor:default}
 /* ─── Group-assign quantity stepper ────────────────────────────── */
-.ga-qty{display:flex;align-items:center;gap:0;flex-shrink:0;border:1px solid #C0BAA8;border-radius:6px;overflow:hidden;background:#fff}
-.ga-qty button{border:none;background:#F2EFE8;width:24px;height:24px;font-size:15px;line-height:1;cursor:pointer;color:#3D6B4F;font-weight:700;padding:0}
+.ga-qty{display:flex;align-items:center;gap:0;flex-shrink:0;border:1px solid #d2d7df;border-radius:6px;overflow:hidden;background:#fff}
+.ga-qty button{border:none;background:#eceef2;width:24px;height:24px;font-size:15px;line-height:1;cursor:pointer;color:#2f54eb;font-weight:700;padding:0}
 .ga-qty button:hover{background:#E2EDE5}
 .ga-qty button:disabled{opacity:.3;cursor:default}
 .ga-qty input{width:38px;height:24px;border:none;border-left:1px solid #E2DFD6;border-right:1px solid #E2DFD6;text-align:center;font-size:12px;font-family:monospace;padding:0;border-radius:0;background:#fff}
-.ga-other{font-size:9px;color:#A09888;font-family:monospace;flex-shrink:0;min-width:54px;text-align:right}
+.ga-other{font-size:9px;color:#667085;font-family:monospace;flex-shrink:0;min-width:54px;text-align:right}
 /* ─── Batch label printing progress ────────────────────────────── */
 .bp-prog{height:8px;background:#E2DFD6;border-radius:4px;overflow:hidden;margin:8px 0}
-.bp-prog-bar{height:100%;background:#3D6B4F;width:0;transition:width .2s}
-.bp-log{max-height:180px;overflow-y:auto;font-size:11px;font-family:monospace;background:#F2EFE8;border:1px solid #E2DFD6;border-radius:6px;padding:6px 8px;margin-top:6px}
+.bp-prog-bar{height:100%;background:#2f54eb;width:0;transition:width .2s}
+.bp-log{max-height:180px;overflow-y:auto;font-size:11px;font-family:monospace;background:#eceef2;border:1px solid #E2DFD6;border-radius:6px;padding:6px 8px;margin-top:6px}
 .bp-log div{padding:1px 0;display:flex;gap:6px;align-items:baseline}
 .bp-scope{display:flex;gap:8px;margin:8px 0}
-.bp-scope label{flex:1;border:1.5px solid #D4CFC2;border-radius:8px;padding:9px 10px;cursor:pointer;font-size:12px;display:flex;flex-direction:column;gap:2px}
-.bp-scope label:hover{background:#F2EFE8}
+.bp-scope label{flex:1;border:1.5px solid #e6e8ed;border-radius:8px;padding:9px 10px;cursor:pointer;font-size:12px;display:flex;flex-direction:column;gap:2px}
+.bp-scope label:hover{background:#eceef2}
 .bp-scope input{display:none}
-.bp-scope input:checked+label,.bp-scope label.sel{border-color:#3D6B4F;background:#EEF4F0}
-.qp{background:#FDFCF9;border:1px solid #D4CFC2;border-radius:10px;padding:11px;margin-bottom:6px}
+.bp-scope input:checked+label,.bp-scope label.sel{border-color:#2f54eb;background:#EEF4F0}
+.qp{background:#ffffff;border:1px solid #e6e8ed;border-radius:10px;padding:11px;margin-bottom:6px}
 .qp-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:9px;gap:8px;flex-wrap:wrap}
 .qp-hdr .sec{margin:0}
-.qp-grand{font-size:18px;font-weight:700;font-family:monospace;color:#3D6B4F;background:#EEF7EE;padding:4px 12px;border-radius:6px;border:1px solid #C3DCC8}
-.qp-mfg{font-size:13px;font-weight:600;font-family:monospace;color:#6B6455;background:#F2EFE8;padding:4px 10px;border-radius:6px;border:1px solid #D4CFC2}
-.qp-mfg-lbl{font-size:9px;color:#A09888;text-transform:uppercase;letter-spacing:.05em;display:block;line-height:1}
-.qp-grand-lbl{font-size:9px;color:#3D6B4F;opacity:.7;text-transform:uppercase;letter-spacing:.05em;display:block;line-height:1}
-.qp-mfg-row td{background:#F2EFE8!important;font-weight:600;border-top:1px solid #1C1A14!important;padding-top:7px!important;color:#1C1A14}
-.qp-cfg{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-bottom:10px;padding:8px;background:#F2EFE8;border-radius:8px;border:1px solid #E8E4DB}
-.qp-cfg .qp-fld label{display:block;font-size:10px;color:#A09888;margin-bottom:2px;text-transform:uppercase;letter-spacing:.04em;font-family:monospace}
-.qp-cfg input,.qp-cfg select{font-size:12px;padding:4px 6px;background:#FDFCF9}
-.qp-cfg .qp-cb{display:flex;align-items:center;gap:5px;font-size:11px;color:#6B6455;cursor:pointer;padding-top:14px}
-.qp-cfg .qp-cb input{width:auto;cursor:pointer;accent-color:#3D6B4F}
+.qp-grand{font-size:18px;font-weight:700;font-family:monospace;color:#2f54eb;background:#EEF7EE;padding:4px 12px;border-radius:6px;border:1px solid #C3DCC8}
+.qp-mfg{font-size:13px;font-weight:600;font-family:monospace;color:#667085;background:#eceef2;padding:4px 10px;border-radius:6px;border:1px solid #e6e8ed}
+.qp-mfg-lbl{font-size:9px;color:#667085;text-transform:uppercase;letter-spacing:.05em;display:block;line-height:1}
+.qp-grand-lbl{font-size:9px;color:#2f54eb;opacity:.7;text-transform:uppercase;letter-spacing:.05em;display:block;line-height:1}
+.qp-mfg-row td{background:#eceef2!important;font-weight:600;border-top:1px solid #1b1e26!important;padding-top:7px!important;color:#1b1e26}
+.qp-cfg{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-bottom:10px;padding:8px;background:#eceef2;border-radius:8px;border:1px solid #e6e8ed}
+.qp-cfg .qp-fld label{display:block;font-size:10px;color:#667085;margin-bottom:2px;text-transform:uppercase;letter-spacing:.04em;font-family:monospace}
+.qp-cfg input,.qp-cfg select{font-size:12px;padding:4px 6px;background:#ffffff}
+.qp-cfg .qp-cb{display:flex;align-items:center;gap:5px;font-size:11px;color:#667085;cursor:pointer;padding-top:14px}
+.qp-cfg .qp-cb input{width:auto;cursor:pointer;accent-color:#2f54eb}
 .qp-tbl{width:100%;border-collapse:collapse;font-size:11px;margin-bottom:6px}
-.qp-tbl th{text-align:left;padding:4px 6px;border-bottom:1px solid #D4CFC2;color:#A09888;font-weight:500;font-size:10px;text-transform:uppercase;letter-spacing:.04em;font-family:monospace}
+.qp-tbl th{text-align:left;padding:4px 6px;border-bottom:1px solid #e6e8ed;color:#667085;font-weight:500;font-size:10px;text-transform:uppercase;letter-spacing:.04em;font-family:monospace}
 .qp-tbl th.qp-num,.qp-tbl td.qp-num{text-align:right;font-family:monospace}
-.qp-tbl td{padding:5px 6px;border-bottom:1px solid #EAE6DC;vertical-align:middle}
+.qp-tbl td{padding:5px 6px;border-bottom:1px solid #e9edf3;vertical-align:middle}
 .qp-tbl tr:last-child td{border:none}
 .qp-tbl .qp-mat-row td{background:#FCFAF4}
 .qp-tbl .qp-mat-name{display:flex;align-items:center;gap:5px}
 .qp-tbl .qp-mat-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
 .qp-tot{font-weight:600;background:#F7F5F0!important}
-.qp-tot td{border-top:1px solid #D4CFC2!important;padding-top:6px!important}
-.qp-grand-row td{background:#EEF7EE!important;color:#3D6B4F;font-weight:700;font-size:13px;border-top:2px solid #3D6B4F!important;padding-top:7px!important;padding-bottom:7px!important}
-.qp-empty{padding:14px;text-align:center;color:#A09888;font-size:12px;background:#F2EFE8;border-radius:6px;border:1px dashed #D4CFC2}
-.qp-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;padding-top:8px;border-top:1px solid #E8E4DB}
+.qp-tot td{border-top:1px solid #e6e8ed!important;padding-top:6px!important}
+.qp-grand-row td{background:#EEF7EE!important;color:#2f54eb;font-weight:700;font-size:13px;border-top:2px solid #2f54eb!important;padding-top:7px!important;padding-bottom:7px!important}
+.qp-empty{padding:14px;text-align:center;color:#667085;font-size:12px;background:#eceef2;border-radius:6px;border:1px dashed #e6e8ed}
+.qp-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;padding-top:8px;border-top:1px solid #e6e8ed}
 @media print{
   .hdr,.side,#stats,#ep,#tabs,#cvc,.qp-actions,.qp-cfg{display:none!important}
   body,.main{background:#fff!important;color:#000!important;height:auto!important;overflow:visible!important;font-size:12px!important}
@@ -205,23 +206,23 @@ input[type=color]{padding:2px 3px;height:27px;cursor:pointer}
 }
 /* Print-status indicator for each parts-list row */
 .pli-print{font-family:monospace;font-size:10px;font-weight:700;min-width:26px;text-align:center;padding:0 3px;border-radius:3px;flex-shrink:0}
-.pli-print.done{color:#3D6B4F;background:#E4EDE3}
-.pli-print.pending{color:#C0BAA8;background:transparent}
+.pli-print.done{color:#2f54eb;background:#E4EDE3}
+.pli-print.pending{color:#d2d7df;background:transparent}
 .pli-print.partial{color:#8a6d1a;background:#F5EEDC}
 /* Rotation lock indicator */
 .pli-rot{font-size:11px;flex-shrink:0;cursor:pointer;opacity:.6;padding:0 2px;user-select:none;line-height:1}
 .pli-rot:hover{opacity:1}
-.pli-rot.auto{color:#A09888;opacity:.55}
-.pli-rot.free{color:#3D6B4F;opacity:.95}
+.pli-rot.auto{color:#667085;opacity:.55}
+.pli-rot.free{color:#2f54eb;opacity:.95}
 .pli-rot.lock{color:#8a6d1a;opacity:.95}
 .pli.pli-done{opacity:.7}
-.pli.pli-done .pli-name{text-decoration:line-through;text-decoration-color:#3D6B4F80}
-@keyframes pliFlash{0%{background:#fff6cc;border-color:#E8C547}100%{background:#FDFCF9;border-color:transparent}}
+.pli.pli-done .pli-name{text-decoration:line-through;text-decoration-color:#2f54eb80}
+@keyframes pliFlash{0%{background:#fff6cc;border-color:#E8C547}100%{background:#ffffff;border-color:transparent}}
 .pli.flash{animation:pliFlash 1.2s ease-out}
 
 .ov2{display:none;position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:300;backdrop-filter:blur(2px);align-items:flex-start;justify-content:center;padding-top:40px}
 .ov2.open{display:flex}
-.mdl{background:#FDFCF9;border-radius:10px;padding:18px;width:460px;border:1px solid #D4CFC2;max-height:90vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,.15)}
+.mdl{background:#ffffff;border-radius:10px;padding:18px;width:460px;border:1px solid #e6e8ed;max-height:90vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,.15)}
 .mdl h3{font-size:14px;font-weight:600;margin-bottom:12px}
 /* Label preview */
 .lw{background:#fff;border:1px solid #ccc;border-radius:4px;padding:8px;margin-bottom:10px;font-family:Arial,sans-serif}
@@ -272,89 +273,89 @@ input[type=color]{padding:2px 3px;height:27px;cursor:pointer}
 .ldesc{font-size:11px;font-weight:700;border:.5px solid #aaa}
 .lmat{font-size:9px;font-weight:700;border:.5px solid #aaa}
 .lfull{font-size:7.5px;border:.5px solid #aaa}
-.zp{font-family:monospace;font-size:10px;background:#F2EFE8;border-radius:6px;padding:8px;white-space:pre-wrap;word-break:break-all;max-height:130px;overflow-y:auto;border:1px solid #D4CFC2;margin-bottom:10px;color:#6B6455}
-.ib{font-size:11px;color:#6B6455;padding:7px 10px;background:#f0f4ff;border-radius:6px;border-left:3px solid #3B6B9E;margin-bottom:10px}
-.wlc{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:40px;color:#A09888}
-.wlc h2{font-size:16px;font-weight:600;color:#6B6455;margin-bottom:8px}
+.zp{font-family:monospace;font-size:10px;background:#eceef2;border-radius:6px;padding:8px;white-space:pre-wrap;word-break:break-all;max-height:130px;overflow-y:auto;border:1px solid #e6e8ed;margin-bottom:10px;color:#667085}
+.ib{font-size:11px;color:#667085;padding:7px 10px;background:#f0f4ff;border-radius:6px;border-left:3px solid #3B6B9E;margin-bottom:10px}
+.wlc{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:40px;color:#667085}
+.wlc h2{font-size:16px;font-weight:600;color:#667085;margin-bottom:8px}
 .wlc p{font-size:12px;line-height:1.9;max-width:300px}
 ::-webkit-scrollbar{width:4px;height:4px}
-::-webkit-scrollbar-thumb{background:#C0BAA8;border-radius:4px}
+::-webkit-scrollbar-thumb{background:#d2d7df;border-radius:4px}
 /* Parts manager window */
 .pw-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:300;backdrop-filter:blur(2px)}
 .pw-overlay.open{display:flex;align-items:flex-start;justify-content:center;padding-top:40px}
-.pw{background:#FDFCF9;border-radius:12px;border:1px solid #D4CFC2;width:820px;max-width:96vw;max-height:82vh;display:flex;flex-direction:column;box-shadow:0 16px 48px rgba(0,0,0,.18)}
-.pw-head{display:flex;align-items:center;gap:8px;padding:12px 16px;border-bottom:1px solid #D4CFC2;flex-shrink:0}
+.pw{background:#ffffff;border-radius:12px;border:1px solid #e6e8ed;width:820px;max-width:96vw;max-height:82vh;display:flex;flex-direction:column;box-shadow:0 16px 48px rgba(0,0,0,.18)}
+.pw-head{display:flex;align-items:center;gap:8px;padding:12px 16px;border-bottom:1px solid #e6e8ed;flex-shrink:0}
 .pw-head h3{font-size:14px;font-weight:600;flex:1}
-.pw-filters{display:flex;gap:6px;padding:8px 12px;border-bottom:1px solid #D4CFC2;flex-wrap:wrap;flex-shrink:0;background:#F7F5F0}
+.pw-filters{display:flex;gap:6px;padding:8px 12px;border-bottom:1px solid #e6e8ed;flex-wrap:wrap;flex-shrink:0;background:#F7F5F0}
 .pw-filters input,.pw-filters select{width:auto;font-size:11px;padding:4px 8px}
 .pw-body{flex:1;overflow-y:auto;padding:0}
 .pw-tbl{width:100%;border-collapse:collapse;font-size:11px}
-.pw-tbl th{position:sticky;top:0;background:#F0EDE5;padding:6px 10px;text-align:left;font-size:10px;font-weight:600;color:#6B6455;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid #D4CFC2;cursor:pointer;user-select:none;white-space:nowrap}
-.pw-tbl th:hover{background:#E8E4DB}
-.pw-tbl td{padding:5px 10px;border-bottom:1px solid #EAE6DC;vertical-align:middle}
+.pw-tbl th{position:sticky;top:0;background:#F0EDE5;padding:6px 10px;text-align:left;font-size:10px;font-weight:600;color:#667085;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid #e6e8ed;cursor:pointer;user-select:none;white-space:nowrap}
+.pw-tbl th:hover{background:#e6e8ed}
+.pw-tbl td{padding:5px 10px;border-bottom:1px solid #e9edf3;vertical-align:middle}
 .pw-tbl tr:hover td{background:#F5F2EC}
 .pw-tbl tr.sel td{background:#E8F4EC}
 .pw-tbl tr.pw-merged td{background:#FBF1E4}
 .pw-tbl tr.pw-merged.sel td{background:#F0E6D2}
-.pw-tbl tr.pw-merged td:first-child{box-shadow:inset 3px 0 0 #8B5A2B}
-.pw-name-merged{color:#8B5A2B !important;font-weight:700 !important;font-style:italic}
+.pw-tbl tr.pw-merged td:first-child{box-shadow:inset 3px 0 0 #647488}
+.pw-name-merged{color:#647488 !important;font-weight:700 !important;font-style:italic}
 .pw-tbl tr{cursor:pointer}
 .pw-edit{width:100%;padding:2px 4px;font-size:11px;border:1px solid transparent;background:transparent;border-radius:3px;outline:none;font-family:inherit;color:inherit}
-.pw-edit:hover{border-color:#D4CFC2;background:#fff}
-.pw-edit:focus{border-color:#3D6B4F;background:#fff;box-shadow:0 0 0 2px #3D6B4F22}
-.pw-swap-btn{border:1px solid #C0BAA8;background:#FDFCF9;color:#3D6B4F;font-size:13px;font-weight:600;padding:1px 5px;border-radius:3px;cursor:pointer;line-height:1}
-.pw-swap-btn:hover{background:#3D6B4F;color:#fff;border-color:#3D6B4F}
+.pw-edit:hover{border-color:#e6e8ed;background:#fff}
+.pw-edit:focus{border-color:#2f54eb;background:#fff;box-shadow:0 0 0 2px #2f54eb22}
+.pw-swap-btn{border:1px solid #d2d7df;background:#ffffff;color:#2f54eb;font-size:13px;font-weight:600;padding:1px 5px;border-radius:3px;cursor:pointer;line-height:1}
+.pw-swap-btn:hover{background:#2f54eb;color:#fff;border-color:#2f54eb}
 .pw-edit-qty{font-weight:600;text-align:center}
-.pw-edit-num{font-family:monospace;color:#3D6B4F;font-weight:600;max-width:72px;text-align:right}
-.pw-edit-t{max-width:56px;color:#6B6455;font-weight:400}
+.pw-edit-num{font-family:monospace;color:#2f54eb;font-weight:600;max-width:72px;text-align:right}
+.pw-edit-t{max-width:56px;color:#667085;font-weight:400}
 .pw-edit-name{font-weight:500}
 .pw-edit-mat{width:auto;min-width:110px;max-width:160px;padding:2px 4px;cursor:pointer}
 .pw-tbl tr.sel .pw-edit:hover{background:#F5F2EC}
 /* hide number input spinners for cleaner look */
 .pw-edit-num::-webkit-inner-spin-button,.pw-edit-num::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
 .pw-edit-num{-moz-appearance:textfield}
-.pw-foot{display:flex;align-items:center;gap:8px;padding:10px 14px;border-top:1px solid #D4CFC2;flex-shrink:0;background:#F7F5F0;flex-wrap:wrap}
+.pw-foot{display:flex;align-items:center;gap:8px;padding:10px 14px;border-top:1px solid #e6e8ed;flex-shrink:0;background:#F7F5F0;flex-wrap:wrap}
 /* Group assign panel — inside side panel, not modal */
 .ga-panel{display:none;position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:300;backdrop-filter:blur(2px)}
 .ga-panel.open{display:flex;align-items:flex-start;justify-content:center;padding-top:60px}
 /* Startup project picker */
 .startup-overlay{display:none;position:fixed;inset:0;background:rgba(28,26,20,.55);z-index:500;backdrop-filter:blur(4px);align-items:center;justify-content:center}
 .startup-overlay.open{display:flex}
-.startup-box{background:#FDFCF9;border-radius:16px;border:1px solid #D4CFC2;width:440px;max-width:94vw;box-shadow:0 24px 64px rgba(0,0,0,.3);overflow:hidden;animation:startupIn .22s ease}
+.startup-box{background:#ffffff;border-radius:16px;border:1px solid #e6e8ed;width:440px;max-width:94vw;box-shadow:0 24px 64px rgba(0,0,0,.3);overflow:hidden;animation:startupIn .22s ease}
 @keyframes startupIn{from{opacity:0;transform:translateY(10px) scale(.98)}to{opacity:1;transform:none}}
 .startup-brand{display:flex;align-items:center;gap:12px;padding:22px 24px 16px}
-.startup-logo{width:44px;height:44px;border-radius:11px;background:#3D6B4F;color:#fff;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0}
-.startup-title{font-size:19px;font-weight:700;letter-spacing:-.3px;color:#1C1A14}
+.startup-logo{width:44px;height:44px;border-radius:11px;background:#2f54eb;color:#fff;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0}
+.startup-title{font-size:19px;font-weight:700;letter-spacing:-.3px;color:#1b1e26}
 .startup-sub{font-size:12px;color:#8A8472;margin-top:1px}
 .startup-choices{padding:4px 16px 18px}
-.startup-card{display:flex;align-items:center;gap:12px;width:100%;text-align:left;padding:13px 14px;border:1px solid #D4CFC2;border-radius:10px;background:#fff;cursor:pointer;margin:8px 0;transition:border-color .12s,background .12s,box-shadow .12s}
-.startup-card:hover{border-color:#3D6B4F;background:#F7FAF8;box-shadow:0 2px 10px rgba(61,107,79,.1)}
-.startup-card.primary{border-color:#3D6B4F;background:#F2F7F4}
+.startup-card{display:flex;align-items:center;gap:12px;width:100%;text-align:left;padding:13px 14px;border:1px solid #e6e8ed;border-radius:10px;background:#fff;cursor:pointer;margin:8px 0;transition:border-color .12s,background .12s,box-shadow .12s}
+.startup-card:hover{border-color:#2f54eb;background:#F7FAF8;box-shadow:0 2px 10px rgba(61,107,79,.1)}
+.startup-card.primary{border-color:#2f54eb;background:#F2F7F4}
 .startup-card.primary:hover{box-shadow:0 4px 14px rgba(61,107,79,.16)}
 .startup-ic{width:34px;height:34px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0}
 .startup-ct{flex:1;min-width:0}
-.startup-ct .ct-t{font-size:14px;font-weight:600;color:#1C1A14;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.startup-ct .ct-t{font-size:14px;font-weight:600;color:#1b1e26;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .startup-ct .ct-s{font-size:11px;color:#8A8472;margin-top:1px}
-.startup-arrow{color:#A09888;font-size:16px;flex-shrink:0}
-.startup-divider{font-size:10px;color:#A09888;text-transform:uppercase;letter-spacing:.06em;text-align:center;margin:14px 0 4px;position:relative}
+.startup-arrow{color:#667085;font-size:16px;flex-shrink:0}
+.startup-divider{font-size:10px;color:#667085;text-transform:uppercase;letter-spacing:.06em;text-align:center;margin:14px 0 4px;position:relative}
 .startup-more{max-height:148px;overflow-y:auto;margin-top:2px}
 .startup-more-row{display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:8px;cursor:pointer;font-size:13px}
-.startup-more-row:hover{background:#F2EFE8}
-.startup-more-row .mr-n{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#1C1A14}
-.startup-more-row .mr-t{font-size:10px;color:#A09888;flex-shrink:0}
-.ga-box{background:#FDFCF9;border-radius:10px;border:1px solid #D4CFC2;width:500px;max-width:94vw;max-height:76vh;display:flex;flex-direction:column;box-shadow:0 12px 40px rgba(0,0,0,.18)}
-.ga-head{display:flex;align-items:center;gap:8px;padding:12px 14px;border-bottom:1px solid #D4CFC2;flex-shrink:0}
+.startup-more-row:hover{background:#eceef2}
+.startup-more-row .mr-n{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#1b1e26}
+.startup-more-row .mr-t{font-size:10px;color:#667085;flex-shrink:0}
+.ga-box{background:#ffffff;border-radius:10px;border:1px solid #e6e8ed;width:500px;max-width:94vw;max-height:76vh;display:flex;flex-direction:column;box-shadow:0 12px 40px rgba(0,0,0,.18)}
+.ga-head{display:flex;align-items:center;gap:8px;padding:12px 14px;border-bottom:1px solid #e6e8ed;flex-shrink:0}
 .ga-body{flex:1;overflow-y:auto}
-.ga-row{display:flex;align-items:center;gap:8px;padding:6px 14px;border-bottom:1px solid #EAE6DC;cursor:pointer}
+.ga-row{display:flex;align-items:center;gap:8px;padding:6px 14px;border-bottom:1px solid #e9edf3;cursor:pointer}
 .ga-row:hover{background:#F5F2EC}
 .ga-row.ingrp{background:#EEF7EE}
-.ga-foot{display:flex;gap:8px;padding:10px 14px;border-top:1px solid #D4CFC2;flex-shrink:0}
+.ga-foot{display:flex;gap:8px;padding:10px 14px;border-top:1px solid #e6e8ed;flex-shrink:0}
 /* Rotation hint in canvas bar */
-.rot-btn{padding:3px 9px;border:1px solid #C0BAA8;border-radius:5px;font-size:11px;background:#FDFCF9;color:#3D6B4F;cursor:pointer;font-weight:600}
-.rot-btn:hover{background:#3D6B4F;color:#fff;border-color:#3D6B4F}
+.rot-btn{padding:3px 9px;border:1px solid #d2d7df;border-radius:5px;font-size:11px;background:#ffffff;color:#2f54eb;cursor:pointer;font-weight:600}
+.rot-btn:hover{background:#2f54eb;color:#fff;border-color:#2f54eb}
 
 /* ═══ PRINT VIEW — shown only when body has .print-mode ═══ */
-.print-root{display:none;background:#fff;color:#1C1A14;font-family:sans-serif}
+.print-root{display:none;background:#fff;color:#1b1e26;font-family:sans-serif}
 body.print-mode .hdr,body.print-mode .app,body.print-mode .ov2,
 body.print-mode .pw-overlay,body.print-mode .ga-panel,body.print-mode .dxf-overlay,
 body.print-mode .hist-overlay{display:none!important}
@@ -364,20 +365,20 @@ body.print-mode{background:#fff}
     width:210mm;height:297mm;box-sizing:border-box;position:relative;overflow:hidden;
     display:flex;flex-direction:column}
 .pp:last-child{page-break-after:auto}
-.pp-head{display:flex;align-items:center;gap:10px;border-bottom:2px solid #1C1A14;padding-bottom:8px;margin-bottom:10px;flex-shrink:0}
+.pp-head{display:flex;align-items:center;gap:10px;border-bottom:2px solid #1b1e26;padding-bottom:8px;margin-bottom:10px;flex-shrink:0}
 .pp-head img{width:34px;height:34px;object-fit:contain}
 .pp-head .pp-brand{font-weight:700;font-size:13px}
 .pp-head .pp-title{font-size:16px;font-weight:600;flex:1;text-align:center}
-.pp-head .pp-meta{font-size:10px;color:#6B6455;font-family:monospace;text-align:right;line-height:1.4}
+.pp-head .pp-meta{font-size:10px;color:#667085;font-family:monospace;text-align:right;line-height:1.4}
 .pp h1{font-size:22px;margin:16px 0 8px}
-.pp h2{font-size:15px;margin:12px 0 6px;border-bottom:1px solid #C0BAA8;padding-bottom:3px}
+.pp h2{font-size:15px;margin:12px 0 6px;border-bottom:1px solid #d2d7df;padding-bottom:3px}
 .pp .summary-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:12px 0}
-.pp .summary-grid .box{border:1px solid #C0BAA8;border-radius:6px;padding:8px 10px}
-.pp .summary-grid .box .v{font-size:20px;font-weight:700;color:#3D6B4F}
-.pp .summary-grid .box .l{font-size:9px;color:#6B6455;text-transform:uppercase;letter-spacing:.05em;margin-top:2px}
+.pp .summary-grid .box{border:1px solid #d2d7df;border-radius:6px;padding:8px 10px}
+.pp .summary-grid .box .v{font-size:20px;font-weight:700;color:#2f54eb}
+.pp .summary-grid .box .l{font-size:9px;color:#667085;text-transform:uppercase;letter-spacing:.05em;margin-top:2px}
 .pp table.ppt{width:100%;border-collapse:collapse;font-size:10px}
-.pp table.ppt th{background:#EAE6DC;padding:4px 6px;text-align:left;border:1px solid #C0BAA8;font-weight:600;font-size:9px;text-transform:uppercase;letter-spacing:.03em}
-.pp table.ppt td{padding:3px 6px;border:1px solid #D4CFC2;vertical-align:top}
+.pp table.ppt th{background:#e9edf3;padding:4px 6px;text-align:left;border:1px solid #d2d7df;font-weight:600;font-size:9px;text-transform:uppercase;letter-spacing:.03em}
+.pp table.ppt td{padding:3px 6px;border:1px solid #e6e8ed;vertical-align:top}
 .pp table.ppt td.num{font-family:monospace;text-align:right}
 .pp table.ppt tr:nth-child(even) td{background:#FBFAF6}
 /* Sheet pages: portrait A4, diagram-dominant layout.
@@ -416,13 +417,13 @@ body.print-mode{background:#fff}
 .pp .sheet-block{display:flex;gap:10px;margin-top:10px;align-items:flex-start}
 .pp .sheet-svg-wrap{flex:0 0 auto}
 .pp .sheet-side{flex:1;min-width:0;font-size:9px}
-.pp .sheet-specs{border:1px solid #C0BAA8;border-radius:4px;padding:6px 8px;margin-bottom:8px;font-size:10px;line-height:1.5}
+.pp .sheet-specs{border:1px solid #d2d7df;border-radius:4px;padding:6px 8px;margin-bottom:8px;font-size:10px;line-height:1.5}
 .pp .sheet-specs .row{display:flex;justify-content:space-between;gap:8px}
-.pp .sheet-specs .row b{color:#3D6B4F}
-.pp .note{font-size:9px;color:#6B6455;margin-top:6px;font-style:italic}
-.pp .footer{position:absolute;bottom:4mm;left:10mm;right:10mm;display:flex;justify-content:space-between;font-size:8px;color:#A09888;border-top:1px solid #EAE6DC;padding-top:3px;flex-shrink:0}
-.pp .scalebar{display:inline-block;font-size:8px;color:#6B6455;margin-top:4px}
-.pp .scalebar .bar{display:inline-block;height:3px;background:#1C1A14;vertical-align:middle;margin-right:4px}
+.pp .sheet-specs .row b{color:#2f54eb}
+.pp .note{font-size:9px;color:#667085;margin-top:6px;font-style:italic}
+.pp .footer{position:absolute;bottom:4mm;left:10mm;right:10mm;display:flex;justify-content:space-between;font-size:8px;color:#667085;border-top:1px solid #e9edf3;padding-top:3px;flex-shrink:0}
+.pp .scalebar{display:inline-block;font-size:8px;color:#667085;margin-top:4px}
+.pp .scalebar .bar{display:inline-block;height:3px;background:#1b1e26;vertical-align:middle;margin-right:4px}
 .pp svg.sheet-svg text{font-family:sans-serif}
 @page{size:A4 portrait;margin:0}
 @media print{
@@ -435,23 +436,23 @@ body.print-mode{background:#fff}
 <!-- Print view — populated and shown when openPrintView() is called -->
 <div class="print-root" id="print-root"></div>
 <div class="hdr">
-  <img src="data:image/png;base64,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" alt="Dėdės Baldai" width="28" height="28" style="display:block;object-fit:contain">
+  <img src="data:image/png;base64,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" alt="Dėdės Baldai" width="28" height="28" style="display:block;object-fit:contain;filter:brightness(0) invert(1)">
   <div><div class="ht">Dėdės Baldai</div><div class="hs" data-i18n="tagline">SWOOD cut list · QR codes · DXF for vCarve · Zebra LP2824</div></div>
   <div style="margin-left:auto;display:flex;align-items:center;gap:8px">
-    <button onclick="openSettings()" title="Numatytieji nustatymai" style="font-size:15px;padding:4px 9px;border:1px solid #D4CFC2;background:#FDFCF9;border-radius:6px;cursor:pointer">⚙</button>
-    <select id="langSel" onchange="setLanguage(this.value)" title="Language" style="font-size:11px;padding:4px 6px;border:1px solid #D4CFC2;background:#FDFCF9;border-radius:6px;cursor:pointer;width:auto">
+    <button onclick="openSettings()" title="Numatytieji nustatymai" style="font-size:15px;padding:4px 9px;border:1px solid #2c3340;background:#232a36;color:#e8ebf0;border-radius:6px;cursor:pointer">⚙</button>
+    <select id="langSel" onchange="setLanguage(this.value)" title="Language" style="font-size:11px;padding:4px 6px;border:1px solid #2c3340;background:#232a36;color:#e8ebf0;border-radius:6px;cursor:pointer;width:auto">
       <option value="en">🇬🇧 EN</option>
       <option value="lt">🇱🇹 LT</option>
     </select>
-    <label data-i18n="project" style="font-size:10px;color:#A09888;font-family:monospace">PROJECT</label>
-    <input id="projName" data-i18n-ph="untitled" placeholder="Untitled" onchange="onProjectNameChange()" oninput="scheduleSave()" style="width:190px;font-size:12px;font-weight:500;padding:4px 8px;border:1px solid #D4CFC2;background:#FDFCF9;border-radius:6px;outline:none">
+    <label data-i18n="project" style="font-size:10px;color:#667085;font-family:monospace">PROJECT</label>
+    <input id="projName" data-i18n-ph="untitled" placeholder="Untitled" onchange="onProjectNameChange()" oninput="scheduleSave()" style="width:190px;font-size:12px;font-weight:500;padding:4px 8px;border:1px solid #e6e8ed;background:#ffffff;border-radius:6px;outline:none">
     <span id="saveStatus" class="save-status" title="Save status"></span>
     <button id="undoBtn" class="urbtn" onclick="undo()" data-i18n-title="undoTip" title="Undo (Ctrl+Z)" disabled>↶</button>
     <button id="redoBtn" class="urbtn" onclick="redo()" data-i18n-title="redoTip" title="Redo (Ctrl+Shift+Z)" disabled>↷</button>
-    <button class="btn bs" onclick="newProjectPrompt()" data-i18n-title="newProjTip" title="Start a new project (current one is preserved)" style="padding:4px 10px;color:#3D6B4F;border-color:#3D6B4F"><span data-i18n="newProj">🆕 New</span></button>
+    <button class="btn bs" onclick="newProjectPrompt()" data-i18n-title="newProjTip" title="Start a new project (current one is preserved)" style="padding:4px 10px;color:#2f54eb;border-color:#2f54eb"><span data-i18n="newProj">🆕 New</span></button>
     <button class="btn bs" onclick="openHistory()" data-i18n-title="openHistory" title="Open project history" style="padding:4px 10px"><span data-i18n="history">🗂 History</span></button>
   </div>
-  <span id="albl" style="font-size:10px;color:#A09888;font-family:monospace"></span>
+  <span id="albl" style="font-size:10px;color:#667085;font-family:monospace"></span>
 </div>
 <div class="app">
 <div class="side">
@@ -459,14 +460,14 @@ body.print-mode{background:#fff}
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px">
       <div class="sec" data-i18n="materialBoards" style="margin:0">Material Boards</div>
       <div style="display:flex;gap:4px">
-        <button class="sec-add-board" onclick="openWarehouseModal()" title="Naršyti sandėlio likučius ir pridėti į plokštes" style="color:#3D6B4F;border-color:#3D6B4F">📦 Sandėlis</button>
-        <button class="sec-add-board" onclick="document.getElementById('scrapBoardIn').click()" title="Import a scrap/offcut DXF and use it as a board for nesting" style="color:#8B5A2B;border-color:#8B5A2B">♻ Scrap</button>
+        <button class="sec-add-board" onclick="openWarehouseModal()" title="Naršyti sandėlio likučius ir pridėti į plokštes">📦 Sandėlis</button>
+        <button class="sec-add-board" onclick="document.getElementById('scrapBoardIn').click()" title="Import a scrap/offcut DXF and use it as a board for nesting">♻ Scrap</button>
         <button class="sec-add-board" onclick="addBoard()"><span style="font-size:14px">＋</span> <span data-i18n="addBoardBtn">Add board</span></button>
       </div>
     </div>
     <input type="file" id="scrapBoardIn" accept=".dxf,.DXF" style="display:none" onchange="loadScrapBoard(this)">
     <div id="blist"></div>
-    <div id="bempty" data-i18n="importHint" style="font-size:11px;color:#A09888;text-align:center;padding:10px;border:1px dashed #D4CFC2;border-radius:8px">Import parts → boards auto-created</div>
+    <div id="bempty" data-i18n="importHint" style="font-size:11px;color:#667085;text-align:center;padding:10px;border:1px dashed #e6e8ed;border-radius:8px">Import parts → boards auto-created</div>
   </div>
   <div>
     <div class="sec" data-i18n="cutSettings">Cut settings</div>
@@ -512,39 +513,39 @@ body.print-mode{background:#fff}
   </div>
   <div>
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px">
-      <div class="sec" style="margin:0"><span data-i18n="partGroups">Part Groups</span> <span style="color:#A09888;font-size:9px" data-i18n="sameGrain">(same grain pattern)</span></div>
+      <div class="sec" style="margin:0"><span data-i18n="partGroups">Part Groups</span> <span style="color:#667085;font-size:9px" data-i18n="sameGrain">(same grain pattern)</span></div>
       <button class="btn bs" onclick="addGroup()" data-i18n="addGroupBtn">+ Group</button>
     </div>
-    <div id="glist"><div id="gempty" data-i18n="noGroups" style="font-size:11px;color:#A09888;text-align:center;padding:8px;border:1px dashed #D4CFC2;border-radius:6px">No groups yet — select parts then assign</div></div>
+    <div id="glist"><div id="gempty" data-i18n="noGroups" style="font-size:11px;color:#667085;text-align:center;padding:8px;border:1px dashed #e6e8ed;border-radius:6px">No groups yet — select parts then assign</div></div>
   </div>
   <div style="flex:1;min-height:120px;display:flex;flex-direction:column">
     <div style="display:flex;align-items:center;gap:4px;margin-bottom:5px">
       <div class="sec" style="margin:0;flex:1;display:flex;align-items:center;gap:6px">
         <span data-i18n="parts">Parts</span> (<span id="pc">0</span>)
-        <span id="pc-printed" style="display:none;font-size:11px;font-weight:600;padding:1px 6px;border-radius:8px;background:#F2EFE8;cursor:pointer" onclick="resetPrintStatus()" title="Click to reset all print status"></span>
+        <span id="pc-printed" style="display:none;font-size:11px;font-weight:600;padding:1px 6px;border-radius:8px;background:#eceef2;cursor:pointer" onclick="resetPrintStatus()" title="Click to reset all print status"></span>
       </div>
       <button class="btn bs br" onclick="clearAllParts()" id="btn-clear-parts" data-i18n="clearBtn" style="display:none">Clear</button>
-      <button class="btn bs" onclick="openPartsWindow()" data-i18n="manageBtn" style="color:#3D6B4F;border-color:#3D6B4F">📋 Manage</button>
+      <button class="btn bs" onclick="openPartsWindow()" data-i18n="manageBtn" style="color:#2f54eb;border-color:#2f54eb">📋 Manage</button>
     </div>
-    <div id="plist" style="flex:1;min-height:0;overflow-y:auto;border:1px solid #D4CFC2;border-radius:6px;background:#F2EFE8;padding:3px">
-      <div id="pempty" data-i18n="noParts" style="font-size:11px;color:#A09888;text-align:center;padding:14px 8px">No parts yet — add one above<br>or import a file</div>
+    <div id="plist" style="flex:1;min-height:0;overflow-y:auto;border:1px solid #e6e8ed;border-radius:6px;background:#eceef2;padding:3px">
+      <div id="pempty" data-i18n="noParts" style="font-size:11px;color:#667085;text-align:center;padding:14px 8px">No parts yet — add one above<br>or import a file</div>
     </div>
   </div>
   <!-- Version selector — appears when at least one layout snapshot exists.
        Lets operator switch between saved layout versions and save new ones. -->
-  <div id="ver-bar" style="display:none;margin-top:6px;padding:6px 7px;background:#F2EFE8;border:1px solid #D4CFC2;border-radius:6px;font-size:11px">
+  <div id="ver-bar" style="display:none;margin-top:6px;padding:6px 7px;background:#eceef2;border:1px solid #e6e8ed;border-radius:6px;font-size:11px">
     <div style="display:flex;align-items:center;gap:5px;margin-bottom:4px">
-      <span style="color:#6B6455;font-weight:600">📚 Version:</span>
+      <span style="color:#667085;font-weight:600">📚 Version:</span>
       <select id="ver-sel" onchange="restoreVersion(this.value)" style="flex:1;min-width:0;font-size:11px;padding:2px 4px"></select>
       <button class="btn bs" onclick="saveAsVersion()" title="Save current layout as a named version" style="padding:2px 6px;font-size:10px">💾 Save as…</button>
     </div>
-    <div id="ver-hint" style="font-size:10px;color:#A09888;line-height:1.3"></div>
+    <div id="ver-hint" style="font-size:10px;color:#667085;line-height:1.3"></div>
   </div>
   <div style="display:flex;gap:4px;margin-top:6px">
     <button class="btn bp" onclick="optimize()" data-i18n="optimize" style="flex:1;padding:9px;font-size:13px">▶ Optimize &amp; Cut</button>
-    <button class="btn bs" onclick="openMergeDialog()" title="Find narrow parts (≤150mm) with matching length and merge them into strips up to 800mm wide. Saves kerf and improves nesting." style="padding:9px 10px;font-size:11px;color:#8B5A2B;border-color:#8B5A2B;white-space:nowrap">🔗 Merge narrow</button>
+    <button class="btn bs" onclick="openMergeDialog()" title="Find narrow parts (≤150mm) with matching length and merge them into strips up to 800mm wide. Saves kerf and improves nesting." style="padding:9px 10px;font-size:11px;color:#647488;border-color:#647488;white-space:nowrap">🔗 Merge narrow</button>
     <button class="btn bs" onclick="runShapeNest()" title="True-shape nesting (SVGnest engine): nests irregular DXF shapes into each other's gaps with rotation, via no-fit-polygon + genetic algorithm. Best for non-rectangular parts." style="padding:9px 10px;font-size:11px;color:#534AB7;border-color:#534AB7;white-space:nowrap">🧩 Shape nest</button>
-    <button class="btn bs" onclick="exportForDeepnest()" title="Export all shapes as one SVG for nesting in Deepnest/SVGnest (true-shape nesting with rotation)" style="padding:9px 12px;font-size:12px;color:#3D6B4F;border-color:#3D6B4F;white-space:nowrap">🔗 Deepnest</button>
+    <button class="btn bs" onclick="exportForDeepnest()" title="Export all shapes as one SVG for nesting in Deepnest/SVGnest (true-shape nesting with rotation)" style="padding:9px 12px;font-size:12px;color:#2f54eb;border-color:#2f54eb;white-space:nowrap">🔗 Deepnest</button>
   </div>
 </div>
 <div class="main">
@@ -598,15 +599,15 @@ body.print-mode{background:#fff}
     </div>
     <div id="qp-body"></div>
     <div class="qp-actions">
-      <button class="btn bs" onclick="openQuotePrint()" title="Open printable quotation (Save as PDF in print dialog)" style="color:#3D6B4F;border-color:#3D6B4F">🖨 Print quote</button>
+      <button class="btn bs" onclick="openQuotePrint()" title="Open printable quotation (Save as PDF in print dialog)" style="color:#2f54eb;border-color:#2f54eb">🖨 Print quote</button>
       <button class="btn bs" onclick="copyQuoteCSV()" title="Copy itemized quote to clipboard as CSV">📋 Copy CSV</button>
-      <span style="margin-left:auto;font-size:10px;color:#A09888;font-family:monospace;align-self:center">Pricing set per material in left panel</span>
+      <span style="margin-left:auto;font-size:10px;color:#667085;font-family:monospace;align-self:center">Pricing set per material in left panel</span>
     </div>
   </div>
   <div id="ep" class="ep" style="display:none">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:7px">
       <div class="sec" data-i18n="exportHdr" style="margin:0">Export — parts only · vCarve DXF</div>
-      <button class="btn bs" onclick="openPrintView()" data-i18n-title="printPdfTip" title="Open printable layout (Save as PDF in print dialog)" style="font-size:10px;padding:3px 8px;color:#3D6B4F;border-color:#3D6B4F"><span data-i18n="printPdf">🖨 Print PDF</span></button>
+      <button class="btn bs" onclick="openPrintView()" data-i18n-title="printPdfTip" title="Open printable layout (Save as PDF in print dialog)" style="font-size:10px;padding:3px 8px;color:#2f54eb;border-color:#2f54eb"><span data-i18n="printPdf">🖨 Print PDF</span></button>
     </div>
     <div id="erows"></div>
   </div>
@@ -616,12 +617,12 @@ body.print-mode{background:#fff}
       <div class="cvb">
         <label><input type="checkbox" id="ssnap" checked> <span data-i18n="snap1mm">Snap 1mm</span></label>
         <button class="rot-btn" id="rot-btn" onclick="rotateSel()" data-i18n-title="rotateTip" title="Rotate selected part 90° (R key)" style="display:none"><span data-i18n="rotateBtn">↻ Rotate (R)</span></button>
-        <button class="rot-btn" id="mv-btn" onclick="openMovePopover(event)" data-i18n-title="moveTip" title="Move selected part to a different sheet" style="display:none;color:#3D6B4F;border-color:#3D6B4F"><span data-i18n="moveBtn">📋 Move…</span></button>
-        <button class="rot-btn" id="pr-btn" onclick="printSel()" data-i18n-title="printTip" title="Print label for selected part (P key)" style="display:none;color:#3D6B4F;border-color:#3D6B4F"><span data-i18n="printBtn">🏷 Print (P)</span></button>
-        <button class="btn bs" onclick="openBatchPrint()" data-i18n-title="printAllTip" title="Print labels for every part on this sheet (or all sheets)" style="margin-left:auto;font-size:10px;padding:3px 8px;color:#3D6B4F;border-color:#3D6B4F"><span data-i18n="printAllBtn">🏷 Print all labels</span></button>
+        <button class="rot-btn" id="mv-btn" onclick="openMovePopover(event)" data-i18n-title="moveTip" title="Move selected part to a different sheet" style="display:none;color:#2f54eb;border-color:#2f54eb"><span data-i18n="moveBtn">📋 Move…</span></button>
+        <button class="rot-btn" id="pr-btn" onclick="printSel()" data-i18n-title="printTip" title="Print label for selected part (P key)" style="display:none;color:#2f54eb;border-color:#2f54eb"><span data-i18n="printBtn">🏷 Print (P)</span></button>
+        <button class="btn bs" onclick="openBatchPrint()" data-i18n-title="printAllTip" title="Print labels for every part on this sheet (or all sheets)" style="margin-left:auto;font-size:10px;padding:3px 8px;color:#2f54eb;border-color:#2f54eb"><span data-i18n="printAllBtn">🏷 Print all labels</span></button>
         <button class="btn bs" onclick="consolidateSheets()" data-i18n-title="consolidateTip" title="Repack current placements — merge nearly-empty sheets" style="font-size:10px;padding:3px 8px"><span data-i18n="consolidateBtn">✨ Consolidate sheets</span></button>
-        <button class="btn bs" onclick="openScrapDialog()" title="Find the largest reusable offcut on each sheet — export its label and DXF for tracking/reuse" style="font-size:10px;padding:3px 8px;color:#8B5A2B;border-color:#8B5A2B">♻ Export scrap</button>
-        <span data-i18n="canvasHint" style="font-size:10px;color:#A09888">Drag · R = rotate · P = print label</span>
+        <button class="btn bs" onclick="openScrapDialog()" title="Find the largest reusable offcut on each sheet — export its label and DXF for tracking/reuse" style="font-size:10px;padding:3px 8px;color:#647488;border-color:#647488">♻ Export scrap</button>
+        <span data-i18n="canvasHint" style="font-size:10px;color:#667085">Drag · R = rotate · P = print label</span>
       </div>
       <canvas id="cv"></canvas>
       <div class="tip" id="tip"></div>
@@ -642,10 +643,10 @@ body.print-mode{background:#fff}
   <div class="pw-head">
     <span style="font-size:16px">📋</span>
     <h3>Parts Manager</h3>
-    <span id="pw-count" style="font-size:11px;color:#A09888;font-family:monospace"></span>
+    <span id="pw-count" style="font-size:11px;color:#667085;font-family:monospace"></span>
     <!-- Multiply-all: clones every part N-1 more times. 20 parts × 5 = 100. -->
-    <div style="display:flex;align-items:center;gap:4px;margin-left:16px;padding-left:16px;border-left:1px solid #D4CFC2">
-      <span style="font-size:11px;color:#6B6455">× Multiply all by</span>
+    <div style="display:flex;align-items:center;gap:4px;margin-left:16px;padding-left:16px;border-left:1px solid #e6e8ed">
+      <span style="font-size:11px;color:#667085">× Multiply all by</span>
       <input id="pw-mult-n" type="number" min="2" max="99" placeholder="–" style="width:48px;padding:2px 4px;font-size:11px;text-align:center">
       <button class="btn bs bp" onclick="pwMultiplyAll()" style="font-size:11px;padding:3px 8px">Apply</button>
     </div>
@@ -690,17 +691,17 @@ body.print-mode{background:#fff}
     </table>
   </div>
   <div class="pw-foot">
-    <span id="pw-sel-count" style="font-size:11px;color:#6B6455;font-family:monospace"></span>
+    <span id="pw-sel-count" style="font-size:11px;color:#667085;font-family:monospace"></span>
     <button class="btn bs" onclick="pwSwapSelected()" title="Swap L and W for all selected parts (also rotates DXF shapes 90°)">⇆ Swap L/W</button>
-    <button class="btn bs" onclick="pwMergeSelected()" title="Merge the selected parts into one strip (they must share a width or a length)" style="color:#8B5A2B;border-color:#8B5A2B">🔗 Merge selected</button>
+    <button class="btn bs" onclick="pwMergeSelected()" title="Merge the selected parts into one strip (they must share a width or a length)" style="color:#647488;border-color:#647488">🔗 Merge selected</button>
     <div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap">
-      <span style="font-size:11px;color:#6B6455">Rotation:</span>
+      <span style="font-size:11px;color:#667085">Rotation:</span>
       <button class="btn bs" onclick="pwSetRotation('auto')" title="Selected parts follow the material's grain setting (default)">⟳ Auto</button>
-      <button class="btn bs" onclick="pwSetRotation('rotate')" title="Force selected parts rotatable — packer may turn them 90° to save sheets" style="color:#3D6B4F;border-color:#3D6B4F">🔄 Allow</button>
+      <button class="btn bs" onclick="pwSetRotation('rotate')" title="Force selected parts rotatable — packer may turn them 90° to save sheets" style="color:#2f54eb;border-color:#2f54eb">🔄 Allow</button>
       <button class="btn bs" onclick="pwSetRotation('lock')" title="Lock selected parts — no rotation (preserve grain / face direction)" style="color:#8a6d1a;border-color:#8a6d1a">🔒 Lock</button>
     </div>
     <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
-      <span style="font-size:11px;color:#6B6455">Assign selected to group:</span>
+      <span style="font-size:11px;color:#667085">Assign selected to group:</span>
       <select id="pw-grp-assign" style="font-size:11px;padding:3px 6px;width:auto"><option value="">— choose —</option></select>
       <button class="btn bs bp" onclick="pwAssignToGroup()">Assign</button>
       <button class="btn bs" onclick="pwUnassignGroup()" style="color:#B84040;border-color:#e0b0b0">Remove from group</button>
@@ -718,10 +719,10 @@ body.print-mode{background:#fff}
     <h3 style="flex:1;font-size:14px;font-weight:600">Import DXF parts</h3>
     <button class="btn bs br" onclick="closeDXFImportDialog()">✕</button>
   </div>
-  <div style="padding:10px 16px 0;font-size:11px;color:#6B6455">
+  <div style="padding:10px 16px 0;font-size:11px;color:#667085">
     Each DXF becomes a shaped part. Nesting uses the bounding box; the real outline is drawn and exported for vCarve.
   </div>
-  <div style="padding:10px 16px;display:grid;grid-template-columns:1fr 90px;gap:8px;align-items:end;border-bottom:1px solid #EAE6DC">
+  <div style="padding:10px 16px;display:grid;grid-template-columns:1fr 90px;gap:8px;align-items:end;border-bottom:1px solid #e9edf3">
     <div><label class="fl">Material (applies to all)</label><select id="dxf-mat"></select></div>
     <div><label class="fl">Thickness mm</label><input id="dxf-thick" type="number" min="1" value="18"></div>
   </div>
@@ -741,10 +742,10 @@ body.print-mode{background:#fff}
     <h3 style="flex:1;font-size:14px;font-weight:600">Import part list (CSV)</h3>
     <button class="btn bs br" onclick="closeCSVImportDialog()">✕</button>
   </div>
-  <div id="csv-summary" style="padding:10px 16px;border-bottom:1px solid #EAE6DC"></div>
-  <div style="padding:10px 16px;border-bottom:1px solid #EAE6DC">
+  <div id="csv-summary" style="padding:10px 16px;border-bottom:1px solid #e9edf3"></div>
+  <div style="padding:10px 16px;border-bottom:1px solid #e9edf3">
     <div class="sec" style="margin:0 0 6px">Material mapping</div>
-    <div style="font-size:10px;color:#6B6455;margin-bottom:6px">Keep each CSV material as-is, or remap to an existing board. New materials get a default 2800×2070 board created automatically.</div>
+    <div style="font-size:10px;color:#667085;margin-bottom:6px">Keep each CSV material as-is, or remap to an existing board. New materials get a default 2800×2070 board created automatically.</div>
     <div id="csv-mat-map" style="display:flex;flex-direction:column;gap:4px"></div>
   </div>
   <div class="dxf-body" id="csv-preview" style="padding:0 16px"></div>
@@ -761,11 +762,11 @@ body.print-mode{background:#fff}
   <div class="hist-head">
     <span style="font-size:16px">🗂</span>
     <h3 style="flex:1;font-size:14px;font-weight:600">Project history</h3>
-    <span id="hist-source" style="font-size:10px;color:#A09888;font-family:monospace"></span>
+    <span id="hist-source" style="font-size:10px;color:#667085;font-family:monospace"></span>
     <button class="btn bs" onclick="newProject()" title="Start a blank project" style="font-size:11px">+ New</button>
     <button class="btn bs br" onclick="closeHistory()">✕</button>
   </div>
-  <div style="padding:8px 14px;font-size:10px;color:#6B6455;border-bottom:1px solid #EAE6DC;display:flex;align-items:center;gap:6px;background:#F7F5F0">
+  <div style="padding:8px 14px;font-size:10px;color:#667085;border-bottom:1px solid #e9edf3;display:flex;align-items:center;gap:6px;background:#F7F5F0">
     <input id="hist-search" placeholder="🔍 Filter…" oninput="renderHistory()" style="flex:1;font-size:11px;padding:3px 7px">
     <button class="btn bs" onclick="refreshHistory()" title="Refresh from cloud" style="font-size:11px">↻ Refresh</button>
     <button class="btn bs" onclick="exportCurrentProject()" title="Download current project as JSON" style="font-size:11px">⤓ Export JSON</button>
@@ -773,7 +774,7 @@ body.print-mode{background:#fff}
   </div>
   <div class="hist-body" id="hist-body"></div>
   <div class="hist-foot">
-    <span id="hist-status" style="font-size:10px;color:#A09888;font-family:monospace;flex:1"></span>
+    <span id="hist-status" style="font-size:10px;color:#667085;font-family:monospace;flex:1"></span>
     <button class="btn bs" onclick="closeHistory()">Close</button>
   </div>
 </div>
@@ -799,16 +800,16 @@ body.print-mode{background:#fff}
 <div class="ga-panel" id="scrap-panel" onclick="if(event.target===this)closeScrapDialog()">
 <div class="ga-box" style="max-width:720px">
   <div class="ga-head">
-    <div style="width:18px;height:18px;background:#8B5A2B;color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;border-radius:4px;flex-shrink:0">♻</div>
+    <div style="width:18px;height:18px;background:#647488;color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;border-radius:4px;flex-shrink:0">♻</div>
     <h3 style="flex:1;font-size:13px">Reusable offcuts (scrap)</h3>
     <button class="btn bs br" onclick="closeScrapDialog()">✕</button>
   </div>
-  <div style="padding:9px 14px;background:#FCFAF4;font-size:11px;color:#6B6455;border-bottom:1px solid #D4CFC2;line-height:1.5">
+  <div style="padding:9px 14px;background:#FCFAF4;font-size:11px;color:#667085;border-bottom:1px solid #e6e8ed;line-height:1.5">
     The largest clean rectangle left on each sheet, after all parts and saw kerf. Export a <strong>label</strong> to stick on the offcut, and a <strong>DXF</strong> of its position &amp; size for tracking or re-nesting later.
   </div>
   <div class="ga-body" id="scrap-body" style="padding:0"></div>
   <div class="ga-foot">
-    <div style="flex:1;font-size:11px;color:#6B6455" id="scrap-summary"></div>
+    <div style="flex:1;font-size:11px;color:#667085" id="scrap-summary"></div>
     <button class="btn bs" onclick="downloadScrapDXF(true)" title="DXF of offcuts on every sheet">⬇ DXF — all sheets</button>
     <button class="btn bs" onclick="closeScrapDialog()">Close</button>
   </div>
@@ -819,17 +820,17 @@ body.print-mode{background:#fff}
 <div class="ga-panel" id="merge-panel" onclick="if(event.target===this)closeMergeDialog()">
 <div class="ga-box" style="max-width:760px">
   <div class="ga-head">
-    <div style="width:18px;height:18px;background:#8B5A2B;color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;border-radius:4px;flex-shrink:0">🔗</div>
+    <div style="width:18px;height:18px;background:#647488;color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;border-radius:4px;flex-shrink:0">🔗</div>
     <h3 style="flex:1;font-size:13px">Merge narrow parts</h3>
     <button class="btn bs br" onclick="closeMergeDialog()">✕</button>
   </div>
-  <div style="padding:9px 14px;background:#FCFAF4;font-size:11px;color:#6B6455;border-bottom:1px solid #D4CFC2;line-height:1.5">
+  <div style="padding:9px 14px;background:#FCFAF4;font-size:11px;color:#667085;border-bottom:1px solid #e6e8ed;line-height:1.5">
     Parts with one dimension ≤<strong>150 mm</strong> are merged into strips up to <strong>800 mm</strong> wide, with a saw-kerf gap between pieces. Same length, material, and thickness required to merge. The cutting operator separates them with a single saw cut along each gap.
   </div>
   <div class="ga-body" id="merge-body" style="padding:0"></div>
   <div class="ga-foot">
-    <div style="flex:1;font-size:11px;color:#6B6455" id="merge-summary"></div>
-    <button class="btn bp" id="merge-apply-btn" onclick="applyMerges()" style="background:#8B5A2B;border-color:#8B5A2B">✓ Merge selected</button>
+    <div style="flex:1;font-size:11px;color:#667085" id="merge-summary"></div>
+    <button class="btn bp" id="merge-apply-btn" onclick="applyMerges()" style="background:#647488;border-color:#647488">✓ Merge selected</button>
     <button class="btn bs" onclick="closeMergeDialog()">Cancel</button>
   </div>
 </div>
@@ -844,7 +845,7 @@ body.print-mode{background:#fff}
     <input id="ga-search" placeholder="🔍 filter…" style="font-size:11px;padding:3px 7px;width:140px" oninput="renderGAPanel()">
     <button class="btn bs br" onclick="closeGAPanel()">✕</button>
   </div>
-  <div style="padding:7px 14px;background:#F7F5F0;font-size:10px;color:#6B6455;border-bottom:1px solid #D4CFC2">
+  <div style="padding:7px 14px;background:#F7F5F0;font-size:10px;color:#667085;border-bottom:1px solid #e6e8ed">
     Set <strong>how many copies</strong> of each part go into this group. Split identical parts across several groups — e.g. 6 facades → 2 + 2 + 2. Grouped parts keep the <strong>same grain direction</strong> (no rotation) and are placed consecutively.
   </div>
   <div class="ga-body" id="ga-body"></div>
@@ -872,7 +873,7 @@ body.print-mode{background:#fff}
     <button class="btn bs" onclick="closeModal()">✕</button>
   </div>
   <div id="xlsmInfo" style="font-size:10px;color:#888;margin-bottom:4px;font-family:monospace;word-break:break-all"></div>
-  <div id="pst" style="font-size:11px;color:#6B6455;margin-top:4px;min-height:32px;line-height:1.6"></div>
+  <div id="pst" style="font-size:11px;color:#667085;margin-top:4px;min-height:32px;line-height:1.6"></div>
   <!-- ZPL text kept hidden — still used by saveZPL -->
   <div class="zp" id="zpl" style="display:none"></div>
   <!-- Printer name kept as hidden input for backwards compat in case code references it -->
@@ -892,14 +893,14 @@ body.print-mode{background:#fff}
     <div id="bp-scope" class="bp-scope">
       <label class="sel" id="bp-scope-sheet" onclick="bpPickScope('sheet')">
         <strong data-i18n="batchScopeSheet">This sheet</strong>
-        <span id="bp-scope-sheet-n" style="font-size:10px;color:#6B6455;font-family:monospace"></span>
+        <span id="bp-scope-sheet-n" style="font-size:10px;color:#667085;font-family:monospace"></span>
       </label>
       <label id="bp-scope-all" onclick="bpPickScope('all')">
         <strong data-i18n="batchScopeAll">All sheets</strong>
-        <span id="bp-scope-all-n" style="font-size:10px;color:#6B6455;font-family:monospace"></span>
+        <span id="bp-scope-all-n" style="font-size:10px;color:#667085;font-family:monospace"></span>
       </label>
     </div>
-    <div id="bp-status" style="font-size:11px;color:#6B6455;min-height:16px"></div>
+    <div id="bp-status" style="font-size:11px;color:#667085;min-height:16px"></div>
     <div class="bp-prog" id="bp-prog-wrap" style="display:none"><div class="bp-prog-bar" id="bp-prog-bar"></div></div>
     <div class="bp-log" id="bp-log" style="display:none"></div>
   </div>
@@ -1783,7 +1784,7 @@ function whComboPanel(){
   var p=document.getElementById('wh-dd');
   if(!p){
     p=document.createElement('div'); p.id='wh-dd';
-    p.style.cssText='position:fixed;z-index:99999;background:#fff;border:1px solid #D8D2C6;border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.14);max-height:280px;overflow:auto;display:none';
+    p.style.cssText='position:fixed;z-index:99999;background:#fff;border:1px solid #e6e8ed;border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.14);max-height:280px;overflow:auto;display:none';
     document.body.appendChild(p);
     // pick an option (mousedown fires before the input blurs)
     p.addEventListener('mousedown',function(e){
@@ -1818,19 +1819,19 @@ function whComboRender(filter){
   var exact=WH_STOCK.some(function(s){ return String(s.material||'').toLowerCase()===fl; });
   var html='';
   if(f&&!exact){
-    html+='<div class="wh-opt" data-mat="'+esc(f)+'" style="padding:9px 12px;cursor:pointer;border-bottom:1px solid #F0ECE3;background:#FAF8F3">'
-      +'<div style="font-weight:600;color:#3D6B4F">➕ Naudoti „'+esc(f)+'" (rankinis įvedimas)</div></div>';
+    html+='<div class="wh-opt" data-mat="'+esc(f)+'" style="padding:9px 12px;cursor:pointer;border-bottom:1px solid #e6e8ed;background:#eef1ff">'
+      +'<div style="font-weight:600;color:#2f54eb">➕ Naudoti „'+esc(f)+'" (rankinis įvedimas)</div></div>';
   }
   html+=list.map(function(s){
     var area=whStockArea(s);
     var sheets=(s.available>0&&area)?Math.floor(s.available/area):0;
     var dim=(s.sheet_w&&s.sheet_h)?(s.sheet_w+'×'+s.sheet_h):'';
     var sub=[(s.thickness!=null?s.thickness+'mm':''),dim,sheets+' lakšt.'].filter(Boolean).join(' · ');
-    return '<div class="wh-opt" data-sku="'+esc(s.sku)+'" data-mat="'+esc(s.material)+'" style="padding:9px 12px;cursor:pointer;border-bottom:1px solid #F0ECE3">'
-      +'<div style="font-weight:600;color:#3a352c">'+esc(s.material)+'</div>'
-      +'<div style="font-size:11px;color:#A09888">'+esc(sub)+'</div></div>';
+    return '<div class="wh-opt" data-sku="'+esc(s.sku)+'" data-mat="'+esc(s.material)+'" style="padding:9px 12px;cursor:pointer;border-bottom:1px solid #e6e8ed">'
+      +'<div style="font-weight:600;color:#1b1e26">'+esc(s.material)+'</div>'
+      +'<div style="font-size:11px;color:#667085">'+esc(sub)+'</div></div>';
   }).join('');
-  if(!list.length&&!f) html='<div style="padding:10px 12px;color:#A09888;font-size:12px">Sandėlio likučių nėra (rašykite ranka)</div>';
+  if(!list.length&&!f) html='<div style="padding:10px 12px;color:#667085;font-size:12px">Sandėlio likučių nėra (rašykite ranka)</div>';
   p.innerHTML=html;
 }
 function whFindStockBySku(sku){ return WH_STOCK.filter(function(s){return String(s.sku)===String(sku);})[0]||null; }
@@ -1876,16 +1877,16 @@ function applyNDToControls(){
 }
 
 function openSettings(){
-  var L='font-size:10px;font-weight:700;color:#6B6455;text-transform:uppercase;letter-spacing:.05em';
-  var H='font-size:11px;font-weight:700;color:#3D6B4F;text-transform:uppercase;letter-spacing:.06em;margin:16px 0 6px';
-  var inp='width:100%;padding:6px 8px;border:1px solid #D8D2C6;border-radius:6px;margin-top:3px;font-size:13px;box-sizing:border-box';
+  var L='font-size:10px;font-weight:700;color:#667085;text-transform:uppercase;letter-spacing:.05em';
+  var H='font-size:11px;font-weight:700;color:#2f54eb;text-transform:uppercase;letter-spacing:.06em;margin:16px 0 6px';
+  var inp='width:100%;padding:6px 8px;border:1px solid #e6e8ed;border-radius:6px;margin-top:3px;font-size:13px;box-sizing:border-box';
   var sel=function(v,opt){return v===opt?' selected':'';};
   var html=''
-   +'<div style="font-size:16px;font-weight:700;color:#3a352c">⚙ Numatytieji nustatymai</div>'
-   +'<div style="font-size:11px;color:#A09888;margin-top:2px">Naudojama naujoms plokštėms ir naujiems projektams.</div>'
+   +'<div style="font-size:16px;font-weight:700;color:#1b1e26">⚙ Numatytieji nustatymai</div>'
+   +'<div style="font-size:11px;color:#667085;margin-top:2px">Naudojama naujoms plokštėms ir naujiems projektams.</div>'
    +'<div style="'+H+'">Matavimo vienetai</div>'
    +'<select id="sd-unit" style="'+inp+'"><option value="mm"'+sel(ND.unit,'mm')+'>mm</option><option value="cm"'+sel(ND.unit,'cm')+'>cm</option><option value="inch"'+sel(ND.unit,'inch')+'>colis (inch)</option></select>'
-   +'<div style="font-size:10px;color:#A09888;margin-top:3px">Taikoma plokščių matmenims. Detalės ir eksportas visada mm.</div>'
+   +'<div style="font-size:10px;color:#667085;margin-top:3px">Taikoma plokščių matmenims. Detalės ir eksportas visada mm.</div>'
    +'<div style="'+H+'">Plokštės numatytieji</div>'
    +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px">'
      +'<div><label style="'+L+'">Plotis ('+uLabel()+')</label><input id="sd-bw" type="number" value="'+mm2u(ND.boardW)+'" style="'+inp+'"></div>'
@@ -1913,8 +1914,8 @@ function openSettings(){
      +'<div><label style="'+L+'">Briauna €/m</label><input id="sd-pedge" type="number" step="0.01" value="'+ND.priceEdge+'" style="'+inp+'"></div>'
    +'</div>'
    +'<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:18px">'
-     +'<button onclick="closeSettings()" style="padding:8px 16px;border:1px solid #D8D2C6;background:#fff;border-radius:7px;cursor:pointer">Atšaukti</button>'
-     +'<button onclick="saveSettings()" style="padding:8px 16px;border:none;background:#3D6B4F;color:#fff;border-radius:7px;cursor:pointer;font-weight:600">Išsaugoti</button>'
+     +'<button onclick="closeSettings()" style="padding:8px 16px;border:1px solid #e6e8ed;background:#fff;border-radius:7px;cursor:pointer">Atšaukti</button>'
+     +'<button onclick="saveSettings()" style="padding:8px 16px;border:none;background:#2f54eb;color:#fff;border-radius:7px;cursor:pointer;font-weight:600">Išsaugoti</button>'
    +'</div>';
   var bg=document.createElement('div'); bg.id='sd-bg';
   bg.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:100000;display:flex;align-items:center;justify-content:center;padding:20px';
@@ -1945,12 +1946,12 @@ function saveSettings(){
 // ════════════════════════════════════════════════════════════════
 function openWarehouseModal(){
   whLoadStock().then(function(){ whRenderWMList(''); });
-  var inp='width:100%;padding:7px 10px;border:1px solid #D8D2C6;border-radius:7px;font-size:13px;box-sizing:border-box';
+  var inp='width:100%;padding:7px 10px;border:1px solid #e6e8ed;border-radius:7px;font-size:13px;box-sizing:border-box';
   var html=''
     +'<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">'
-      +'<div style="font-size:16px;font-weight:700;color:#3a352c">📦 Sandėlio likučiai</div>'
-      +'<button onclick="whLoadStock().then(function(){whRenderWMList((document.getElementById(\'wm-f\')||{}).value||\'\')})" title="Atnaujinti" style="margin-left:auto;font-size:13px;padding:5px 10px;border:1px solid #D8D2C6;background:#fff;border-radius:6px;cursor:pointer">↻</button>'
-      +'<button onclick="closeWarehouseModal()" style="font-size:13px;padding:5px 10px;border:1px solid #D8D2C6;background:#fff;border-radius:6px;cursor:pointer">✕</button>'
+      +'<div style="font-size:16px;font-weight:700;color:#1b1e26">📦 Sandėlio likučiai</div>'
+      +'<button onclick="whLoadStock().then(function(){whRenderWMList((document.getElementById(\'wm-f\')||{}).value||\'\')})" title="Atnaujinti" style="margin-left:auto;font-size:13px;padding:5px 10px;border:1px solid #e6e8ed;background:#fff;border-radius:6px;cursor:pointer">↻</button>'
+      +'<button onclick="closeWarehouseModal()" style="font-size:13px;padding:5px 10px;border:1px solid #e6e8ed;background:#fff;border-radius:6px;cursor:pointer">✕</button>'
     +'</div>'
     +'<input id="wm-f" placeholder="Ieškoti medžiagos…" oninput="whRenderWMList(this.value)" style="'+inp+'">'
     +'<div id="wm-list" style="margin-top:12px">Kraunama…</div>';
@@ -1972,23 +1973,23 @@ function whRenderWMList(filter){
   var match=function(name){return !f||String(name||'').toLowerCase().indexOf(f)>=0;};
   var sheets=WH_STOCK.filter(function(s){return match(s.material);});
   var offs=WH_OFFCUTS.filter(function(o){return match(o.material);});
-  var rowBtn='padding:5px 12px;border:none;background:#3D6B4F;color:#fff;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;flex-shrink:0';
+  var rowBtn='padding:5px 12px;border:none;background:#2f54eb;color:#fff;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;flex-shrink:0';
   var row=function(title,sub,attr){
-    return '<div style="display:flex;align-items:center;gap:10px;padding:9px 4px;border-bottom:1px solid #F0ECE3">'
-      +'<div style="flex:1;min-width:0"><div style="font-weight:600;color:#3a352c;font-size:13px">'+esc(title)+'</div><div style="font-size:11px;color:#A09888">'+esc(sub)+'</div></div>'
+    return '<div style="display:flex;align-items:center;gap:10px;padding:9px 4px;border-bottom:1px solid #e6e8ed">'
+      +'<div style="flex:1;min-width:0"><div style="font-weight:600;color:#1b1e26;font-size:13px">'+esc(title)+'</div><div style="font-size:11px;color:#667085">'+esc(sub)+'</div></div>'
       +'<button '+attr+' style="'+rowBtn+'">+ Pridėti</button></div>';
   };
   var html='';
-  html+='<div style="font-size:11px;font-weight:700;color:#3D6B4F;text-transform:uppercase;letter-spacing:.06em;margin:4px 0 4px">Plokštės ('+sheets.length+')</div>';
-  if(!sheets.length) html+='<div style="font-size:12px;color:#A09888;padding:6px 4px">Nėra</div>';
+  html+='<div style="font-size:11px;font-weight:700;color:#2f54eb;text-transform:uppercase;letter-spacing:.06em;margin:4px 0 4px">Plokštės ('+sheets.length+')</div>';
+  if(!sheets.length) html+='<div style="font-size:12px;color:#667085;padding:6px 4px">Nėra</div>';
   html+=sheets.map(function(s){
     var area=whStockArea(s), cnt=(s.available>0&&area)?Math.floor(s.available/area):0;
     var dim=(s.sheet_w&&s.sheet_h)?(s.sheet_w+'×'+s.sheet_h):'';
     var sub=[(s.thickness!=null?s.thickness+'mm':''),dim,cnt+' lakšt.'].filter(Boolean).join(' · ');
     return row(s.material,sub,'data-add-sku="'+esc(s.sku)+'"');
   }).join('');
-  html+='<div style="font-size:11px;font-weight:700;color:#8B5A2B;text-transform:uppercase;letter-spacing:.06em;margin:14px 0 4px">Atraižos ('+offs.length+')</div>';
-  if(!offs.length) html+='<div style="font-size:12px;color:#A09888;padding:6px 4px">Nėra</div>';
+  html+='<div style="font-size:11px;font-weight:700;color:#647488;text-transform:uppercase;letter-spacing:.06em;margin:14px 0 4px">Atraižos ('+offs.length+')</div>';
+  if(!offs.length) html+='<div style="font-size:12px;color:#667085;padding:6px 4px">Nėra</div>';
   html+=offs.map(function(o){
     var sub=[(o.thickness!=null?o.thickness+'mm':''),(o.w&&o.h?o.w+'×'+o.h:'')].filter(Boolean).join(' · ');
     return row(o.material||'Atraiža',sub,'data-add-offcut="'+esc(o.id)+'"');
@@ -2495,14 +2496,14 @@ async function renderHistory(){
   var body=document.getElementById('hist-body');
   var status=document.getElementById('hist-status');
   var srcEl=document.getElementById('hist-source');
-  body.innerHTML='<div style="padding:20px;text-align:center;color:#A09888;font-size:11px">Loading…</div>';
+  body.innerHTML='<div style="padding:20px;text-align:center;color:#667085;font-size:11px">Loading…</div>';
   var list=await listProjects();
   srcEl.textContent=_supabaseOnline?'☁ cloud + local':'⚠ local only';
-  srcEl.style.color=_supabaseOnline?'#3D6B4F':'#A36A1A';
+  srcEl.style.color=_supabaseOnline?'#2f54eb':'#A36A1A';
   var filter=((document.getElementById('hist-search')||{}).value||'').toLowerCase();
   var filtered=filter?list.filter(function(p){return p.name.toLowerCase().indexOf(filter)>=0;}):list;
   if(!filtered.length){
-    body.innerHTML='<div style="padding:30px;text-align:center;color:#A09888;font-size:12px">'+(list.length?'No matches for "'+esc(filter)+'"':'No projects yet — edit something and it will be saved automatically.')+'</div>';
+    body.innerHTML='<div style="padding:30px;text-align:center;color:#667085;font-size:12px">'+(list.length?'No matches for "'+esc(filter)+'"':'No projects yet — edit something and it will be saved automatically.')+'</div>';
     status.textContent=list.length+' total';
     return;
   }
@@ -2512,8 +2513,8 @@ async function renderHistory(){
     var srcTitle=p.source==='cloud'?'Cloud only':(p.source==='both'?'Cloud + local':'Local only');
     var isCurrent=p.name===currentProjectName;
     return '<div class="hist-row'+(isCurrent?' current':'')+'" data-name="'+esc(p.name)+'" onclick="histRowClick(event,\''+esc(p.name).replace(/'/g,"\\'")+'\')">'
-      +'<span title="'+srcTitle+'" style="font-size:11px;color:#6B6455">'+srcBadge+'</span>'
-      +'<span class="hname">'+(isCurrent?'<strong>':'')+esc(p.name)+(isCurrent?' <span style="font-size:9px;color:#3D6B4F;font-weight:normal">(current)</span></strong>':'')+'</span>'
+      +'<span title="'+srcTitle+'" style="font-size:11px;color:#667085">'+srcBadge+'</span>'
+      +'<span class="hname">'+(isCurrent?'<strong>':'')+esc(p.name)+(isCurrent?' <span style="font-size:9px;color:#2f54eb;font-weight:normal">(current)</span></strong>':'')+'</span>'
       +'<span class="hmeta">'+when+'</span>'
       +'<span class="hacts">'
       +'<button class="hbtn" onclick="event.stopPropagation();histAction(\'open\',\''+esc(p.name).replace(/'/g,"\\'")+'\')">Open</button>'
@@ -2734,19 +2735,19 @@ function showStartupModal(){
     var html='';
     if(continueName){
       html+='<button class="startup-card primary" onclick="startupContinue('+JSON.stringify(continueName).replace(/"/g,'&quot;')+')">'
-        +'<div class="startup-ic" style="background:#3D6B4F;color:#fff">↩</div>'
+        +'<div class="startup-ic" style="background:#2f54eb;color:#fff">↩</div>'
         +'<div class="startup-ct"><div class="ct-t">Continue '+esc(continueName)+'</div><div class="ct-s">'+esc(continueSub||'pick up where you left off')+'</div></div>'
         +'<div class="startup-arrow">→</div></button>';
     }
     html+='<button class="startup-card" onclick="startupNew()">'
-      +'<div class="startup-ic" style="background:#F2EFE8;color:#3D6B4F">＋</div>'
+      +'<div class="startup-ic" style="background:#eceef2;color:#2f54eb">＋</div>'
       +'<div class="startup-ct"><div class="ct-t">New Project</div><div class="ct-s">start from a blank sheet</div></div>'
       +'<div class="startup-arrow">→</div></button>';
     if(others&&others.length){
       html+='<div class="startup-divider">Other recent projects</div><div class="startup-more">';
       others.forEach(function(p){
         html+='<div class="startup-more-row" onclick="startupContinue('+JSON.stringify(p.name).replace(/"/g,'&quot;')+')">'
-          +'<span style="color:#A09888">📁</span>'
+          +'<span style="color:#667085">📁</span>'
           +'<span class="mr-n">'+esc(p.name)+'</span>'
           +'<span class="mr-t">'+esc(_relTime(p.updated_at))+'</span></div>';
       });
@@ -2872,13 +2873,13 @@ function renderBoards(){
       +'<div><label class="fl">Storis (mm)</label><input type="number" value="'+(b.thickness!=null?b.thickness:18)+'" onchange="updateBoard('+b.id+',\'thickness\',this.value)"></div>'
       +'<div><label class="fl">Color</label><input type="color" value="'+b.color+'" onchange="updateBoard('+b.id+',\'color\',this.value)"></div>'
       +'</div>'
-      +'<label style="display:flex;align-items:center;gap:6px;font-size:11px;color:#6B6455;cursor:pointer;margin-top:6px;padding-top:5px;border-top:1px solid #E8E4DB">'
-      +'<input type="checkbox" '+(b.grain?'checked':'')+' onchange="updateBoard('+b.id+',\'grain\',this.checked)" style="accent-color:#3D6B4F;width:auto;cursor:pointer">'
-      +'<span>🌾 Lock grain direction <span style="color:#A09888;font-size:10px">(no rotation)</span></span>'
+      +'<label style="display:flex;align-items:center;gap:6px;font-size:11px;color:#667085;cursor:pointer;margin-top:6px;padding-top:5px;border-top:1px solid #e6e8ed">'
+      +'<input type="checkbox" '+(b.grain?'checked':'')+' onchange="updateBoard('+b.id+',\'grain\',this.checked)" style="accent-color:#2f54eb;width:auto;cursor:pointer">'
+      +'<span>🌾 Lock grain direction <span style="color:#667085;font-size:10px">(no rotation)</span></span>'
       +'</label>'
       +'<div class="bprice-toggle" onclick="this.nextElementSibling.classList.toggle(\'open\');this.querySelector(\'.bprice-arr\').textContent=this.nextElementSibling.classList.contains(\'open\')?\'▾\':\'▸\'">'
       +'<span class="bprice-arr">'+(pOpen?'▾':'▸')+'</span><span>💶 Pricing</span>'
-      +'<span style="margin-left:auto;color:#A09888;font-size:10px;font-family:monospace">'+(b.priceM2?('€'+b.priceM2+'/m²'+(b.priceMatMarkup?(' +'+b.priceMatMarkup+'%'):'')):'set prices')+'</span>'
+      +'<span style="margin-left:auto;color:#667085;font-size:10px;font-family:monospace">'+(b.priceM2?('€'+b.priceM2+'/m²'+(b.priceMatMarkup?(' +'+b.priceMatMarkup+'%'):'')):'set prices')+'</span>'
       +'</div>'
       +'<div class="bprice-wrap'+pOpen+'">'
       +'<div class="bprice">'
@@ -2923,7 +2924,7 @@ function routeFiles(files){
 
 async function processFile(f){
   var st=document.getElementById('ist');
-  st.style.color='#6B6455';st.textContent='Reading…';
+  st.style.color='#667085';st.textContent='Reading…';
   try{
     var ab=await f.arrayBuffer();
     var wb=await XLSX.read(ab);
@@ -3184,7 +3185,7 @@ async function processFile(f){
     document.getElementById('dropz').classList.add('ok');
     var opCount=Object.values(opIdMap).filter(function(o){return o.hasCNC;}).length;
     var src=_panelSrc || (wb.SheetNames.indexOf('PARTLIST')>=0?'PARTLIST':'STOCK_CORE');
-    st.style.color='#3D6B4F';
+    st.style.color='#2f54eb';
     st.textContent='✓ '+added+' parts · '+boards.length+' materials · '+opCount+' CNC op IDs · from '+src;
   }catch(err){
     st.style.color='#B84040';st.textContent='⚠ '+err.message;console.error(err);
@@ -3492,7 +3493,7 @@ function _shiftEntity(e,dx,dy){
 var _dxfImportQueue=null;
 async function processDXFFiles(files){
   var st=document.getElementById('ist');
-  st.style.color='#6B6455';st.textContent='Parsing DXF…';
+  st.style.color='#667085';st.textContent='Parsing DXF…';
   var parsed=[];
   for(var i=0;i<files.length;i++){
     try{
@@ -3529,7 +3530,7 @@ async function processDXFFiles(files){
   _dxfImportQueue=parsed;
   openDXFImportDialog(parsed);
   var totalHoles=parsed.reduce(function(n,p){return n+(p.holes?p.holes.length:0);},0);
-  st.style.color='#3D6B4F';st.textContent='✓ '+parsed.length+' shape'+(parsed.length>1?'s':'')+(totalHoles?' · '+totalHoles+' hole'+(totalHoles>1?'s':''):'')+' parsed';
+  st.style.color='#2f54eb';st.textContent='✓ '+parsed.length+' shape'+(parsed.length>1?'s':'')+(totalHoles?' · '+totalHoles+' hole'+(totalHoles>1?'s':''):'')+' parsed';
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -3585,7 +3586,7 @@ function _csvFindCol(headers,keywords){
 }
 async function processCSVFile(f){
   var st=document.getElementById('ist');
-  st.style.color='#6B6455';st.textContent='Reading CSV…';
+  st.style.color='#667085';st.textContent='Reading CSV…';
   try{
     var text=await f.text();
     var parsed=parseCSV(text);
@@ -3632,7 +3633,7 @@ async function processCSVFile(f){
     if(!preview.length)throw new Error('No valid parts found (need non-zero Length and Width).');
     _csvImportQueue={filename:f.name,rows:preview,skipped:skipped,defaultMat:'MDF 18mm'};
     openCSVImportDialog(_csvImportQueue);
-    st.style.color='#3D6B4F';st.textContent='✓ '+preview.length+' row'+(preview.length>1?'s':'')+(skipped?' · '+skipped+' skipped':'')+' parsed — review below';
+    st.style.color='#2f54eb';st.textContent='✓ '+preview.length+' row'+(preview.length>1?'s':'')+(skipped?' · '+skipped+' skipped':'')+' parsed — review below';
   }catch(err){
     console.error(err);
     st.style.color='#B84040';st.textContent='⚠ '+err.message;
@@ -3651,13 +3652,13 @@ function openCSVImportDialog(q){
   var matList=csvMats.length?csvMats:['(none specified)'];
   var matHTML=matList.map(function(m,i){
     var total=matsFromCSV[m]||0;
-    var label=m==='(none specified)'?'<em style="color:#A09888">no material in CSV</em>':esc(m);
+    var label=m==='(none specified)'?'<em style="color:#667085">no material in CSV</em>':esc(m);
     var existingOpts=Object.keys(existingMats).map(function(em){return'<option value="'+esc(em)+'"'+(em===m?' selected':'')+'>'+esc(em)+'</option>';}).join('');
     return '<div class="csv-mat-row">'
       +'<div style="flex:1;min-width:0"><strong style="font-size:12px">'+label+'</strong>'
-      +(total?'<span style="color:#A09888;font-family:monospace;font-size:10px;margin-left:6px">'+total+' parts</span>':'')
+      +(total?'<span style="color:#667085;font-family:monospace;font-size:10px;margin-left:6px">'+total+' parts</span>':'')
       +'</div>'
-      +'<span style="color:#A09888;font-size:10px">→</span>'
+      +'<span style="color:#667085;font-size:10px">→</span>'
       +'<select class="csv-mat-map" data-src="'+esc(m)+'">'
       +'<option value="__keep__"'+(existingMats[m]?' selected':'')+'>Use as-is</option>'
       +existingOpts
@@ -3671,15 +3672,15 @@ function openCSVImportDialog(q){
   var totalParts=q.rows.reduce(function(n,r){return n+r.qty;},0);
   document.getElementById('csv-summary').innerHTML=
     '<div style="font-size:12px;margin-bottom:4px"><strong>'+totalParts+' parts</strong> from '+q.rows.length+' row'+(q.rows.length>1?'s':'')+' · '+esc(q.filename)+'</div>'
-    +'<div style="font-size:10px;color:#6B6455">'+csvMats.length+' material'+(csvMats.length!==1?'s':'')+' · '+Object.keys(byDim).length+' unique dimensions'+(q.skipped?' · <span style="color:#B84040">'+q.skipped+' rows skipped (missing L/W)</span>':'')+'</div>';
+    +'<div style="font-size:10px;color:#667085">'+csvMats.length+' material'+(csvMats.length!==1?'s':'')+' · '+Object.keys(byDim).length+' unique dimensions'+(q.skipped?' · <span style="color:#B84040">'+q.skipped+' rows skipped (missing L/W)</span>':'')+'</div>';
   // Preview rows (first 25)
   var previewTbl=document.getElementById('csv-preview');
   previewTbl.innerHTML='<table class="pw-tbl" style="font-size:11px"><thead><tr><th>Name</th><th>L</th><th>W</th><th>Qty</th><th>Material</th><th>Edgebands</th></tr></thead><tbody>'
     +q.rows.slice(0,25).map(function(r){
-      var eb=[r.eb.eb1,r.eb.eb2,r.eb.eb3,r.eb.eb4].filter(Boolean).join(' / ')||'<span style="color:#D4CFC2">—</span>';
-      return '<tr><td>'+esc(r.name)+'</td><td style="font-family:monospace;color:#3D6B4F;font-weight:600">'+r.l+'</td><td style="font-family:monospace;color:#3D6B4F">'+r.w+'</td><td style="font-family:monospace">×'+r.qty+'</td><td>'+esc(r.mat||'—')+'</td><td style="font-size:10px;color:#6B6455">'+eb+'</td></tr>';
+      var eb=[r.eb.eb1,r.eb.eb2,r.eb.eb3,r.eb.eb4].filter(Boolean).join(' / ')||'<span style="color:#e6e8ed">—</span>';
+      return '<tr><td>'+esc(r.name)+'</td><td style="font-family:monospace;color:#2f54eb;font-weight:600">'+r.l+'</td><td style="font-family:monospace;color:#2f54eb">'+r.w+'</td><td style="font-family:monospace">×'+r.qty+'</td><td>'+esc(r.mat||'—')+'</td><td style="font-size:10px;color:#667085">'+eb+'</td></tr>';
     }).join('')+'</tbody></table>'
-    +(q.rows.length>25?'<div style="font-size:10px;color:#A09888;padding:6px 4px">… and '+(q.rows.length-25)+' more</div>':'');
+    +(q.rows.length>25?'<div style="font-size:10px;color:#667085;padding:6px 4px">… and '+(q.rows.length-25)+' more</div>':'');
   document.getElementById('csv-overlay').classList.add('open');
 }
 function closeCSVImportDialog(){document.getElementById('csv-overlay').classList.remove('open');_csvImportQueue=null;}
@@ -3726,7 +3727,7 @@ function confirmCSVImport(){
   renderParts();
   var pl=document.getElementById('plist');if(pl)pl.scrollTop=0;
   var st=document.getElementById('ist');
-  st.style.color='#3D6B4F';
+  st.style.color='#2f54eb';
   st.textContent='✓ '+added+' parts imported from CSV';
   document.getElementById('dropz').classList.add('ok');
 }
@@ -3739,12 +3740,12 @@ function openDXFImportDialog(parsed){
   // fill file list with qty inputs
   var listEl=document.getElementById('dxf-files');
   listEl.innerHTML=parsed.map(function(p,i){
-    var holesInfo=(p.holes&&p.holes.length)?' · <span style="color:#3D6B4F">'+p.holes.length+' hole'+(p.holes.length>1?'s':'')+'</span>':'';
+    var holesInfo=(p.holes&&p.holes.length)?' · <span style="color:#2f54eb">'+p.holes.length+' hole'+(p.holes.length>1?'s':'')+'</span>':'';
     return '<div class="dxf-row">'
       +'<div class="dxf-prev" id="dxf-prev-'+i+'"></div>'
       +'<div style="flex:1;min-width:0">'
       +'<input data-i="'+i+'" class="dxf-name" value="'+esc(p.name)+'" style="width:100%;font-size:12px;font-weight:500">'
-      +'<div style="font-size:10px;color:#A09888;font-family:monospace;margin-top:2px">'+p.l+' × '+p.w+' mm · '+p.shape.length+' pts'+holesInfo+'</div>'
+      +'<div style="font-size:10px;color:#667085;font-family:monospace;margin-top:2px">'+p.l+' × '+p.w+' mm · '+p.shape.length+' pts'+holesInfo+'</div>'
       +'</div>'
       +'<div style="width:60px"><label class="fl">Qty</label><input type="number" class="dxf-qty" data-i="'+i+'" value="1" min="1"></div>'
       +'</div>';
@@ -3756,7 +3757,7 @@ function openDXFImportDialog(parsed){
     function ptsToPath(pts){return pts.map(function(pt,k){return (k?'L':'M')+(pt.x*sc).toFixed(2)+' '+((p.w-pt.y)*sc).toFixed(2);}).join(' ')+' Z';}
     var d=ptsToPath(p.shape);
     (p.holes||[]).forEach(function(h){d+=' '+ptsToPath(h);});
-    prev.innerHTML='<svg width="'+SZ+'" height="'+SZ+'" viewBox="0 0 '+SZ+' '+SZ+'"><path d="'+d+'" fill="#3D6B4F33" stroke="#3D6B4F" stroke-width="1.2" fill-rule="evenodd"/></svg>';
+    prev.innerHTML='<svg width="'+SZ+'" height="'+SZ+'" viewBox="0 0 '+SZ+' '+SZ+'"><path d="'+d+'" fill="#2f54eb33" stroke="#2f54eb" stroke-width="1.2" fill-rule="evenodd"/></svg>';
   });
   document.getElementById('dxf-overlay').classList.add('open');
 }
@@ -3796,7 +3797,7 @@ function confirmDXFImport(){
   closeDXFImportDialog();
   renderParts();
   var pl=document.getElementById('plist');if(pl)pl.scrollTop=0;
-  var st=document.getElementById('ist');st.style.color='#3D6B4F';st.textContent='✓ '+added+' DXF part'+(added>1?'s':'')+' added';
+  var st=document.getElementById('ist');st.style.color='#2f54eb';st.textContent='✓ '+added+' DXF part'+(added>1?'s':'')+' added';
 }
 
 var _flashAddKey=null;
@@ -3872,7 +3873,7 @@ function renderParts(){
     if (stats.total > 0) {
       var allDone = stats.printed === stats.total;
       pc2.style.display = 'inline';
-      pc2.style.color = allDone ? '#3D6B4F' : (stats.printed > 0 ? '#8a6d1a' : '#A09888');
+      pc2.style.color = allDone ? '#2f54eb' : (stats.printed > 0 ? '#8a6d1a' : '#667085');
       pc2.textContent = '🖨 ' + stats.printed + '/' + stats.total;
       pc2.title = stats.printed + ' printed of ' + stats.total + ' parts' + (stats.printed < stats.total ? ' — ' + (stats.total - stats.printed) + ' remaining' : ' — all done!');
     } else {
@@ -3883,7 +3884,7 @@ function renderParts(){
   var clrBtn=document.getElementById('btn-clear-parts');
   if(!listEl)return;
   if(!parts.length){
-    listEl.innerHTML='<div id="pempty" style="font-size:11px;color:#A09888;text-align:center;padding:14px 8px">No parts yet — add one above<br>or import a file</div>';
+    listEl.innerHTML='<div id="pempty" style="font-size:11px;color:#667085;text-align:center;padding:14px 8px">No parts yet — add one above<br>or import a file</div>';
     if(clrBtn)clrBtn.style.display='none';
     if(document.getElementById('pw-overlay').classList.contains('open'))renderPartsWindow();
     return;
@@ -3904,9 +3905,9 @@ function renderParts(){
   var html=order.map(function(k){
     var g=groups[k];
     var bd=matchBoard(g.mat);
-    var color=bd?bd.color:'#C0BAA8';
+    var color=bd?bd.color:'#d2d7df';
     var flash=(k===_flashAddKey)?' flash':'';
-    var shapeTag=g.hasShape?'<span title="DXF shape" style="font-size:9px;color:#3D6B4F;margin-right:1px">📐</span>':'';
+    var shapeTag=g.hasShape?'<span title="DXF shape" style="font-size:9px;color:#2f54eb;margin-right:1px">📐</span>':'';
     // Print-status checkmark column
     var printTag;
     var allDone = g.printedCount >= g.qty;
@@ -3958,10 +3959,10 @@ function renderParts(){
       var pieces = mergedPart.__mergedShorts ? mergedPart.__mergedShorts.join('+') : (mergedPart.__mergedFrom ? mergedPart.__mergedFrom.length+' pcs' : '');
       var nPcs = mergedPart.__mergedFrom ? mergedPart.__mergedFrom.length : (mergedPart.__mergedShorts ? mergedPart.__mergedShorts.length : 0);
       var axisLbl = (mergedPart.__mergedMode === 'length') ? 'end-to-end' : 'side-by-side';
-      mergedTag = '<span title="Merged strip ('+axisLbl+'): '+pieces+' mm with '+(mergedPart.__mergedKerf||3)+'mm saw kerfs" style="font-size:10px;color:#8B5A2B;flex-shrink:0;font-weight:600">🔗</span>';
+      mergedTag = '<span title="Merged strip ('+axisLbl+'): '+pieces+' mm with '+(mergedPart.__mergedKerf||3)+'mm saw kerfs" style="font-size:10px;color:#647488;flex-shrink:0;font-weight:600">🔗</span>';
       // Prefix the name with a small MERGED badge so it reads clearly even
       // before noticing the colour/icon.
-      nameHtml = '<span style="font-size:8px;background:#8B5A2B;color:#fff;padding:1px 4px;border-radius:3px;margin-right:4px;font-style:normal;font-weight:700;letter-spacing:.03em;vertical-align:middle">MERGED ×'+nPcs+'</span>'+esc(g.name);
+      nameHtml = '<span style="font-size:8px;background:#647488;color:#fff;padding:1px 4px;border-radius:3px;margin-right:4px;font-style:normal;font-weight:700;letter-spacing:.03em;vertical-align:middle">MERGED ×'+nPcs+'</span>'+esc(g.name);
     }
     return '<div class="'+rowCls+'" title="'+esc(g.name)+' · '+esc(g.mat)+(g.hasShape?' · DXF shape':'')+(mergedPart?' · merged strip':'')+'">'
       +'<span class="pli-dot" style="background:'+color+'"></span>'
@@ -3973,7 +3974,7 @@ function renderParts(){
       +'<span class="pli-dim">'+g.l+'×'+g.w+'</span>'
       +'<span class="pli-qty">×'+g.qty+'</span>'
       +(mergedPart
-        ? '<button class="pli-x" title="Un-merge: restore original parts" onclick="unmergePart(\''+mergedPart.id+'\')" style="color:#8B5A2B;border-color:#8B5A2B">↩</button>'
+        ? '<button class="pli-x" title="Un-merge: restore original parts" onclick="unmergePart(\''+mergedPart.id+'\')" style="color:#647488;border-color:#647488">↩</button>'
         : '<button class="pli-x" title="Remove" onclick="pliRemoveGroup(\''+k.replace(/'/g,"\\'")+'\')">×</button>')
       +'</div>';
   }).join('');
@@ -4086,38 +4087,38 @@ function renderPartsWindow(){
     var grp=p.groupId?partGroups.find(function(g){return g.id===p.groupId;}):null;
     var eb=p.eb||{};
     var ebStr=[eb.eb1,eb.eb2,eb.eb3,eb.eb4].filter(Boolean).join(' / ')||'—';
-    var qrStr=p.op1?'<span style="color:#3D6B4F;font-size:10px" title="'+esc(p.op1)+'">✓ CNC</span>':'<span style="color:#D4CFC2;font-size:10px">—</span>';
-    var grpStr=grp?'<span style="background:'+grp.color+'22;border:1px solid '+grp.color+'55;color:'+grp.color+';padding:1px 5px;border-radius:3px;font-size:9px;white-space:nowrap">'+esc(grp.name)+'</span>':'<span style="color:#D4CFC2;font-size:9px">—</span>';
+    var qrStr=p.op1?'<span style="color:#2f54eb;font-size:10px" title="'+esc(p.op1)+'">✓ CNC</span>':'<span style="color:#e6e8ed;font-size:10px">—</span>';
+    var grpStr=grp?'<span style="background:'+grp.color+'22;border:1px solid '+grp.color+'55;color:'+grp.color+';padding:1px 5px;border-radius:3px;font-size:9px;white-space:nowrap">'+esc(grp.name)+'</span>':'<span style="color:#e6e8ed;font-size:9px">—</span>';
     var sid=String(p.id);
     var isSel=pwSel.has(sid);
     var bd=matchBoard(p.mat);
     var dot=bd?'<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:'+bd.color+';margin-right:4px;flex-shrink:0;vertical-align:middle"></span>':'';
     var isMerged=!!p.__merged;
-    var mergeIcon=isMerged?'<span title="Merged strip — '+(p.__mergedFrom?p.__mergedFrom.length:'?')+' pieces" style="font-size:10px;color:#8B5A2B;flex-shrink:0;font-weight:700">🔗</span>':'';
+    var mergeIcon=isMerged?'<span title="Merged strip — '+(p.__mergedFrom?p.__mergedFrom.length:'?')+' pieces" style="font-size:10px;color:#647488;flex-shrink:0;font-weight:700">🔗</span>':'';
     // Build material select with current value preselected
     var matSel='<select class="pw-edit pw-edit-mat" data-id="'+sid+'" onchange="pwEditField(\''+sid+'\',\'mat\',this.value)">'
       +allMats.map(function(m){return'<option value="'+esc(m)+'"'+(m===p.mat?' selected':'')+'>'+esc(m)+'</option>';}).join('')
       +'</select>';
     return'<tr class="'+(isSel?'sel':'')+(isMerged?' pw-merged':'')+'" data-id="'+sid+'">'
       +'<td><input type="checkbox" class="pw-row-chk" '+(isSel?'checked':'')+' data-id="'+sid+'" style="width:auto;cursor:pointer"></td>'
-      +'<td style="max-width:220px"><div style="display:flex;align-items:center;gap:4px">'+mergeIcon+(p.shape?'<span title="DXF shape — L/W locked" style="font-size:10px;color:#3D6B4F;flex-shrink:0">📐</span>':'')+'<input class="pw-edit pw-edit-name'+(isMerged?' pw-name-merged':'')+'" data-id="'+sid+'" value="'+esc(p.origName)+'" title="'+esc(p.origName)+'" onchange="pwEditField(\''+sid+'\',\'name\',this.value)"></div></td>'
+      +'<td style="max-width:220px"><div style="display:flex;align-items:center;gap:4px">'+mergeIcon+(p.shape?'<span title="DXF shape — L/W locked" style="font-size:10px;color:#2f54eb;flex-shrink:0">📐</span>':'')+'<input class="pw-edit pw-edit-name'+(isMerged?' pw-name-merged':'')+'" data-id="'+sid+'" value="'+esc(p.origName)+'" title="'+esc(p.origName)+'" onchange="pwEditField(\''+sid+'\',\'name\',this.value)"></div></td>'
       +'<td><input class="pw-edit pw-edit-num pw-edit-l" data-id="'+sid+'" type="number" min="1" value="'+p.l+'" onchange="pwEditField(\''+sid+'\',\'l\',this.value)"></td>'
       +'<td><input class="pw-edit pw-edit-num pw-edit-w" data-id="'+sid+'" type="number" min="1" value="'+p.w+'" onchange="pwEditField(\''+sid+'\',\'w\',this.value)"></td>'
       +'<td style="text-align:center;padding:0"><button class="pw-swap-btn" title="Swap L and W for this part (also rotates DXF shape 90°)" onclick="pwSwapRow(\''+sid+'\')">⇆</button></td>'
       +'<td style="text-align:center;padding:0">'+(function(){
           var st=p.allowRotate===true?'rotate':p.allowRotate===false?'lock':'auto';
           var gl=st==='rotate'?'🔄':st==='lock'?'🔒':'⟳';
-          var cl=st==='rotate'?'#3D6B4F':st==='lock'?'#8a6d1a':'#A09888';
+          var cl=st==='rotate'?'#2f54eb':st==='lock'?'#8a6d1a':'#667085';
           var ti=st==='rotate'?'Rotation: ALLOW (may turn 90°) — click → lock'
                 :st==='lock'?'Rotation: LOCKED (no turning) — click → auto'
                 :'Rotation: AUTO — follows material — click → allow';
           return '<button class="pw-swap-btn" style="color:'+cl+'" title="'+ti+'" onclick="pwCycleRowRotation(\''+sid+'\')">'+gl+'</button>';
         })()+'</td>'
       +'<td style="padding:0 2px"><input class="pw-edit pw-edit-num pw-edit-qty" data-id="'+sid+'" type="number" min="1" value="'+countGroupOf(p)+'" title="Total quantity of identical parts (same name + material + L×W + thickness). Editing clones or removes copies." onchange="pwSetQty(\''+sid+'\',this.value)"></td>'
-      +'<td style="font-family:monospace;font-size:10px;color:#A09888" data-id="'+sid+'-area">'+((p.l*p.w)/1e6).toFixed(4)+'</td>'
+      +'<td style="font-family:monospace;font-size:10px;color:#667085" data-id="'+sid+'-area">'+((p.l*p.w)/1e6).toFixed(4)+'</td>'
       +'<td><input class="pw-edit pw-edit-num pw-edit-t" data-id="'+sid+'" type="number" min="1" value="'+p.thick+'" onchange="pwEditField(\''+sid+'\',\'thick\',this.value)"></td>'
       +'<td style="max-width:140px">'+dot+matSel+'</td>'
-      +'<td style="font-size:10px;color:#6B6455;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(ebStr)+'">'+esc(ebStr.substring(0,18))+'</td>'
+      +'<td style="font-size:10px;color:#667085;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(ebStr)+'">'+esc(ebStr.substring(0,18))+'</td>'
       +'<td>'+qrStr+'</td>'
       +'<td>'+grpStr+'</td>'
       +'<td><button class="btn bs br" style="padding:1px 5px;font-size:10px" onclick="pwDelete(\''+sid+'\')">×</button></td>'
@@ -4435,12 +4436,12 @@ function renderGAPanel(){
     return'<div class="ga-row '+(n.inThis>0?'ingrp':'')+'">'
       +dot
       +'<span style="flex:1;font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(n.origName)+'">'+esc(n.origName)+'</span>'
-      +'<span style="font-size:10px;color:#A09888;font-family:monospace;flex-shrink:0">'+n.l+'×'+n.w+'·×'+n.total+'</span>'
+      +'<span style="font-size:10px;color:#667085;font-family:monospace;flex-shrink:0">'+n.l+'×'+n.w+'·×'+n.total+'</span>'
       +stepper
       +otherNote
       +'</div>';
   }).join('')
-    +(rows.length?'':'<div style="padding:18px;text-align:center;color:#A09888;font-size:11px">No parts match.</div>');
+    +(rows.length?'':'<div style="padding:18px;text-align:center;color:#667085;font-size:11px">No parts match.</div>');
 }
 // Set exactly `target` copies of origName (row idx) into the current group.
 // Pulls from unassigned copies when increasing; releases this group's copies
@@ -4613,22 +4614,22 @@ function renderMergeBody(){
   var existing = parts.filter(function(p){ return p.__merged; });
   var html = '';
   if (existing.length){
-    html += '<div style="padding:10px 14px 4px 14px"><div style="font-size:10px;font-weight:600;color:#8B5A2B;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">🔗 Currently merged strips ('+existing.length+')</div>'
+    html += '<div style="padding:10px 14px 4px 14px"><div style="font-size:10px;font-weight:600;color:#647488;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">🔗 Currently merged strips ('+existing.length+')</div>'
          +  '<table style="width:100%;border-collapse:collapse;font-size:12px">'
-         +  '<thead><tr style="color:#A09888;font-size:10px;text-transform:uppercase;letter-spacing:.04em">'
-         +  '<th style="text-align:left;padding:6px 4px;border-bottom:1px solid #D4CFC2">Material</th>'
-         +  '<th style="text-align:right;padding:6px 4px;border-bottom:1px solid #D4CFC2">Dims</th>'
-         +  '<th style="text-align:left;padding:6px 8px;border-bottom:1px solid #D4CFC2">Pieces</th>'
-         +  '<th style="text-align:right;padding:6px 4px;border-bottom:1px solid #D4CFC2;width:80px"></th>'
+         +  '<thead><tr style="color:#667085;font-size:10px;text-transform:uppercase;letter-spacing:.04em">'
+         +  '<th style="text-align:left;padding:6px 4px;border-bottom:1px solid #e6e8ed">Material</th>'
+         +  '<th style="text-align:right;padding:6px 4px;border-bottom:1px solid #e6e8ed">Dims</th>'
+         +  '<th style="text-align:left;padding:6px 8px;border-bottom:1px solid #e6e8ed">Pieces</th>'
+         +  '<th style="text-align:right;padding:6px 4px;border-bottom:1px solid #e6e8ed;width:80px"></th>'
          +  '</tr></thead><tbody>';
     existing.forEach(function(m){
       var pieces = m.__mergedShorts ? m.__mergedShorts.join(' + ') + ' mm' : ((m.__mergedFrom||[]).length + ' pcs');
       var n = (m.__mergedFrom||[]).length;
-      html += '<tr style="border-bottom:1px solid #EAE6DC">'
-           +  '<td style="padding:7px 4px"><div style="font-weight:600">'+esc(m.mat)+'</div><div style="font-size:10px;color:#A09888">'+(m.thick||'?')+'mm thick</div></td>'
-           +  '<td style="text-align:right;padding:7px 4px;font-family:monospace"><b>'+m.l+'×'+m.w+'</b><div style="font-size:9px;color:#A09888">'+n+' pieces</div></td>'
-           +  '<td style="padding:7px 8px;font-family:monospace;font-size:11px;color:#6B6455">'+esc(pieces)+'</td>'
-           +  '<td style="text-align:right;padding:7px 4px"><button class="btn bs" onclick="unmergePart(\''+m.id+'\');closeMergeDialog()" style="background:#fff;color:#8B5A2B;border-color:#8B5A2B;font-size:11px;padding:3px 9px;white-space:nowrap">↩ Unmerge</button></td>'
+      html += '<tr style="border-bottom:1px solid #e9edf3">'
+           +  '<td style="padding:7px 4px"><div style="font-weight:600">'+esc(m.mat)+'</div><div style="font-size:10px;color:#667085">'+(m.thick||'?')+'mm thick</div></td>'
+           +  '<td style="text-align:right;padding:7px 4px;font-family:monospace"><b>'+m.l+'×'+m.w+'</b><div style="font-size:9px;color:#667085">'+n+' pieces</div></td>'
+           +  '<td style="padding:7px 8px;font-family:monospace;font-size:11px;color:#667085">'+esc(pieces)+'</td>'
+           +  '<td style="text-align:right;padding:7px 4px"><button class="btn bs" onclick="unmergePart(\''+m.id+'\');closeMergeDialog()" style="background:#fff;color:#647488;border-color:#647488;font-size:11px;padding:3px 9px;white-space:nowrap">↩ Unmerge</button></td>'
            +  '</tr>';
     });
     html += '</tbody></table></div>';
@@ -4636,18 +4637,18 @@ function renderMergeBody(){
   // Section 2: new merge proposals
   if (_mergeProposals.length){
     var allChecked = _mergeProposals.length>0 && _mergeProposals.every(function(_, i){ return _mergeSelected[i]; });
-    html += '<div style="padding:'+(existing.length?'14px':'10px')+' 14px 0 14px;'+(existing.length?'border-top:1px solid #D4CFC2;margin-top:8px':'')+'">'
+    html += '<div style="padding:'+(existing.length?'14px':'10px')+' 14px 0 14px;'+(existing.length?'border-top:1px solid #e6e8ed;margin-top:8px':'')+'">'
          +  '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">'
-         +    '<div style="font-size:10px;font-weight:600;color:#3D6B4F;text-transform:uppercase;letter-spacing:.05em">+ New merge proposals ('+_mergeProposals.length+')</div>'
-         +    '<label style="display:flex;align-items:center;gap:5px;font-size:11px;color:#6B6455;cursor:pointer"><input type="checkbox" '+(allChecked?'checked':'')+' onchange="mergeToggleAll(this.checked)" style="width:auto;accent-color:#8B5A2B;cursor:pointer"> Select all</label>'
+         +    '<div style="font-size:10px;font-weight:600;color:#2f54eb;text-transform:uppercase;letter-spacing:.05em">+ New merge proposals ('+_mergeProposals.length+')</div>'
+         +    '<label style="display:flex;align-items:center;gap:5px;font-size:11px;color:#667085;cursor:pointer"><input type="checkbox" '+(allChecked?'checked':'')+' onchange="mergeToggleAll(this.checked)" style="width:auto;accent-color:#647488;cursor:pointer"> Select all</label>'
          +  '</div>'
          +  '<table style="width:100%;border-collapse:collapse;font-size:12px">'
-         +  '<thead><tr style="color:#A09888;font-size:10px;text-transform:uppercase;letter-spacing:.04em">'
-         +  '<th style="text-align:left;padding:6px 4px;border-bottom:1px solid #D4CFC2;width:30px"></th>'
-         +  '<th style="text-align:left;padding:6px 4px;border-bottom:1px solid #D4CFC2">Material</th>'
-         +  '<th style="text-align:left;padding:6px 4px;border-bottom:1px solid #D4CFC2">Shared</th>'
-         +  '<th style="text-align:left;padding:6px 8px;border-bottom:1px solid #D4CFC2">Pieces</th>'
-         +  '<th style="text-align:right;padding:6px 4px;border-bottom:1px solid #D4CFC2">Result</th>'
+         +  '<thead><tr style="color:#667085;font-size:10px;text-transform:uppercase;letter-spacing:.04em">'
+         +  '<th style="text-align:left;padding:6px 4px;border-bottom:1px solid #e6e8ed;width:30px"></th>'
+         +  '<th style="text-align:left;padding:6px 4px;border-bottom:1px solid #e6e8ed">Material</th>'
+         +  '<th style="text-align:left;padding:6px 4px;border-bottom:1px solid #e6e8ed">Shared</th>'
+         +  '<th style="text-align:left;padding:6px 8px;border-bottom:1px solid #e6e8ed">Pieces</th>'
+         +  '<th style="text-align:right;padding:6px 4px;border-bottom:1px solid #e6e8ed">Result</th>'
          +  '</tr></thead><tbody>';
     _mergeProposals.forEach(function(pr, i){
       var checked = _mergeSelected[i] ? 'checked' : '';
@@ -4659,19 +4660,19 @@ function renderMergeBody(){
         : '<span title="Stacked side-by-side (same length, narrow widths)" style="font-size:9px;background:#FCE6CE;color:#5C3A1A;padding:1px 5px;border-radius:3px;white-space:nowrap">↔ width</span>';
       // Result dims: width-mode → shared(L) × combined(W); length-mode → combined(L) × shared(W)
       var resultDims = isLen ? (pr.combined + '×' + pr.shared) : (pr.shared + '×' + pr.combined);
-      html += '<tr style="border-bottom:1px solid #EAE6DC">'
-           +  '<td style="padding:7px 4px"><input type="checkbox" '+checked+' onchange="_mergeSelected['+i+']=this.checked;updateMergeSummary()" style="cursor:pointer;accent-color:#8B5A2B;width:auto"></td>'
-           +  '<td style="padding:7px 4px"><div style="font-weight:600">'+esc(pr.mat)+'</div><div style="font-size:10px;color:#A09888">'+(pr.thick||'?')+'mm · '+badge+'</div></td>'
+      html += '<tr style="border-bottom:1px solid #e9edf3">'
+           +  '<td style="padding:7px 4px"><input type="checkbox" '+checked+' onchange="_mergeSelected['+i+']=this.checked;updateMergeSummary()" style="cursor:pointer;accent-color:#647488;width:auto"></td>'
+           +  '<td style="padding:7px 4px"><div style="font-weight:600">'+esc(pr.mat)+'</div><div style="font-size:10px;color:#667085">'+(pr.thick||'?')+'mm · '+badge+'</div></td>'
            +  '<td style="padding:7px 4px;font-family:monospace;font-size:11px">'+esc(pr.sharedLabel)+'</td>'
-           +  '<td style="padding:7px 8px;font-family:monospace;font-size:11px;color:#6B6455">'+esc(piecesText)+'</td>'
-           +  '<td style="text-align:right;padding:7px 4px;font-family:monospace"><b>'+resultDims+'</b><div style="font-size:9px;color:#A09888">'+pr.parts.length+' pcs · '+pr.kerf+'mm kerf</div></td>'
+           +  '<td style="padding:7px 8px;font-family:monospace;font-size:11px;color:#667085">'+esc(piecesText)+'</td>'
+           +  '<td style="text-align:right;padding:7px 4px;font-family:monospace"><b>'+resultDims+'</b><div style="font-size:9px;color:#667085">'+pr.parts.length+' pcs · '+pr.kerf+'mm kerf</div></td>'
            +  '</tr>';
     });
     html += '</tbody></table></div>';
   }
   // Empty state — only when BOTH sections are empty
   if (!existing.length && !_mergeProposals.length){
-    html = '<div style="padding:30px;text-align:center;color:#A09888;font-size:13px">'
+    html = '<div style="padding:30px;text-align:center;color:#667085;font-size:13px">'
          + 'No merged strips yet, and no mergeable parts found.<br><br>'
          + '<span style="font-size:11px">Width-merge needs narrow parts (≤' + MERGE_NARROW_THRESHOLD + 'mm) sharing a length. '
          + 'Length-merge needs strip parts (≤' + MERGE_STRIP_MAX + 'mm wide) sharing a width. '
@@ -4832,23 +4833,23 @@ function _chooseMergeDir(sel, kerf, cb){
   ov.style.cssText = 'position:fixed;inset:0;background:rgba(28,26,20,.55);z-index:99999;display:flex;align-items:center;justify-content:center;font-family:sans-serif';
   ov.innerHTML =
     '<div style="background:#fff;border-radius:14px;padding:22px 24px;min-width:380px;max-width:92vw;box-shadow:0 12px 40px rgba(0,0,0,.3)">'
-    + '<div style="font-size:15px;font-weight:600;color:#1C1A14;margin-bottom:4px">Merge '+n+' parts — which direction?</div>'
-    + '<div style="font-size:12px;color:#6B6455;margin-bottom:16px">These pieces share both dimensions, so they can be joined either way.</div>'
+    + '<div style="font-size:15px;font-weight:600;color:#1b1e26;margin-bottom:4px">Merge '+n+' parts — which direction?</div>'
+    + '<div style="font-size:12px;color:#667085;margin-bottom:16px">These pieces share both dimensions, so they can be joined either way.</div>'
     + '<div style="display:flex;gap:12px">'
-    +   '<button id="md-width" style="flex:1;text-align:left;padding:14px;border:2px solid #8B5A2B;background:#FBF1E4;border-radius:10px;cursor:pointer">'
-    +     '<div style="font-size:14px;font-weight:700;color:#8B5A2B">↔ Side-by-side</div>'
-    +     '<div style="font-size:11px;color:#6B6455;margin-top:5px">Combine widths · share the '+sharedL+'mm length</div>'
-    +     '<div style="font-size:12px;color:#1C1A14;margin-top:6px;font-weight:600">Strip: '+sharedL+' × '+Math.round(sumW)+' mm</div>'
+    +   '<button id="md-width" style="flex:1;text-align:left;padding:14px;border:2px solid #647488;background:#FBF1E4;border-radius:10px;cursor:pointer">'
+    +     '<div style="font-size:14px;font-weight:700;color:#647488">↔ Side-by-side</div>'
+    +     '<div style="font-size:11px;color:#667085;margin-top:5px">Combine widths · share the '+sharedL+'mm length</div>'
+    +     '<div style="font-size:12px;color:#1b1e26;margin-top:6px;font-weight:600">Strip: '+sharedL+' × '+Math.round(sumW)+' mm</div>'
     +     '<div style="font-size:10px;color:#7A2E12;margin-top:4px">✂ rip cuts along the length</div>'
     +   '</button>'
-    +   '<button id="md-length" style="flex:1;text-align:left;padding:14px;border:2px solid #8B5A2B;background:#FBF1E4;border-radius:10px;cursor:pointer">'
-    +     '<div style="font-size:14px;font-weight:700;color:#8B5A2B">↕ End-to-end</div>'
-    +     '<div style="font-size:11px;color:#6B6455;margin-top:5px">Combine lengths · share the '+sharedW+'mm width</div>'
-    +     '<div style="font-size:12px;color:#1C1A14;margin-top:6px;font-weight:600">Strip: '+Math.round(sumL)+' × '+sharedW+' mm</div>'
+    +   '<button id="md-length" style="flex:1;text-align:left;padding:14px;border:2px solid #647488;background:#FBF1E4;border-radius:10px;cursor:pointer">'
+    +     '<div style="font-size:14px;font-weight:700;color:#647488">↕ End-to-end</div>'
+    +     '<div style="font-size:11px;color:#667085;margin-top:5px">Combine lengths · share the '+sharedW+'mm width</div>'
+    +     '<div style="font-size:12px;color:#1b1e26;margin-top:6px;font-weight:600">Strip: '+Math.round(sumL)+' × '+sharedW+' mm</div>'
     +     '<div style="font-size:10px;color:#7A2E12;margin-top:4px">✂ crosscuts across the width</div>'
     +   '</button>'
     + '</div>'
-    + '<div style="display:flex;justify-content:flex-end;margin-top:16px"><button id="md-cancel" style="padding:7px 16px;border:1px solid #B0A99A;color:#6B6455;background:#fff;border-radius:8px;font-size:13px;cursor:pointer">Cancel</button></div>'
+    + '<div style="display:flex;justify-content:flex-end;margin-top:16px"><button id="md-cancel" style="padding:7px 16px;border:1px solid #B0A99A;color:#667085;background:#fff;border-radius:8px;font-size:13px;cursor:pointer">Cancel</button></div>'
     + '</div>';
   document.body.appendChild(ov);
   function done(mode){ ov.remove(); cb(mode); }
@@ -5007,21 +5008,21 @@ function openScrapDialog(){
     grandArea += scrap.totalArea;
     var lr = scrap.largest;
     if (lr) sheetsWithScrap++;
-    var largestTxt = lr ? (Math.round(lr.w) + ' × ' + Math.round(lr.h) + ' mm') : '<span style="color:#A09888">— none ≥ '+SCRAP_MIN_DIM+'mm</span>';
+    var largestTxt = lr ? (Math.round(lr.w) + ' × ' + Math.round(lr.h) + ' mm') : '<span style="color:#667085">— none ≥ '+SCRAP_MIN_DIM+'mm</span>';
     var areaTxt = (scrap.totalArea/1e6).toFixed(2) + ' m²';
-    rows += '<tr style="border-bottom:1px solid #EAE6DC">'
-         +  '<td style="padding:8px 6px"><div style="font-weight:600">Sheet '+(si+1)+'</div><div style="font-size:10px;color:#A09888">'+esc(lay.matName||'')+'</div></td>'
-         +  '<td style="padding:8px 6px;font-family:monospace"><b>'+largestTxt+'</b><div style="font-size:9px;color:#A09888">largest offcut'+(scrap.usable.length>1?(' · '+scrap.usable.length+' pieces'):'')+'</div></td>'
+    rows += '<tr style="border-bottom:1px solid #e9edf3">'
+         +  '<td style="padding:8px 6px"><div style="font-weight:600">Sheet '+(si+1)+'</div><div style="font-size:10px;color:#667085">'+esc(lay.matName||'')+'</div></td>'
+         +  '<td style="padding:8px 6px;font-family:monospace"><b>'+largestTxt+'</b><div style="font-size:9px;color:#667085">largest offcut'+(scrap.usable.length>1?(' · '+scrap.usable.length+' pieces'):'')+'</div></td>'
          +  '<td style="padding:8px 6px;text-align:right;font-family:monospace">'+areaTxt+'</td>'
          +  '<td style="padding:8px 6px;text-align:right;white-space:nowrap">'
-         +    (lr ? '<button class="btn bs" onclick="printScrapLabel('+si+')" style="font-size:10px;padding:3px 8px;color:#8B5A2B;border-color:#8B5A2B">🏷 Label</button> '
+         +    (lr ? '<button class="btn bs" onclick="printScrapLabel('+si+')" style="font-size:10px;padding:3px 8px;color:#647488;border-color:#647488">🏷 Label</button> '
                   + '<button class="btn bs" onclick="curSheet='+si+';downloadScrapDXF(false)" style="font-size:10px;padding:3px 8px">⬇ DXF</button>'
                   : '')
          +  '</td>'
          +  '</tr>';
   });
   body.innerHTML = '<div style="padding:6px 14px"><table style="width:100%;border-collapse:collapse;font-size:12px">'
-    + '<thead><tr style="color:#A09888;font-size:10px;text-transform:uppercase;letter-spacing:.04em">'
+    + '<thead><tr style="color:#667085;font-size:10px;text-transform:uppercase;letter-spacing:.04em">'
     + '<th style="text-align:left;padding:6px">Sheet</th>'
     + '<th style="text-align:left;padding:6px">Largest offcut</th>'
     + '<th style="text-align:right;padding:6px">Reusable area</th>'
@@ -5177,8 +5178,8 @@ function _openScrapBoardDialog(rects, fileName){
   document.getElementById('scrap-panel').classList.add('open');
   document.querySelector('#scrap-panel .ga-head h3').textContent='Import scrap as board';
   body.innerHTML='<div style="padding:12px 16px">'
-    +'<div style="font-size:12px;color:#6B6455;margin-bottom:10px">From <b>'+esc(fileName||'DXF')+'</b> — '+rects.length+' usable piece'+(rects.length>1?'s':'')+':</div>'
-    +'<div style="background:#FCFAF4;border:1px solid #EAE6DC;border-radius:8px;padding:8px 12px;margin-bottom:12px;max-height:120px;overflow-y:auto">'+rectList+'</div>'
+    +'<div style="font-size:12px;color:#667085;margin-bottom:10px">From <b>'+esc(fileName||'DXF')+'</b> — '+rects.length+' usable piece'+(rects.length>1?'s':'')+':</div>'
+    +'<div style="background:#FCFAF4;border:1px solid #e9edf3;border-radius:8px;padding:8px 12px;margin-bottom:12px;max-height:120px;overflow-y:auto">'+rectList+'</div>'
     +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'
     +'<div><label class="fl">Material</label>'
       +'<select id="scrapMatSel" style="width:100%" onchange="document.getElementById(\'scrapMatNew\').style.display=this.value===\'__new__\'?\'block\':\'none\'">'
@@ -5187,8 +5188,8 @@ function _openScrapBoardDialog(rects, fileName){
     +'<div><label class="fl">Thickness mm</label><input id="scrapThick" type="number" value="18" min="1" style="width:100%"></div>'
     +'</div></div>';
   var foot=document.querySelector('#scrap-panel .ga-foot');
-  foot.innerHTML='<div style="flex:1;font-size:11px;color:#6B6455">Each piece becomes a board (qty 1) you can nest onto.</div>'
-    +'<button class="btn bp" onclick="confirmScrapBoard()" style="background:#8B5A2B;border-color:#8B5A2B">✓ Add board'+(rects.length>1?'s':'')+'</button>'
+  foot.innerHTML='<div style="flex:1;font-size:11px;color:#667085">Each piece becomes a board (qty 1) you can nest onto.</div>'
+    +'<button class="btn bp" onclick="confirmScrapBoard()" style="background:#647488;border-color:#647488">✓ Add board'+(rects.length>1?'s':'')+'</button>'
     +'<button class="btn bs" onclick="closeScrapDialog();_restoreScrapFoot()">Cancel</button>';
   if(!matOpts) document.getElementById('scrapMatSel').style.display='none';
 }
@@ -5197,7 +5198,7 @@ function _restoreScrapFoot(){
   // Restore the export-dialog footer/header after an import confirm/cancel
   var head=document.querySelector('#scrap-panel .ga-head h3'); if(head) head.textContent='Reusable offcuts (scrap)';
   var foot=document.querySelector('#scrap-panel .ga-foot');
-  if(foot) foot.innerHTML='<div style="flex:1;font-size:11px;color:#6B6455" id="scrap-summary"></div>'
+  if(foot) foot.innerHTML='<div style="flex:1;font-size:11px;color:#667085" id="scrap-summary"></div>'
     +'<button class="btn bs" onclick="downloadScrapDXF(true)" title="DXF of offcuts on every sheet">⬇ DXF — all sheets</button>'
     +'<button class="btn bs" onclick="closeScrapDialog()">Close</button>';
 }
@@ -5241,7 +5242,7 @@ function renderGroups(){
     d.innerHTML='<div class="gh">'
       +'<div style="width:10px;height:10px;border-radius:50%;background:'+g.color+';flex-shrink:0"></div>'
       +'<input class="gn" value="'+esc(g.name)+'" oninput="updateGroupName('+g.id+',this.value)">'
-      +'<button class="btn bs" onclick="assignToGroup('+g.id+')" style="font-size:10px;padding:2px 8px;color:#3D6B4F;border-color:#3D6B4F">+ Assign parts</button>'
+      +'<button class="btn bs" onclick="assignToGroup('+g.id+')" style="font-size:10px;padding:2px 8px;color:#2f54eb;border-color:#2f54eb">+ Assign parts</button>'
       +'<button class="btn bs br" onclick="removeGroup('+g.id+')" style="font-size:10px;padding:2px 6px">×</button>'
       +'</div>'
       +'<div class="gparts">'
@@ -5250,7 +5251,7 @@ function renderGroups(){
             return'<span class="gtag" style="background:'+g.color+'22;border:1px solid '+g.color+'44;color:'+g.color+'">'
               +esc(kv[0].split('_')[0].substring(0,12))+' <strong>×'+kv[1]+'</strong></span>';
           }).join('')
-        : '<span style="font-size:10px;color:#A09888;padding:2px 4px">No parts assigned — click Assign parts</span>')
+        : '<span style="font-size:10px;color:#667085;padding:2px 4px">No parts assigned — click Assign parts</span>')
       +'</div>'
       +'<div class="ginfo">🌾 Same grain · No rotation · Placed consecutively</div>';
     el.appendChild(d);
@@ -5734,9 +5735,9 @@ function _nestShowProgress(matCount){
     ov.style.cssText='position:fixed;inset:0;background:rgba(28,26,20,.55);z-index:99999;display:flex;align-items:center;justify-content:center;font-family:sans-serif';
     ov.innerHTML=
       '<div style="background:#fff;border-radius:14px;padding:24px 28px;min-width:340px;max-width:90vw;box-shadow:0 12px 40px rgba(0,0,0,.3)">'
-      +'<div style="font-size:15px;font-weight:600;color:#1C1A14;margin-bottom:4px">🧩 Shape nesting…</div>'
-      +'<div id="nest-prog-sub" style="font-size:12px;color:#6B6455;margin-bottom:14px">Starting…</div>'
-      +'<div style="height:10px;background:#EAE6DC;border-radius:6px;overflow:hidden"><div id="nest-prog-bar" style="height:100%;width:0;background:#534AB7;transition:width .2s"></div></div>'
+      +'<div style="font-size:15px;font-weight:600;color:#1b1e26;margin-bottom:4px">🧩 Shape nesting…</div>'
+      +'<div id="nest-prog-sub" style="font-size:12px;color:#667085;margin-bottom:14px">Starting…</div>'
+      +'<div style="height:10px;background:#e9edf3;border-radius:6px;overflow:hidden"><div id="nest-prog-bar" style="height:100%;width:0;background:#534AB7;transition:width .2s"></div></div>'
       +'<div style="display:flex;justify-content:flex-end;margin-top:16px"><button id="nest-prog-cancel" style="padding:7px 16px;border:1px solid #B84040;color:#B84040;background:#fff;border-radius:8px;font-size:13px;cursor:pointer">Cancel</button></div>'
       +'</div>';
     document.body.appendChild(ov);
@@ -6925,7 +6926,7 @@ function buildTabs(){
   var dups = computeLayoutDupGroups();
   document.getElementById('tabs').innerHTML=layouts.map(function(l,i){
     var warn=l.trimWarning?'<span style="color:#B84040;margin-left:2px" title="No trim">⚠</span>':'';
-    var grain=l.grainLocked?'<span style="color:#3D6B4F;margin-left:2px" title="Grain locked">🌾</span>':'';
+    var grain=l.grainLocked?'<span style="color:#2f54eb;margin-left:2px" title="Grain locked">🌾</span>':'';
     // Machine icon: 🪚 for saw, 🤖 for cnc, nothing for unspecified (older layouts)
     var mach=l.machine==='saw' ? '<span title="Saw — k='+l.kerf+'mm" style="margin-right:2px">🪚</span>'
            : l.machine==='cnc' ? '<span title="CNC — k='+l.kerf+'mm" style="margin-right:2px">🤖</span>'
@@ -6936,7 +6937,7 @@ function buildTabs(){
     var dupCount = dups.countBy[sig];
     var dupBadge = '';
     if(dupCount > 1){
-      dupBadge = '<span style="margin-left:4px;padding:0 4px;background:#3D6B4F;color:#fff;border-radius:3px;font-size:9px;font-weight:600" title="'+dups.occurrence[i]+' of '+dupCount+' identical sheets">×'+dupCount+'</span>';
+      dupBadge = '<span style="margin-left:4px;padding:0 4px;background:#2f54eb;color:#fff;border-radius:3px;font-size:9px;font-weight:600" title="'+dups.occurrence[i]+' of '+dupCount+' identical sheets">×'+dupCount+'</span>';
     }
     return'<div class="tab" id="tab-'+i+'" onclick="activateTab('+i+')">'
       +mach
@@ -6969,7 +6970,7 @@ function draw(lay){
         ry = ty + uh;             // canvas y of usable-area BOTTOM edge
     var armLen = 16;
     ctx.save();
-    ctx.strokeStyle = '#1C1A14';
+    ctx.strokeStyle = '#1b1e26';
     ctx.lineWidth = 2;
     ctx.beginPath();
     ctx.moveTo(rx, ry - armLen);   // up
@@ -6977,18 +6978,18 @@ function draw(lay){
     ctx.lineTo(rx + armLen, ry);   // right
     ctx.stroke();
     // Filled dot at the exact origin
-    ctx.fillStyle = '#1C1A14';
+    ctx.fillStyle = '#1b1e26';
     ctx.beginPath();
     ctx.arc(rx, ry, 3.2, 0, Math.PI * 2);
     ctx.fill();
     // White ring around the dot for contrast on dark fills
-    ctx.strokeStyle = '#FDFCF9';
+    ctx.strokeStyle = '#ffffff';
     ctx.lineWidth = 1.25;
     ctx.beginPath();
     ctx.arc(rx, ry, 3.2, 0, Math.PI * 2);
     ctx.stroke();
     // "(0,0)" label tucked above-right of the origin so it doesn't overlap parts
-    ctx.fillStyle = '#1C1A14';
+    ctx.fillStyle = '#1b1e26';
     ctx.font = 'bold 9px monospace';
     ctx.textAlign = 'left';
     ctx.textBaseline = 'bottom';
@@ -7090,7 +7091,7 @@ function draw(lay){
       // Stroke outline on top
       tracePartPath(ctx,p,x,y,SC);
       if(grp){ctx.strokeStyle=grp.color;ctx.lineWidth=isSel?3:2;ctx.stroke();}
-      ctx.strokeStyle=isSel?'#1C1A14':isDragged?'#3D6B4F':'rgba(0,0,0,.5)';
+      ctx.strokeStyle=isSel?'#1b1e26':isDragged?'#2f54eb':'rgba(0,0,0,.5)';
       ctx.lineWidth=isSel?2:isDragged?1.8:1;
       ctx.stroke();
       // Stroke each hole so the cutouts are visible
@@ -7110,7 +7111,7 @@ function draw(lay){
     } else {
       ctx.fillRect(x,y,w,h);
       if(grp){ctx.strokeStyle=grp.color;ctx.lineWidth=isSel?3:2;ctx.strokeRect(x+1,y+1,w-2,h-2);}
-      ctx.strokeStyle=isSel?'#1C1A14':isDragged?'#3D6B4F':'rgba(0,0,0,.3)';
+      ctx.strokeStyle=isSel?'#1b1e26':isDragged?'#2f54eb':'rgba(0,0,0,.3)';
       ctx.lineWidth=isSel?2.5:isDragged?2:1;ctx.strokeRect(x+.5,y+.5,w-1,h-1);
     }
     // ── MERGED STRIP: internal saw-cut markers ────────────────────
@@ -7190,7 +7191,7 @@ function draw(lay){
       if(w>18&&h>14){
         var bSize=Math.min(14, Math.min(w,h)*0.35);
         var bx=x+w-bSize-2, by=y+2;
-        ctx.fillStyle='#3D6B4F';
+        ctx.fillStyle='#2f54eb';
         ctx.beginPath();
         ctx.arc(bx+bSize/2, by+bSize/2, bSize/2, 0, Math.PI*2);
         ctx.fill();
@@ -7457,7 +7458,7 @@ function openMovePopover(ev){
   });
   var html='<div class="mv-hdr">'+t('moveSel')+' '+esc(srcPart.origName)+' ('+selP.pw+'×'+selP.ph+' '+esc(srcPart.mat)+')</div>';
   if(!candidates.length){
-    html+='<div style="padding:12px;font-size:11px;color:#A09888">'+t('noOtherSheets')+'</div>';
+    html+='<div style="padding:12px;font-size:11px;color:#667085">'+t('noOtherSheets')+'</div>';
   } else {
     html+=candidates.map(function(c){
       var cls='mv-row';
@@ -7715,7 +7716,7 @@ function _quoteData(){
     var bd = matchBoard(mat);
     if(!byMat[mat]) byMat[mat] = {
       sheets:0, sheetArea_m2:0, usedArea_m2:0, cutM:0, parts:0, edgeM:0,
-      board: bd, color: (bd&&bd.color) || l.matColor || '#A09888'
+      board: bd, color: (bd&&bd.color) || l.matColor || '#667085'
     };
     var row = byMat[mat];
     row.sheets += 1;
@@ -7802,7 +7803,7 @@ function renderQuote(){
       // Material cell shows raw + markup hint if a per-material markup is set
       var matCell;
       if(r.pMatMk){
-        matCell = '<span title="Raw '+fm(r.costMatRaw)+' + '+r.pMatMk+'% markup '+fm(r.costMatMk)+'"><b>'+fm(r.costMat)+'</b> <span style="color:#A09888;font-size:9px">+'+r.pMatMk+'%</span></span>';
+        matCell = '<span title="Raw '+fm(r.costMatRaw)+' + '+r.pMatMk+'% markup '+fm(r.costMatMk)+'"><b>'+fm(r.costMat)+'</b> <span style="color:#667085;font-size:9px">+'+r.pMatMk+'%</span></span>';
       } else {
         matCell = fm(r.costMat);
       }
@@ -7825,11 +7826,11 @@ function renderQuote(){
     // This is your cost. Markup is added on top, then VAT.
     html += '<tr class="qp-mfg-row"><td colspan="'+colSpan+'" style="text-align:right">🏭 Manufacturing cost</td><td class="qp-num">'+fm(q.subtotal)+'</td></tr>';
     if(q.margin){
-      html += '<tr><td colspan="'+colSpan+'" style="text-align:right;color:#6B6455">+ Markup '+q.margin+'%</td><td class="qp-num">+'+fm(q.marginAmt)+'</td></tr>';
-      html += '<tr><td colspan="'+colSpan+'" style="text-align:right;color:#6B6455">= Price before VAT</td><td class="qp-num">'+fm(q.afterMargin)+'</td></tr>';
+      html += '<tr><td colspan="'+colSpan+'" style="text-align:right;color:#667085">+ Markup '+q.margin+'%</td><td class="qp-num">+'+fm(q.marginAmt)+'</td></tr>';
+      html += '<tr><td colspan="'+colSpan+'" style="text-align:right;color:#667085">= Price before VAT</td><td class="qp-num">'+fm(q.afterMargin)+'</td></tr>';
     }
     if(q.vat){
-      html += '<tr><td colspan="'+colSpan+'" style="text-align:right;color:#6B6455">+ VAT '+q.vat+'%</td><td class="qp-num">+'+fm(q.vatAmt)+'</td></tr>';
+      html += '<tr><td colspan="'+colSpan+'" style="text-align:right;color:#667085">+ VAT '+q.vat+'%</td><td class="qp-num">+'+fm(q.vatAmt)+'</td></tr>';
     }
     html += '<tr class="qp-grand-row"><td colspan="'+colSpan+'" style="text-align:right">💶 Customer price</td><td class="qp-num">'+fm(q.grand)+'</td></tr>';
     html += '</tbody></table>';
@@ -7922,28 +7923,28 @@ function openQuotePrint(){
 
   var html = '<!doctype html><html><head><meta charset="utf-8"><title>'+esc(headerTitle)+' — Quotation '+quoteNo+'</title>'
     + '<style>'
-    + 'body{font-family:-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;color:#1C1A14;padding:30px;max-width:760px;margin:0 auto;font-size:13px}'
+    + 'body{font-family:-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;color:#1b1e26;padding:30px;max-width:760px;margin:0 auto;font-size:13px}'
     + 'h1{font-size:28px;margin:0 0 4px;letter-spacing:-.5px}'
-    + '.meta{color:#6B6455;font-size:12px;margin-bottom:28px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px;padding-bottom:14px;border-bottom:2px solid #1C1A14}'
-    + '.meta b{color:#1C1A14;font-size:14px}'
+    + '.meta{color:#667085;font-size:12px;margin-bottom:28px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px;padding-bottom:14px;border-bottom:2px solid #1b1e26}'
+    + '.meta b{color:#1b1e26;font-size:14px}'
     + '.summary{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:28px}'
-    + '.sc{border:1px solid #D4CFC2;border-radius:8px;padding:14px;text-align:center}'
+    + '.sc{border:1px solid #e6e8ed;border-radius:8px;padding:14px;text-align:center}'
     + '.sc .v{font-size:22px;font-weight:700;font-family:monospace}'
-    + '.sc .l{font-size:11px;color:#A09888;text-transform:uppercase;letter-spacing:.05em;margin-top:4px}'
+    + '.sc .l{font-size:11px;color:#667085;text-transform:uppercase;letter-spacing:.05em;margin-top:4px}'
     + 'table{width:100%;border-collapse:collapse;margin-bottom:24px;font-size:13px}'
-    + 'th{text-align:left;padding:9px 10px;border-bottom:2px solid #1C1A14;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:#6B6455;font-weight:600}'
+    + 'th{text-align:left;padding:9px 10px;border-bottom:2px solid #1b1e26;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:#667085;font-weight:600}'
     + 'th.n,td.n{text-align:right;font-family:monospace}'
-    + 'td{padding:9px 10px;border-bottom:1px solid #EAE6DC}'
-    + 'tr.sub td{border-top:1px solid #1C1A14;border-bottom:none;font-weight:500;padding-top:12px;color:#6B6455}'
-    + 'tr.gt td{background:#1C1A14;color:#F2EFE8;font-size:17px;font-weight:700;padding:14px 10px}'
-    + '.notes{font-size:11px;color:#6B6455;margin-top:24px;padding-top:14px;border-top:1px solid #D4CFC2;line-height:1.55}'
-    + '.notes b{color:#1C1A14}'
-    + '.foot{font-size:11px;color:#A09888;margin-top:36px;padding-top:14px;border-top:1px solid #D4CFC2;text-align:center;line-height:1.6}'
-    + '.foot b{color:#1C1A14;font-size:12px}'
+    + 'td{padding:9px 10px;border-bottom:1px solid #e9edf3}'
+    + 'tr.sub td{border-top:1px solid #1b1e26;border-bottom:none;font-weight:500;padding-top:12px;color:#667085}'
+    + 'tr.gt td{background:#1b1e26;color:#eceef2;font-size:17px;font-weight:700;padding:14px 10px}'
+    + '.notes{font-size:11px;color:#667085;margin-top:24px;padding-top:14px;border-top:1px solid #e6e8ed;line-height:1.55}'
+    + '.notes b{color:#1b1e26}'
+    + '.foot{font-size:11px;color:#667085;margin-top:36px;padding-top:14px;border-top:1px solid #e6e8ed;text-align:center;line-height:1.6}'
+    + '.foot b{color:#1b1e26;font-size:12px}'
     + '@media print{body{padding:15mm}.no-print{display:none}}'
     + '.no-print{position:fixed;top:12px;right:12px;display:flex;gap:6px}'
-    + '.no-print button{padding:8px 14px;border:1px solid #1C1A14;background:#FDFCF9;border-radius:6px;font-size:13px;cursor:pointer}'
-    + '.no-print button.pri{background:#3D6B4F;color:#fff;border-color:#3D6B4F}'
+    + '.no-print button{padding:8px 14px;border:1px solid #1b1e26;background:#ffffff;border-radius:6px;font-size:13px;cursor:pointer}'
+    + '.no-print button.pri{background:#2f54eb;color:#fff;border-color:#2f54eb}'
     + '</style></head><body>'
     + '<div class="no-print"><button class="pri" onclick="window.print()">🖨 Print / Save PDF</button><button onclick="window.close()">Close</button></div>'
     + '<h1>'+esc(headerTitle)+'</h1>'
@@ -7961,7 +7962,7 @@ function openQuotePrint(){
     + rowsHtml
     + (q.vat
         ? ('<tr class="sub"><td colspan="3" style="text-align:right">Subtotal (net)</td><td class="n">'+fm(q.afterMargin)+'</td></tr>'
-           + '<tr><td colspan="3" style="text-align:right;color:#6B6455">VAT '+q.vat+'%</td><td class="n">+'+fm(q.vatAmt)+'</td></tr>'
+           + '<tr><td colspan="3" style="text-align:right;color:#667085">VAT '+q.vat+'%</td><td class="n">+'+fm(q.vatAmt)+'</td></tr>'
            + '<tr class="gt"><td colspan="3" style="text-align:right">Total</td><td class="n">'+fm(q.grand)+'</td></tr>')
         : ('<tr class="gt"><td colspan="3" style="text-align:right">Total</td><td class="n">'+fm(q.grand)+'</td></tr>')
       )
@@ -8206,7 +8207,7 @@ function printSheetSVG(lay,widthMm){
   var W=widthMm, H=widthMm*(vbH/vbW);
   var svg='<svg class="sheet-svg" width="'+W+'mm" height="'+H+'mm" viewBox="'+vbX+' '+vbY+' '+vbW+' '+vbH+'" xmlns="http://www.w3.org/2000/svg">';
   // Board background + trim rectangle
-  svg+='<rect x="0" y="0" width="'+sw+'" height="'+sh+'" fill="#FDFCF9" stroke="#1C1A14" stroke-width="3"/>';
+  svg+='<rect x="0" y="0" width="'+sw+'" height="'+sh+'" fill="#ffffff" stroke="#1b1e26" stroke-width="3"/>';
   if(trim>0){
     svg+='<rect x="'+trim+'" y="'+trim+'" width="'+(sw-2*trim)+'" height="'+(sh-2*trim)+'" fill="none" stroke="#B84040" stroke-width="1" stroke-dasharray="12 6"/>';
   }
@@ -8241,11 +8242,11 @@ function printSheetSVG(lay,widthMm){
         });
         d+='Z';
       });
-      svg+='<path d="'+d+'" fill="'+p.color+'33" stroke="#1C1A14" stroke-width="1.2" fill-rule="evenodd"/>';
+      svg+='<path d="'+d+'" fill="'+p.color+'33" stroke="#1b1e26" stroke-width="1.2" fill-rule="evenodd"/>';
       // Dashed bbox so operator sees nesting footprint
-      svg+='<rect x="'+ax+'" y="'+ay+'" width="'+pw+'" height="'+ph+'" fill="none" stroke="#6B6455" stroke-width=".6" stroke-dasharray="8 4"/>';
+      svg+='<rect x="'+ax+'" y="'+ay+'" width="'+pw+'" height="'+ph+'" fill="none" stroke="#667085" stroke-width=".6" stroke-dasharray="8 4"/>';
     } else {
-      svg+='<rect x="'+ax+'" y="'+ay+'" width="'+pw+'" height="'+ph+'" fill="'+(isMergedStrip?'#C28F5E55':(p.color+'55'))+'" stroke="#1C1A14" stroke-width="1.2"/>';
+      svg+='<rect x="'+ax+'" y="'+ay+'" width="'+pw+'" height="'+ph+'" fill="'+(isMergedStrip?'#C28F5E55':(p.color+'55'))+'" stroke="#1b1e26" stroke-width="1.2"/>';
     }
     // Label: centered name + edge-placed dimensions. Font sizes are computed
     // to fit both the part's inner width AND height (so long names don't overflow).
@@ -8286,15 +8287,15 @@ function printSheetSVG(lay,widthMm){
     if(pw>=40 && ph>=30){
       var ly=ay+dimFs+dimMargin;
       var lrX=cx-lDimW/2-3, lrY=ly-dimFs*0.75, lrW=lDimW+6, lrH=dimFs*1.1;
-      svg+='<rect x="'+lrX+'" y="'+lrY+'" width="'+lrW+'" height="'+lrH+'" fill="#FDFCF9" fill-opacity="0.92" stroke="#1C1A14" stroke-width="0.3" rx="1.5"/>';
-      svg+='<text x="'+cx+'" y="'+ly+'" text-anchor="middle" dominant-baseline="middle" font-size="'+dimFs+'" font-family="monospace" font-weight="700" fill="#1C1A14">'+lDimText+'</text>';
+      svg+='<rect x="'+lrX+'" y="'+lrY+'" width="'+lrW+'" height="'+lrH+'" fill="#ffffff" fill-opacity="0.92" stroke="#1b1e26" stroke-width="0.3" rx="1.5"/>';
+      svg+='<text x="'+cx+'" y="'+ly+'" text-anchor="middle" dominant-baseline="middle" font-size="'+dimFs+'" font-family="monospace" font-weight="700" fill="#1b1e26">'+lDimText+'</text>';
     }
     // Vertical dimension (W) pill near left edge, rotated -90°
     if(ph>=40 && pw>=30){
       var wx=ax+dimFs+dimMargin;
       var wrX=wx-dimFs*0.55, wrY=cy-wDimW/2-3, wrW=dimFs*1.1, wrH=wDimW+6;
-      svg+='<rect x="'+wrX+'" y="'+wrY+'" width="'+wrW+'" height="'+wrH+'" fill="#FDFCF9" fill-opacity="0.92" stroke="#1C1A14" stroke-width="0.3" rx="1.5"/>';
-      svg+='<text x="'+wx+'" y="'+cy+'" text-anchor="middle" dominant-baseline="middle" font-size="'+dimFs+'" font-family="monospace" font-weight="700" fill="#1C1A14" transform="rotate(-90 '+wx+' '+cy+')">'+wDimText+'</text>';
+      svg+='<rect x="'+wrX+'" y="'+wrY+'" width="'+wrW+'" height="'+wrH+'" fill="#ffffff" fill-opacity="0.92" stroke="#1b1e26" stroke-width="0.3" rx="1.5"/>';
+      svg+='<text x="'+wx+'" y="'+cy+'" text-anchor="middle" dominant-baseline="middle" font-size="'+dimFs+'" font-family="monospace" font-weight="700" fill="#1b1e26" transform="rotate(-90 '+wx+' '+cy+')">'+wDimText+'</text>';
     }
     // Centered name — drawn AFTER the dimension pills so it overlaps cleanly if ever needed.
     // Skip for merged strips: they get per-piece labels + cut lines instead (below).
@@ -8353,7 +8354,7 @@ function printSheetSVG(lay,widthMm){
     // Grain arrow if this sheet is grain-locked
     if(lay.grainLocked){
       var ay1=ay+8, ay2=ay+Math.min(28,ph/3);
-      var ag='#6B6455';
+      var ag='#667085';
       svg+='<g stroke="'+ag+'" stroke-width="1" fill="'+ag+'"><line x1="'+(ax+6)+'" y1="'+ay1+'" x2="'+(ax+6)+'" y2="'+ay2+'"/><polygon points="'+(ax+3)+','+ay2+' '+(ax+9)+','+ay2+' '+(ax+6)+','+(ay2+5)+'"/></g>';
     }
     labelIdx++;
@@ -8368,33 +8369,33 @@ function printSheetSVG(lay,widthMm){
   {
     var dy=sh+bdOff;
     // Extension lines from the board corners down to the dim line
-    svg+='<line x1="0" y1="'+sh+'" x2="0" y2="'+(dy+bdExt)+'" stroke="#1C1A14" stroke-width="1.2"/>';
-    svg+='<line x1="'+sw+'" y1="'+sh+'" x2="'+sw+'" y2="'+(dy+bdExt)+'" stroke="#1C1A14" stroke-width="1.2"/>';
+    svg+='<line x1="0" y1="'+sh+'" x2="0" y2="'+(dy+bdExt)+'" stroke="#1b1e26" stroke-width="1.2"/>';
+    svg+='<line x1="'+sw+'" y1="'+sh+'" x2="'+sw+'" y2="'+(dy+bdExt)+'" stroke="#1b1e26" stroke-width="1.2"/>';
     // Dimension line itself
-    svg+='<line x1="0" y1="'+dy+'" x2="'+sw+'" y2="'+dy+'" stroke="#1C1A14" stroke-width="1.2"/>';
+    svg+='<line x1="0" y1="'+dy+'" x2="'+sw+'" y2="'+dy+'" stroke="#1b1e26" stroke-width="1.2"/>';
     // Arrow heads (filled triangles) pointing at the extension lines
-    svg+='<polygon points="0,'+dy+' '+bdTick+','+(dy-bdTick/2.5)+' '+bdTick+','+(dy+bdTick/2.5)+'" fill="#1C1A14"/>';
-    svg+='<polygon points="'+sw+','+dy+' '+(sw-bdTick)+','+(dy-bdTick/2.5)+' '+(sw-bdTick)+','+(dy+bdTick/2.5)+'" fill="#1C1A14"/>';
+    svg+='<polygon points="0,'+dy+' '+bdTick+','+(dy-bdTick/2.5)+' '+bdTick+','+(dy+bdTick/2.5)+'" fill="#1b1e26"/>';
+    svg+='<polygon points="'+sw+','+dy+' '+(sw-bdTick)+','+(dy-bdTick/2.5)+' '+(sw-bdTick)+','+(dy+bdTick/2.5)+'" fill="#1b1e26"/>';
     // Label — white pill background so it stands over the dim line cleanly
     var wLabel=sw+' mm';
     var wLabelW=wLabel.length*bdFs*0.6;
-    svg+='<rect x="'+(sw/2-wLabelW/2-6)+'" y="'+(dy-bdFs*0.75)+'" width="'+(wLabelW+12)+'" height="'+(bdFs*1.15)+'" fill="#FDFCF9" rx="2"/>';
-    svg+='<text x="'+(sw/2)+'" y="'+dy+'" text-anchor="middle" dominant-baseline="middle" font-size="'+bdFs+'" font-weight="700" font-family="sans-serif" fill="#1C1A14">'+wLabel+'</text>';
+    svg+='<rect x="'+(sw/2-wLabelW/2-6)+'" y="'+(dy-bdFs*0.75)+'" width="'+(wLabelW+12)+'" height="'+(bdFs*1.15)+'" fill="#ffffff" rx="2"/>';
+    svg+='<text x="'+(sw/2)+'" y="'+dy+'" text-anchor="middle" dominant-baseline="middle" font-size="'+bdFs+'" font-weight="700" font-family="sans-serif" fill="#1b1e26">'+wLabel+'</text>';
   }
   // HEIGHT callout (vertical) — right of the board
   {
     var dx=sw+bdOff;
-    svg+='<line x1="'+sw+'" y1="0" x2="'+(dx+bdExt)+'" y2="0" stroke="#1C1A14" stroke-width="1.2"/>';
-    svg+='<line x1="'+sw+'" y1="'+sh+'" x2="'+(dx+bdExt)+'" y2="'+sh+'" stroke="#1C1A14" stroke-width="1.2"/>';
-    svg+='<line x1="'+dx+'" y1="0" x2="'+dx+'" y2="'+sh+'" stroke="#1C1A14" stroke-width="1.2"/>';
-    svg+='<polygon points="'+dx+',0 '+(dx-bdTick/2.5)+','+bdTick+' '+(dx+bdTick/2.5)+','+bdTick+'" fill="#1C1A14"/>';
-    svg+='<polygon points="'+dx+','+sh+' '+(dx-bdTick/2.5)+','+(sh-bdTick)+' '+(dx+bdTick/2.5)+','+(sh-bdTick)+'" fill="#1C1A14"/>';
+    svg+='<line x1="'+sw+'" y1="0" x2="'+(dx+bdExt)+'" y2="0" stroke="#1b1e26" stroke-width="1.2"/>';
+    svg+='<line x1="'+sw+'" y1="'+sh+'" x2="'+(dx+bdExt)+'" y2="'+sh+'" stroke="#1b1e26" stroke-width="1.2"/>';
+    svg+='<line x1="'+dx+'" y1="0" x2="'+dx+'" y2="'+sh+'" stroke="#1b1e26" stroke-width="1.2"/>';
+    svg+='<polygon points="'+dx+',0 '+(dx-bdTick/2.5)+','+bdTick+' '+(dx+bdTick/2.5)+','+bdTick+'" fill="#1b1e26"/>';
+    svg+='<polygon points="'+dx+','+sh+' '+(dx-bdTick/2.5)+','+(sh-bdTick)+' '+(dx+bdTick/2.5)+','+(sh-bdTick)+'" fill="#1b1e26"/>';
     var hLabel=sh+' mm';
     var hLabelW=hLabel.length*bdFs*0.6;
     // Rotated label with white pill
     svg+='<g transform="rotate(-90 '+dx+' '+(sh/2)+')">';
-    svg+='<rect x="'+(dx-hLabelW/2-6)+'" y="'+(sh/2-bdFs*0.75)+'" width="'+(hLabelW+12)+'" height="'+(bdFs*1.15)+'" fill="#FDFCF9" rx="2"/>';
-    svg+='<text x="'+dx+'" y="'+(sh/2)+'" text-anchor="middle" dominant-baseline="middle" font-size="'+bdFs+'" font-weight="700" font-family="sans-serif" fill="#1C1A14">'+hLabel+'</text>';
+    svg+='<rect x="'+(dx-hLabelW/2-6)+'" y="'+(sh/2-bdFs*0.75)+'" width="'+(hLabelW+12)+'" height="'+(bdFs*1.15)+'" fill="#ffffff" rx="2"/>';
+    svg+='<text x="'+dx+'" y="'+(sh/2)+'" text-anchor="middle" dominant-baseline="middle" font-size="'+bdFs+'" font-weight="700" font-family="sans-serif" fill="#1b1e26">'+hLabel+'</text>';
     svg+='</g>';
   }
   svg+='</svg>';
@@ -8436,7 +8437,7 @@ function buildPrintView(){
   var byMat={};
   layouts.forEach(function(l){
     var mat=l.matName||'?';
-    if(!byMat[mat])byMat[mat]={sheets:0,parts:0,used:0,total:0,color:l.matColor||'#6B6455'};
+    if(!byMat[mat])byMat[mat]={sheets:0,parts:0,used:0,total:0,color:l.matColor||'#667085'};
     byMat[mat].sheets++;
     byMat[mat].parts+=(l.placements||[]).length;
     byMat[mat].used+=(l.placements||[]).reduce(function(b,p){return b+p.pw*p.ph;},0);
@@ -8456,7 +8457,7 @@ function buildPrintView(){
   // ── COVER PAGE ──
   html+='<div class="pp">'+header(t('coverTitle'));
   html+='<h1 style="margin-top:24px;text-align:center;font-size:28px">'+esc(proj)+'</h1>';
-  html+='<div style="text-align:center;color:#6B6455;font-size:13px;margin-bottom:18px">'+t('generatedOn')+' '+dateStr+'</div>';
+  html+='<div style="text-align:center;color:#667085;font-size:13px;margin-bottom:18px">'+t('generatedOn')+' '+dateStr+'</div>';
   html+='<div class="summary-grid">'
     +'<div class="box"><div class="v">'+totSheets+'</div><div class="l">'+t('statSheets')+'</div></div>'
     +'<div class="box"><div class="v">'+totParts+'</div><div class="l">'+t('statParts')+'</div></div>'
@@ -8522,7 +8523,7 @@ function buildPrintView(){
                    : 'nano-dense';
     html+='<div class="pp sheet-page '+densityCls+'">'+header(t('sheetPageTitle',{n:i+1,total:layouts.length}));
     var copiesNote = dupCount>1
-      ? ' <span style="background:#3D6B4F;color:#fff;border-radius:4px;padding:2px 8px;font-size:14px;margin-left:6px">CUT × '+dupCount+'</span>'
+      ? ' <span style="background:#2f54eb;color:#fff;border-radius:4px;padding:2px 8px;font-size:14px;margin-left:6px">CUT × '+dupCount+'</span>'
       : '';
     html+='<h1 style="margin-top:4px;font-size:16px"><span style="display:inline-block;width:12px;height:12px;background:'+lay.matColor+';border-radius:50%;vertical-align:middle;margin-right:6px"></span>'+matLabel+' — '+t('sheetLabel',{n:i+1})+copiesNote+'</h1>';
     // The diagram — rendered at 190mm wide (full content width). CSS max-height
@@ -8537,7 +8538,7 @@ function buildPrintView(){
       +'<div class="row"><span>'+t('statEfficiency')+'</span><b>'+eff+'%</b></div>'
       +(lay.trim?'<div class="row"><span>'+t('withTrim')+'</span><b>'+lay.trim+' mm</b></div>':'')
       +(lay.machine ? '<div class="row"><span>Machine</span><b>'+(lay.machine==='saw'?'🪚 Saw':'🤖 CNC')+' · kerf '+lay.kerf+'mm</b></div>' : '')
-      +(dupCount>1?'<div class="row" style="color:#3D6B4F"><span>📐 Copies</span><b>×'+dupCount+' (total '+(placements.length*dupCount)+')</b></div>':'')
+      +(dupCount>1?'<div class="row" style="color:#2f54eb"><span>📐 Copies</span><b>×'+dupCount+' (total '+(placements.length*dupCount)+')</b></div>':'')
       +(lay.grainLocked?'<div class="row"><span>'+t('grainLock')+'</span><b>'+t('locked')+' ↑</b></div>':'')
       +(lay.trimWarning?'<div class="row" style="color:#B84040;grid-column:1/-1"><span>⚠ '+t('trimWarn')+'</span></div>':'')
       +'</div>';
@@ -8607,7 +8608,7 @@ function buildPrintView(){
       +'<td class="num">'+area.toFixed(3)+'</td>'
       +'</tr>';
   });
-  html+='<tr style="font-weight:700;background:#EAE6DC"><td colspan="5">'+t('totalRow')+'</td><td class="num">×'+sumQty+'</td><td class="num">'+sumArea.toFixed(3)+'</td></tr>';
+  html+='<tr style="font-weight:700;background:#e9edf3"><td colspan="5">'+t('totalRow')+'</td><td class="num">×'+sumQty+'</td><td class="num">'+sumArea.toFixed(3)+'</td></tr>';
   html+='</tbody></table>';
 
   // ── Sheet plan: which sheets are unique vs duplicated ──
@@ -8630,7 +8631,7 @@ function buildPrintView(){
     var totalSheetsToCut = 0;
     planRows.forEach(function(r){
       var copyBadge = r.copies>1
-        ? '<b style="color:#3D6B4F">×'+r.copies+'</b>'
+        ? '<b style="color:#2f54eb">×'+r.copies+'</b>'
         : '×1';
       var mach = r.lay.machine==='saw' ? '🪚 Saw' : r.lay.machine==='cnc' ? '🤖 CNC' : '—';
       totalSheetsToCut += r.copies;
@@ -8643,7 +8644,7 @@ function buildPrintView(){
         +'<td class="num">'+(r.partsCount*r.copies)+'</td>'
         +'</tr>';
     });
-    html+='<tr style="font-weight:700;background:#EAE6DC"><td colspan="4">'+planRows.length+' unique pattern(s) → '+totalSheetsToCut+' sheets to cut total</td><td class="num"></td><td class="num"></td></tr>';
+    html+='<tr style="font-weight:700;background:#e9edf3"><td colspan="4">'+planRows.length+' unique pattern(s) → '+totalSheetsToCut+' sheets to cut total</td><td class="num"></td><td class="num"></td></tr>';
     html+='</tbody></table>';
   }
   html+='<div class="note" style="margin-top:14px">'+t('summaryNote')+'</div>';
@@ -8699,12 +8700,12 @@ function buildExport(){
 
   // "Download all as ZIP" row at the top
   var allRow=document.createElement('div');allRow.className='er';
-  allRow.style.cssText='background:#EEF7EE;border:1px solid #3D6B4F33;border-radius:6px;padding:6px 8px;margin-bottom:4px';
+  allRow.style.cssText='background:#EEF7EE;border:1px solid #2f54eb33;border-radius:6px;padding:6px 8px;margin-bottom:4px';
   var allNm=document.createElement('div');allNm.className='en';
-  allNm.innerHTML='<strong>📦 All files as ZIP</strong> <span style="color:#A09888;font-weight:normal">('+files.length+' files)</span>';
+  allNm.innerHTML='<strong>📦 All files as ZIP</strong> <span style="color:#667085;font-weight:normal">('+files.length+' files)</span>';
   var allSz=document.createElement('div');allSz.className='ez';
   allSz.textContent='';
-  var allBtn=document.createElement('button');allBtn.className='bdl';allBtn.style.background='#3D6B4F';allBtn.style.color='#fff';allBtn.style.borderColor='#3D6B4F';
+  var allBtn=document.createElement('button');allBtn.className='bdl';allBtn.style.background='#2f54eb';allBtn.style.color='#fff';allBtn.style.borderColor='#2f54eb';
   allBtn.textContent='⬇ Download ZIP';
   allBtn.onclick=function(){
     var nm=(currentProjectName||'nesting').replace(/[^A-Za-z0-9_\-]/g,'_').substring(0,40)||'nesting';
@@ -9628,19 +9629,19 @@ function refreshXlsmInfo(){
 // ── Open the OS file picker via the local server, store the chosen path ──
 function pickXlsmFile(){
   var pst = document.getElementById('pst');
-  pst.innerHTML = '<span style="color:#6B6455">Opening file picker…</span>';
+  pst.innerHTML = '<span style="color:#667085">Opening file picker…</span>';
   fetch('/pick-file').then(function(r){
     return r.json().then(function(j){ return { ok:r.ok, body:j }; });
   }).then(function(res){
     if (res.ok && res.body && res.body.ok){
       var path = res.body.path || '';
       if (!path){
-        pst.innerHTML = '<span style="color:#6B6455">Picker cancelled.</span>';
+        pst.innerHTML = '<span style="color:#667085">Picker cancelled.</span>';
         return;
       }
       try { localStorage.setItem('fabflow_xlsm_path', path); } catch(e){}
       refreshXlsmInfo();
-      pst.innerHTML = '<b style="color:#3D6B4F">\u2713 File set</b>';
+      pst.innerHTML = '<b style="color:#2f54eb">\u2713 File set</b>';
     } else {
       pst.innerHTML = '<b style="color:#B84040">Picker failed: '+esc((res.body&&res.body.error)||'unknown')+'</b>';
     }
@@ -9664,7 +9665,7 @@ function doPrint(){
   if (location.protocol === 'file:'){
     pst.innerHTML =
       '<b style="color:#B84040">App must run via http://, not file://</b><br>' +
-      '<span style="font-size:11px;color:#6B6455">' +
+      '<span style="font-size:11px;color:#667085">' +
       'Run start-fabflow.cmd to launch the local server, then open ' +
       '<a href="http://localhost:8000" target="_blank">http://localhost:8000</a>.' +
       '</span>';
@@ -9705,15 +9706,15 @@ function doPrintMergedBatch(p, pst){
   var total = members.length;
   var ok = 0, failed = [];
 
-  pst.innerHTML = '<span style="color:#6B6455">Printing 1 of '+total+'\u2026</span>';
+  pst.innerHTML = '<span style="color:#667085">Printing 1 of '+total+'\u2026</span>';
 
   function nextLabel(i){
     if (i >= total){
       if (failed.length){
         pst.innerHTML = '<b style="color:#B84040">'+ok+' of '+total+' printed</b><br>' +
-                       '<span style="font-size:11px;color:#6B6455">Failed: '+esc(failed.join(', '))+'</span>';
+                       '<span style="font-size:11px;color:#667085">Failed: '+esc(failed.join(', '))+'</span>';
       } else {
-        pst.innerHTML = '<b style="color:#3D6B4F">\u2713 Printed all '+total+' labels</b>';
+        pst.innerHTML = '<b style="color:#2f54eb">\u2713 Printed all '+total+' labels</b>';
         // Mark the merged strip itself as printed once all members succeeded.
         // skipModalClose=false → standard auto-close behaviour after the success flash.
         markPartPrinted(p, false);
@@ -9722,7 +9723,7 @@ function doPrintMergedBatch(p, pst){
     }
     var member = members[i];
     var label = member.origName || member.name || ('Piece '+(i+1));
-    pst.innerHTML = '<span style="color:#6B6455">Printing '+(i+1)+' of '+total+': '+esc(label)+'\u2026</span>';
+    pst.innerHTML = '<span style="color:#667085">Printing '+(i+1)+' of '+total+': '+esc(label)+'\u2026</span>';
     // Build a virtual placement so the print pipeline gets a familiar shape.
     // Position fields are placeholders — labels don't actually use sheet xy.
     var virtPl = {
@@ -9821,22 +9822,22 @@ function doPrintViaExcel(p, pst){
   if (!getXlsmPath()){
     pst.innerHTML =
       '<b style="color:#B84040">No .xlsm chosen</b><br>' +
-      '<span style="font-size:11px;color:#6B6455">' +
+      '<span style="font-size:11px;color:#667085">' +
       'Click <b>📂 Choose .xlsm…</b> to select your SWOOD file (e.g. from OneDrive).' +
       '</span>';
     return;
   }
   var printer = (document.getElementById('prn').value || 'ZDesigner GK420d').trim();
-  pst.innerHTML = '<span style="color:#6B6455">Excel \u2192 '+esc(printer)+'\u2026</span>';
+  pst.innerHTML = '<span style="color:#667085">Excel \u2192 '+esc(printer)+'\u2026</span>';
   _printLabelExcelCore(p).then(function(res){
     if (res.ok){
       pst.innerHTML =
-        '<b style="color:#3D6B4F">\u2713 Printed</b><br>' +
-        '<span style="font-size:11px;color:#6B6455">'+esc(res.msg)+'</span>';
+        '<b style="color:#2f54eb">\u2713 Printed</b><br>' +
+        '<span style="font-size:11px;color:#667085">'+esc(res.msg)+'</span>';
     } else {
       pst.innerHTML =
         '<b style="color:#B84040">Print failed</b><br>' +
-        '<span style="font-size:11px;color:#6B6455">'+esc(res.msg)+'</span>';
+        '<span style="font-size:11px;color:#667085">'+esc(res.msg)+'</span>';
     }
   });
 }
@@ -9871,7 +9872,7 @@ function doPrintViaBrowserPrint(p, pst){
   if (typeof BrowserPrint === 'undefined'){
     pst.innerHTML =
       '<b style="color:#B84040">Zebra Browser Print not loaded</b><br>' +
-      '<span style="font-size:11px;color:#6B6455">' +
+      '<span style="font-size:11px;color:#667085">' +
       'Install Zebra Browser Print from ' +
       '<a href="https://www.zebra.com/browserprint" target="_blank">zebra.com/browserprint</a>, ' +
       'then reload this page.' +
@@ -9879,16 +9880,16 @@ function doPrintViaBrowserPrint(p, pst){
     return;
   }
   var lay = layouts[curSheet];
-  pst.innerHTML = '<span style="color:#6B6455">Rasterizing &amp; sending label\u2026</span>';
+  pst.innerHTML = '<span style="color:#667085">Rasterizing &amp; sending label\u2026</span>';
   _printLabelBrowserCore(p, lay).then(function(res){
     if (res.ok){
       pst.innerHTML =
-        '<b style="color:#3D6B4F">\u2713 Printed</b><br>' +
-        '<span style="font-size:11px;color:#6B6455">'+esc(res.msg)+'</span>';
+        '<b style="color:#2f54eb">\u2713 Printed</b><br>' +
+        '<span style="font-size:11px;color:#667085">'+esc(res.msg)+'</span>';
     } else {
       pst.innerHTML =
         '<b style="color:#B84040">Print failed</b><br>' +
-        '<span style="font-size:11px;color:#6B6455">'+esc(res.msg)+'</span>';
+        '<span style="font-size:11px;color:#667085">'+esc(res.msg)+'</span>';
     }
   });
 }
@@ -9973,10 +9974,10 @@ function bpPickScope(scope){
 function _bpLog(name, ok, msg){
   var log = document.getElementById('bp-log');
   log.style.display = 'block';
-  var icon = ok ? '<span style="color:#3D6B4F">✓</span>' : '<span style="color:#B84040">✕</span>';
+  var icon = ok ? '<span style="color:#2f54eb">✓</span>' : '<span style="color:#B84040">✕</span>';
   var div = document.createElement('div');
   div.innerHTML = icon + '<span style="flex:1">' + esc(name) + '</span>' +
-    (msg ? '<span style="color:#A09888;font-size:10px">' + esc(msg) + '</span>' : '');
+    (msg ? '<span style="color:#667085;font-size:10px">' + esc(msg) + '</span>' : '');
   log.appendChild(div);
   log.scrollTop = log.scrollHeight;
 }
@@ -10007,7 +10008,7 @@ function runBatchPrint(){
     var msg = (state === 'cancelled')
       ? t('batchCancelled', {ok:okCount})
       : t('batchDonePrinting', {ok:okCount, fail:failCount});
-    status.innerHTML = '<b style="color:'+(failCount?'#B84040':'#3D6B4F')+'">'+esc(msg)+'</b>';
+    status.innerHTML = '<b style="color:'+(failCount?'#B84040':'#2f54eb')+'">'+esc(msg)+'</b>';
     startBtn.disabled = false; startBtn.style.display = '';
     startBtn.textContent = t('batchStart');
     document.getElementById('bp-cancel-btn').textContent = t('batchClose');
@@ -10018,7 +10019,7 @@ function runBatchPrint(){
     if (i >= jobs.length){ finish('done'); return; }
     var job = jobs[i];
     var nm = job.p.part.origName || ('#'+(i+1));
-    status.innerHTML = '<span style="color:#6B6455">'+esc(t('batchPrinting', {i:i+1, n:jobs.length}))+' '+esc(nm)+'</span>';
+    status.innerHTML = '<span style="color:#667085">'+esc(t('batchPrinting', {i:i+1, n:jobs.length}))+' '+esc(nm)+'</span>';
     bar.style.width = Math.round((i/jobs.length)*100) + '%';
     printLabelPromise(job.p, job.lay).then(function(res){
       if (res && res.ok){
