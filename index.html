@@ -555,6 +555,7 @@ body.print-mode{background:#fff}
     <div class="stat"><div class="sv" id="sv3">–</div><div class="sl" data-i18n="statEfficiency">Efficiency</div><div class="efb"><div class="eff" id="ef" style="width:0%"></div></div></div>
     <div class="stat"><div class="sv" id="sv4">–</div><div class="sl" data-i18n="statWaste">Waste m²</div></div>
   </div>
+  <div style="display:flex;justify-content:flex-end;margin:-2px 0 2px"><button class="btn bp" onclick="reserveForCutting()" title="Rezervuoti panaudotus lakštus pjovimui — patvirtinama GVS sandėlyje" style="background:#1b1e26;border-color:#1b1e26;color:#fff">📤 Naudoti iš sandėlio (pjovimui)</button></div>
   <!-- ─── Quotation panel ──────────────────────────────────────────
        Shows itemized pricing: material area + cutting length + per-part + edgeband,
        per material, then overall totals. Pricing inputs are stored per board. -->
@@ -2009,6 +2010,29 @@ function whAddBoardFromOffcut(id){
   boards.push({id:bId++,mat:o.material||'Atraiža',sku:o.sku||null,w:o.w||ND.boardW,h:o.h||ND.boardH,thickness:(o.thickness!=null?o.thickness:ND.thickness),qty:1,color:COLORS[boards.length%COLORS.length],grain:false,priceM2:ND.priceM2,priceMatMarkup:ND.priceMatMarkup,priceCutM:ND.priceCutM,pricePart:ND.pricePart,priceEdge:ND.priceEdge});
   renderBoards(); refreshSel();
   if(typeof toast==='function')toast('Pridėta atraiža');
+}
+
+// ── Reserve the sheets this nest uses, for cutting (confirmed later in GVS warehouse) ──
+async function reserveForCutting(){
+  if(!layouts||!layouts.length){ alert('Pirma paleiskite optimizaciją (Optimize).'); return; }
+  var used={};
+  layouts.forEach(function(l){ var m=l.matName||''; if(m)used[m]=(used[m]||0)+1; });
+  var lines=Object.keys(used).map(function(m){
+    var b=boards.filter(function(x){return x.mat===m;})[0]||{};
+    return {sku:b.sku||null, material:m, thickness:(b.thickness!=null?b.thickness:null), qty_reserved:used[m]};
+  });
+  if(!lines.length){ alert('Nėra ką rezervuoti.'); return; }
+  var pn=document.getElementById('projName');
+  var proj=((pn&&pn.value)||'').trim()||'Nesting';
+  var total=lines.reduce(function(s,l){return s+l.qty_reserved;},0);
+  if(!confirm('Rezervuoti pjovimui '+total+' lakšt. ('+lines.length+' medžiaga(-os))?\nProjektas: '+proj+'\n\nPatvirtinsite GVS → Sandėlis.'))return;
+  var id='cj_'+Date.now()+'_'+Math.random().toString(36).slice(2,7);
+  var body=[{id:id,workspace_code:WH_WS||null,project_name:proj,status:'reserved',lines:lines,offcuts:[],created_by:'nesting'}];
+  try{
+    var r=await fetch(WH_SB_URL+'/rest/v1/fabflow_cut_jobs',{method:'POST',headers:Object.assign({},whHeaders(),{'Prefer':'return=minimal'}),body:JSON.stringify(body)});
+    if(!r.ok){var t=await r.text();throw new Error(r.status+' '+t.slice(0,140));}
+    alert('✓ Rezervuota: '+total+' lakšt.\nAtidarykite GVS → Sandėlis ir patvirtinkite.');
+  }catch(e){ alert('Klaida rezervuojant: '+(e&&e.message)); }
 }
 
 function collectProjectState(){
