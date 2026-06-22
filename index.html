@@ -445,7 +445,7 @@ body.print-mode{background:#fff}
       <option value="lt">🇱🇹 LT</option>
     </select>
     <label data-i18n="project" style="font-size:10px;color:#667085;font-family:monospace">PROJECT</label>
-    <input id="projName" data-i18n-ph="untitled" placeholder="Untitled" onchange="onProjectNameChange()" oninput="scheduleSave()" style="width:190px;font-size:12px;font-weight:500;padding:4px 8px;border:1px solid #e6e8ed;background:#ffffff;border-radius:6px;outline:none">
+    <input id="projName" data-i18n-ph="untitled" placeholder="Untitled" onchange="onProjectNameChange()" oninput="scheduleSave()" style="width:190px;font-size:12px;font-weight:500;padding:4px 8px;border:1px solid #e6e8ed;background:#ffffff;border-radius:6px;outline:none"><span id="gvsLink" style="display:none;font-size:10px;color:#2f54eb;font-weight:700;margin-left:6px"></span>
     <span id="saveStatus" class="save-status" title="Save status"></span>
     <button id="undoBtn" class="urbtn" onclick="undo()" data-i18n-title="undoTip" title="Undo (Ctrl+Z)" disabled>↶</button>
     <button id="redoBtn" class="urbtn" onclick="redo()" data-i18n-title="redoTip" title="Redo (Ctrl+Shift+Z)" disabled>↷</button>
@@ -1729,6 +1729,7 @@ function supaConfigured(){
 var WH_SB_URL='https://byvtqycdgboqbmpoysyt.supabase.co';
 var WH_SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ5dnRxeWNkZ2JvcWJtcG95c3l0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU3ODA0MzAsImV4cCI6MjA5MTM1NjQzMH0.IoQRxA4m45--5fQ9U40ChNVCwsBPmxTM4p8sM1-3AUo';
 var WH_STOCK=[], WH_OFFCUTS=[], WH_WS='';
+var GVS_PROJECT_ID='';
 function whHeaders(){return {'apikey':WH_SB_KEY,'Authorization':'Bearer '+WH_SB_KEY,'Content-Type':'application/json'};}
 function whStdSheetArea(){return 2800*2070/1e6;} // standard full sheet m² (for the count hint)
 // Real board area for a stock row — uses the warehouse dimensions, falls back to standard.
@@ -2027,13 +2028,14 @@ async function reserveForCutting(){
   var total=lines.reduce(function(s,l){return s+l.qty_reserved;},0);
   if(!confirm('Rezervuoti pjovimui '+total+' lakšt. ('+lines.length+' medžiaga(-os))?\nProjektas: '+proj+'\n\nPatvirtinsite GVS → Sandėlis.'))return;
   var id='cj_'+Date.now()+'_'+Math.random().toString(36).slice(2,7);
-  var body=[{id:id,workspace_code:WH_WS||null,project_name:proj,status:'reserved',lines:lines,offcuts:[],created_by:'nesting'}];
+  var body=[{id:id,workspace_code:WH_WS||null,project_name:proj,gvs_project_id:GVS_PROJECT_ID||null,status:'reserved',lines:lines,offcuts:[],created_by:'nesting'}];
   try{
     var r=await fetch(WH_SB_URL+'/rest/v1/fabflow_cut_jobs',{method:'POST',headers:Object.assign({},whHeaders(),{'Prefer':'return=minimal'}),body:JSON.stringify(body)});
     if(!r.ok){var t=await r.text();throw new Error(r.status+' '+t.slice(0,140));}
     alert('✓ Rezervuota: '+total+' lakšt.\nAtidarykite GVS → Sandėlis ir patvirtinkite.');
   }catch(e){ alert('Klaida rezervuojant: '+(e&&e.message)); }
 }
+function updateGvsBadge(){var el=document.getElementById('gvsLink');if(!el)return;if(GVS_PROJECT_ID){el.style.display='inline';el.textContent='\uD83D\uDD17 GVS';el.title='Susietas su GVS projektu';}else{el.style.display='none';}}
 
 function collectProjectState(){
   // Snapshot everything the app needs to fully restore a project.
@@ -2041,6 +2043,7 @@ function collectProjectState(){
   // Deep-copying here just wastes CPU during saves.
   return {
     v:1,
+    gvsId:GVS_PROJECT_ID,
     boards:boards,
     bId:bId,
     parts:parts,
@@ -2107,6 +2110,7 @@ function applyProjectState(d){
   if(!d||typeof d!=='object')return;
   _suppressSave=true;
   try{
+    if(d.gvsId)GVS_PROJECT_ID=d.gvsId; if(typeof updateGvsBadge==='function')updateGvsBadge();
     boards=(d.boards||[]).map(function(b){return Object.assign({},b);});
     bId=d.bId||(boards.reduce(function(m,b){return Math.max(m,b.id||0);},0)+1);
     parts=(d.parts||[]).map(function(p){return Object.assign({},p);});
@@ -2724,11 +2728,14 @@ document.addEventListener('DOMContentLoaded',function(){
   // Apply initial machine mode (default 'cnc' hides the saw kerf input)
   if(typeof onMachineModeChange==='function') onMachineModeChange();
   // URL override: ?project=NAME → deep-link straight in, skip the picker.
-  var urlName=null;
-  try{var u=new URLSearchParams(location.search);urlName=u.get('project');}catch(e){}
+  var urlName=null, urlGvs='';
+  try{var u=new URLSearchParams(location.search);urlName=u.get('project');urlGvs=u.get('gvs')||'';}catch(e){}
+  if(urlGvs)GVS_PROJECT_ID=urlGvs;
   if(urlName){
     loadProjectByName(urlName).then(function(ok){
-      if(!ok){startupNew(true);}
+      if(!ok){startupNew(true);var pn=document.getElementById('projName');if(pn)pn.value=urlName;}
+      if(urlGvs)GVS_PROJECT_ID=urlGvs;
+      if(typeof updateGvsBadge==='function')updateGvsBadge();
       if(typeof resetHistory==='function') resetHistory();
     });
     return;
