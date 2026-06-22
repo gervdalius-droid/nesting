@@ -459,6 +459,7 @@ body.print-mode{background:#fff}
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px">
       <div class="sec" data-i18n="materialBoards" style="margin:0">Material Boards</div>
       <div style="display:flex;gap:4px">
+        <button class="sec-add-board" onclick="openWarehouseModal()" title="Naršyti sandėlio likučius ir pridėti į plokštes" style="color:#3D6B4F;border-color:#3D6B4F">📦 Sandėlis</button>
         <button class="sec-add-board" onclick="document.getElementById('scrapBoardIn').click()" title="Import a scrap/offcut DXF and use it as a board for nesting" style="color:#8B5A2B;border-color:#8B5A2B">♻ Scrap</button>
         <button class="sec-add-board" onclick="addBoard()"><span style="font-size:14px">＋</span> <span data-i18n="addBoardBtn">Add board</span></button>
       </div>
@@ -1937,6 +1938,76 @@ function saveSettings(){
   ND.priceCutM=parseFloat(gv('sd-pcut'))||0; ND.pricePart=parseFloat(gv('sd-ppart'))||0; ND.priceEdge=parseFloat(gv('sd-pedge'))||0;
   saveND(); applyNDToControls(); renderBoards(); closeSettings();
   if(typeof toast==='function')toast('Nustatymai išsaugoti');
+}
+
+// ════════════════════════════════════════════════════════════════
+// WAREHOUSE BROWSER — view live warehouse stock + offcuts, add any to boards
+// ════════════════════════════════════════════════════════════════
+function openWarehouseModal(){
+  whLoadStock().then(function(){ whRenderWMList(''); });
+  var inp='width:100%;padding:7px 10px;border:1px solid #D8D2C6;border-radius:7px;font-size:13px;box-sizing:border-box';
+  var html=''
+    +'<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">'
+      +'<div style="font-size:16px;font-weight:700;color:#3a352c">📦 Sandėlio likučiai</div>'
+      +'<button onclick="whLoadStock().then(function(){whRenderWMList((document.getElementById(\'wm-f\')||{}).value||\'\')})" title="Atnaujinti" style="margin-left:auto;font-size:13px;padding:5px 10px;border:1px solid #D8D2C6;background:#fff;border-radius:6px;cursor:pointer">↻</button>'
+      +'<button onclick="closeWarehouseModal()" style="font-size:13px;padding:5px 10px;border:1px solid #D8D2C6;background:#fff;border-radius:6px;cursor:pointer">✕</button>'
+    +'</div>'
+    +'<input id="wm-f" placeholder="Ieškoti medžiagos…" oninput="whRenderWMList(this.value)" style="'+inp+'">'
+    +'<div id="wm-list" style="margin-top:12px">Kraunama…</div>';
+  var bg=document.createElement('div'); bg.id='wm-bg';
+  bg.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:100000;display:flex;align-items:flex-start;justify-content:center;padding:40px 20px';
+  bg.onclick=function(e){if(e.target===bg)closeWarehouseModal();};
+  var card=document.createElement('div');
+  card.style.cssText='background:#fff;border-radius:14px;padding:20px 22px;width:560px;max-width:95vw;max-height:85vh;overflow-y:auto;box-shadow:0 12px 40px rgba(0,0,0,.25)';
+  card.innerHTML=html; bg.appendChild(card); document.body.appendChild(bg);
+  card.addEventListener('click',function(e){
+    var b=e.target.closest('[data-add-sku]'); if(b){whAddBoardFromStock(b.getAttribute('data-add-sku'));return;}
+    var o=e.target.closest('[data-add-offcut]'); if(o){whAddBoardFromOffcut(o.getAttribute('data-add-offcut'));return;}
+  });
+}
+function closeWarehouseModal(){var b=document.getElementById('wm-bg');if(b)b.remove();}
+function whRenderWMList(filter){
+  var el=document.getElementById('wm-list'); if(!el)return;
+  var f=String(filter||'').trim().toLowerCase();
+  var match=function(name){return !f||String(name||'').toLowerCase().indexOf(f)>=0;};
+  var sheets=WH_STOCK.filter(function(s){return match(s.material);});
+  var offs=WH_OFFCUTS.filter(function(o){return match(o.material);});
+  var rowBtn='padding:5px 12px;border:none;background:#3D6B4F;color:#fff;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;flex-shrink:0';
+  var row=function(title,sub,attr){
+    return '<div style="display:flex;align-items:center;gap:10px;padding:9px 4px;border-bottom:1px solid #F0ECE3">'
+      +'<div style="flex:1;min-width:0"><div style="font-weight:600;color:#3a352c;font-size:13px">'+esc(title)+'</div><div style="font-size:11px;color:#A09888">'+esc(sub)+'</div></div>'
+      +'<button '+attr+' style="'+rowBtn+'">+ Pridėti</button></div>';
+  };
+  var html='';
+  html+='<div style="font-size:11px;font-weight:700;color:#3D6B4F;text-transform:uppercase;letter-spacing:.06em;margin:4px 0 4px">Plokštės ('+sheets.length+')</div>';
+  if(!sheets.length) html+='<div style="font-size:12px;color:#A09888;padding:6px 4px">Nėra</div>';
+  html+=sheets.map(function(s){
+    var area=whStockArea(s), cnt=(s.available>0&&area)?Math.floor(s.available/area):0;
+    var dim=(s.sheet_w&&s.sheet_h)?(s.sheet_w+'×'+s.sheet_h):'';
+    var sub=[(s.thickness!=null?s.thickness+'mm':''),dim,cnt+' lakšt.'].filter(Boolean).join(' · ');
+    return row(s.material,sub,'data-add-sku="'+esc(s.sku)+'"');
+  }).join('');
+  html+='<div style="font-size:11px;font-weight:700;color:#8B5A2B;text-transform:uppercase;letter-spacing:.06em;margin:14px 0 4px">Atraižos ('+offs.length+')</div>';
+  if(!offs.length) html+='<div style="font-size:12px;color:#A09888;padding:6px 4px">Nėra</div>';
+  html+=offs.map(function(o){
+    var sub=[(o.thickness!=null?o.thickness+'mm':''),(o.w&&o.h?o.w+'×'+o.h:'')].filter(Boolean).join(' · ');
+    return row(o.material||'Atraiža',sub,'data-add-offcut="'+esc(o.id)+'"');
+  }).join('');
+  el.innerHTML=html;
+}
+function whAddBoardFromStock(sku){
+  var s=whFindStockBySku(sku); if(!s)return;
+  var w=s.sheet_w||ND.boardW, h=s.sheet_h||ND.boardH;
+  var area=whStockArea(s), qty=(area>0&&s.available>0)?Math.floor(s.available/area):ND.qty;
+  boards.push({id:bId++,mat:s.material,sku:s.sku,w:w,h:h,thickness:(s.thickness!=null?s.thickness:ND.thickness),qty:qty,color:COLORS[boards.length%COLORS.length],grain:false,priceM2:ND.priceM2,priceMatMarkup:ND.priceMatMarkup,priceCutM:ND.priceCutM,pricePart:ND.pricePart,priceEdge:ND.priceEdge});
+  renderBoards(); refreshSel();
+  if(typeof toast==='function')toast('Pridėta: '+s.material);
+}
+function whAddBoardFromOffcut(id){
+  var o=WH_OFFCUTS.filter(function(x){return String(x.id)===String(id);})[0]; if(!o)return;
+  boards.push({id:bId++,mat:o.material||'Atraiža',sku:o.sku||null,w:o.w||ND.boardW,h:o.h||ND.boardH,thickness:(o.thickness!=null?o.thickness:ND.thickness),qty:1,color:COLORS[boards.length%COLORS.length],grain:false,priceM2:ND.priceM2,priceMatMarkup:ND.priceMatMarkup,priceCutM:ND.priceCutM,pricePart:ND.pricePart,priceEdge:ND.priceEdge});
+  renderBoards(); refreshSel();
+  if(typeof toast==='function')toast('Pridėta atraiža');
 }
 
 function collectProjectState(){
