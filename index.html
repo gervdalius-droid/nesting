@@ -330,6 +330,14 @@ input[type=color]{padding:2px 3px;height:27px;cursor:pointer}
 .startup-choices{padding:4px 16px 18px}
 .startup-card{display:flex;align-items:center;gap:12px;width:100%;text-align:left;padding:13px 14px;border:1px solid #e6e8ed;border-radius:10px;background:#fff;cursor:pointer;margin:8px 0;transition:border-color .12s,background .12s,box-shadow .12s}
 .startup-card:hover{border-color:#2f54eb;background:#F7FAF8;box-shadow:0 2px 10px rgba(61,107,79,.1)}
+.pin-dots{display:flex;justify-content:center;gap:14px;margin:8px 0 10px}
+.pin-dots span{width:14px;height:14px;border-radius:50%;border:2px solid #c3c9d4;background:transparent;transition:background .1s,border-color .1s}
+.pin-dots span.on{background:#2f54eb;border-color:#2f54eb}
+.kpad{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.kpad button{padding:15px 0;font-size:21px;font-weight:600;border:1px solid #e6e8ed;border-radius:10px;background:#fff;color:#1b1e26;cursor:pointer;font-family:inherit;user-select:none}
+.kpad button:hover{background:#eef1ff;border-color:#2f54eb}
+.kpad button:active{background:#dde8f5}
+.kpad button.kpad-sec{font-size:16px;color:#667085;background:#f6f7f9}
 .startup-card.primary{border-color:#2f54eb;background:#F2F7F4}
 .startup-card.primary:hover{box-shadow:0 4px 14px rgba(61,107,79,.16)}
 .startup-ic{width:34px;height:34px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0}
@@ -451,6 +459,10 @@ body.print-mode{background:#fff}
     <button id="redoBtn" class="urbtn" onclick="redo()" data-i18n-title="redoTip" title="Redo (Ctrl+Shift+Z)" disabled>↷</button>
     <button class="btn bs" onclick="newProjectPrompt()" data-i18n-title="newProjTip" title="Start a new project (current one is preserved)" style="padding:4px 10px;color:#2f54eb;border-color:#2f54eb"><span data-i18n="newProj">🆕 New</span></button>
     <button class="btn bs" onclick="openHistory()" data-i18n-title="openHistory" title="Open project history" style="padding:4px 10px"><span data-i18n="history">🗂 History</span></button>
+    <span id="auth-chip" style="display:none;align-items:center;gap:6px;font-size:11px;color:#9aa3b2;font-family:monospace;background:#232a36;border:1px solid #2c3340;border-radius:6px;padding:3px 8px">
+      <span>👤</span><span class="auth-chip-name"></span>
+      <button onclick="authLogout()" title="Atsijungti" style="background:none;border:none;color:#9aa3b2;cursor:pointer;font-size:13px;padding:0 0 0 4px;line-height:1">⎋</button>
+    </span>
   </div>
   <span id="albl" style="font-size:10px;color:#667085;font-family:monospace"></span>
 </div>
@@ -794,6 +806,43 @@ body.print-mode{background:#fff}
     <div class="startup-choices" id="startup-choices">
       <!-- populated by showStartupModal() -->
     </div>
+  </div>
+</div>
+
+<!-- LOGIN GATE — shared account with the GVS warehouse / db app -->
+<div class="startup-overlay" id="auth-overlay" style="z-index:600">
+  <div class="startup-box" style="width:380px">
+    <div class="startup-brand">
+      <div class="startup-logo">🔒</div>
+      <div>
+        <div class="startup-title">Dėdės Baldai</div>
+        <div class="startup-sub">Prisijunkite, kad tęstumėte</div>
+      </div>
+    </div>
+    <form onsubmit="return submitLogin(event)" autocomplete="off" style="padding:4px 24px 22px;display:flex;flex-direction:column;gap:10px">
+      <div><label class="fl">Vardas</label><input id="auth-name" autocomplete="off" placeholder="pvz. Jonas"></div>
+      <div>
+        <label class="fl">PIN</label>
+        <div class="pin-dots" id="pin-dots"></div>
+        <div class="kpad">
+          <button type="button" onclick="pinPush(1)">1</button>
+          <button type="button" onclick="pinPush(2)">2</button>
+          <button type="button" onclick="pinPush(3)">3</button>
+          <button type="button" onclick="pinPush(4)">4</button>
+          <button type="button" onclick="pinPush(5)">5</button>
+          <button type="button" onclick="pinPush(6)">6</button>
+          <button type="button" onclick="pinPush(7)">7</button>
+          <button type="button" onclick="pinPush(8)">8</button>
+          <button type="button" onclick="pinPush(9)">9</button>
+          <button type="button" class="kpad-sec" onclick="pinClear()">C</button>
+          <button type="button" onclick="pinPush(0)">0</button>
+          <button type="button" class="kpad-sec" onclick="pinBack()">⌫</button>
+        </div>
+      </div>
+      <div id="auth-err" style="display:none;color:#B84040;font-size:11px;background:#fdf0f0;border:1px solid #e0b0b0;border-radius:6px;padding:6px 9px"></div>
+      <button id="auth-btn" type="submit" class="btn bp" style="width:100%;padding:11px;margin-top:2px;font-size:14px">Prisijungti</button>
+      <div style="font-size:10px;color:#8A8472;text-align:center;line-height:1.5">Tas pats prisijungimas kaip GVS sandėlio sistemoje.</div>
+    </form>
   </div>
 </div>
 
@@ -1689,7 +1738,7 @@ function detectLanguage(){
 }
 // Initialize language as early as possible (before DOMContentLoaded renders static HTML)
 _lang=detectLanguage();
-document.addEventListener('DOMContentLoaded',function(){translateAll();applyNDToControls();whLoadStock();});
+document.addEventListener('DOMContentLoaded',function(){translateAll();applyNDToControls();}); // whLoadStock() runs in bootApp(), after login
 
 // ═══════════════════════════════════════════════════════════════
 // PROJECT PERSISTENCE — Supabase with localStorage fallback
@@ -1730,7 +1779,124 @@ var WH_SB_URL='https://byvtqycdgboqbmpoysyt.supabase.co';
 var WH_SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ5dnRxeWNkZ2JvcWJtcG95c3l0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU3ODA0MzAsImV4cCI6MjA5MTM1NjQzMH0.IoQRxA4m45--5fQ9U40ChNVCwsBPmxTM4p8sM1-3AUo';
 var WH_STOCK=[], WH_OFFCUTS=[], WH_WS='';
 var GVS_PROJECT_ID='';
-function whHeaders(){return {'apikey':WH_SB_KEY,'Authorization':'Bearer '+WH_SB_KEY,'Content-Type':'application/json'};}
+
+// ═══════════════════════════════════════════════════════════════
+// AUTHENTICATION — shared login with the GVS warehouse / db app.
+// Both apps authenticate against the SAME Supabase project (the
+// warehouse, byvtqycd) so ONE account works in both places.
+// The familiar "code + name" is kept, plus a password; together they
+// map to a Supabase Auth account (email = name.code@AUTH_DOMAIN).
+// The logged-in user's JWT then replaces the shared anon key on every
+// warehouse call below, so Row-Level-Security on Supabase can enforce
+// who may read/write. NOTE: the login UI only becomes real protection
+// once RLS is enabled on the warehouse tables — see WAREHOUSE_AUTH_SETUP.md.
+// ═══════════════════════════════════════════════════════════════
+var AUTH_DOMAIN='dedesbaldai.lt';   // synthetic email domain (no real mail is sent)
+var WORKSHOP_CODE='gvs';            // baked-in workshop code — workers never type it; keeps the hidden email unique
+var PIN_LEN=4;                      // PIN length (raise to 5–6 for more brute-force resistance)
+var AUTH_PIN_SALT='_dedes';         // appended to the PIN to form the real Supabase password (meets the 6-char minimum)
+var LS_AUTH='fabflow_auth';         // localStorage session key
+var AUTH=null;                      // {access_token,refresh_token,expires_at,name,code,user}
+var _authTimer=null, _pin='';
+
+function authSlug(s){return String(s||'').trim().toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'');}
+function authEmail(code,name){return authSlug(name)+'.'+authSlug(code)+'@'+AUTH_DOMAIN;}
+// A worker's 4-digit PIN becomes their real (longer) Supabase password.
+function authPinToPassword(pin){return String(pin)+AUTH_PIN_SALT;}
+
+// ── On-screen number pad ──
+function pinRender(){
+  var d=document.getElementById('pin-dots'); if(!d)return;
+  var h=''; for(var i=0;i<PIN_LEN;i++)h+='<span class="'+(i<_pin.length?'on':'')+'"></span>';
+  d.innerHTML=h;
+}
+function pinPush(n){ if(_pin.length<PIN_LEN){_pin+=String(n);pinRender();} }
+function pinBack(){ _pin=_pin.slice(0,-1); pinRender(); }
+function pinClear(){ _pin=''; pinRender(); }
+function authLoad(){try{var s=JSON.parse(localStorage.getItem(LS_AUTH)||'null');if(s&&s.access_token)AUTH=s;}catch(e){}return AUTH;}
+function authStore(s){AUTH=s;try{localStorage.setItem(LS_AUTH,JSON.stringify(s));}catch(e){}}
+function authClear(){AUTH=null;try{localStorage.removeItem(LS_AUTH);}catch(e){}}
+function authValid(){return !!(AUTH&&AUTH.access_token&&AUTH.expires_at&&AUTH.expires_at>Date.now()+5000);}
+
+// Exchange name+PIN for a Supabase session (PIN → real password behind the scenes).
+async function authLogin(name,pin){
+  var r=await fetch(WH_SB_URL+'/auth/v1/token?grant_type=password',{
+    method:'POST',headers:{'apikey':WH_SB_KEY,'Content-Type':'application/json'},
+    body:JSON.stringify({email:authEmail(WORKSHOP_CODE,name),password:authPinToPassword(pin)})
+  });
+  var d=await r.json().catch(function(){return {};});
+  if(!r.ok||!d.access_token)throw new Error(d.error_description||d.msg||d.error||('HTTP '+r.status));
+  authStore({access_token:d.access_token,refresh_token:d.refresh_token,
+    expires_at:Date.now()+((d.expires_in||3600)*1000),
+    name:String(name).trim(),code:WORKSHOP_CODE,user:d.user||null});
+  return AUTH;
+}
+// Refresh the access token using the stored refresh token.
+async function authRefresh(){
+  if(!AUTH||!AUTH.refresh_token)return false;
+  try{
+    var r=await fetch(WH_SB_URL+'/auth/v1/token?grant_type=refresh_token',{
+      method:'POST',headers:{'apikey':WH_SB_KEY,'Content-Type':'application/json'},
+      body:JSON.stringify({refresh_token:AUTH.refresh_token})
+    });
+    var d=await r.json().catch(function(){return {};});
+    if(!r.ok||!d.access_token){authClear();return false;}
+    authStore(Object.assign({},AUTH,{access_token:d.access_token,
+      refresh_token:d.refresh_token||AUTH.refresh_token,
+      expires_at:Date.now()+((d.expires_in||3600)*1000),user:d.user||AUTH.user}));
+    return true;
+  }catch(e){return false;}
+}
+function authStartRefreshTimer(){
+  if(_authTimer)return;
+  _authTimer=setInterval(function(){if(AUTH&&AUTH.expires_at&&AUTH.expires_at<Date.now()+120000)authRefresh();},60000);
+}
+async function authLogout(){
+  try{if(AUTH&&AUTH.access_token)await fetch(WH_SB_URL+'/auth/v1/logout',{method:'POST',headers:{'apikey':WH_SB_KEY,'Authorization':'Bearer '+AUTH.access_token}});}catch(e){}
+  authClear();location.reload();
+}
+function showAuthOverlay(){
+  var o=document.getElementById('auth-overlay');if(o)o.classList.add('open');
+  _pin='';pinRender();
+  var c=document.getElementById('auth-name');if(c)c.focus();
+}
+function hideAuthOverlay(){var o=document.getElementById('auth-overlay');if(o)o.classList.remove('open');}
+// Physical keyboard: digits/Backspace/Enter work too (handy on a desktop).
+document.addEventListener('keydown',function(e){
+  var o=document.getElementById('auth-overlay'); if(!o||!o.classList.contains('open'))return;
+  if(e.key>='0'&&e.key<='9'){pinPush(e.key);}
+  else if(e.key==='Backspace'&&document.activeElement!==document.getElementById('auth-name')){e.preventDefault();pinBack();}
+  else if(e.key==='Enter'){e.preventDefault();submitLogin();}
+});
+function authRenderUser(){
+  var el=document.getElementById('auth-chip');if(!el)return;
+  if(AUTH&&AUTH.name){el.style.display='inline-flex';var n=el.querySelector('.auth-chip-name');if(n)n.textContent=AUTH.name;}
+  else{el.style.display='none';}
+}
+async function submitLogin(ev){
+  if(ev&&ev.preventDefault)ev.preventDefault();
+  var name=(document.getElementById('auth-name')||{}).value||'';
+  var err=document.getElementById('auth-err'), btn=document.getElementById('auth-btn');
+  if(!name.trim()){if(err){err.textContent='Įveskite vardą.';err.style.display='block';}return false;}
+  if(_pin.length<PIN_LEN){if(err){err.textContent='Įveskite '+PIN_LEN+' skaitmenų PIN.';err.style.display='block';}return false;}
+  if(err)err.style.display='none';
+  if(btn){btn.disabled=true;btn.textContent='Jungiamasi…';}
+  try{
+    await authLogin(name,_pin);
+    hideAuthOverlay();authRenderUser();authStartRefreshTimer();bootApp();
+  }catch(e){
+    _pin='';pinRender();
+    if(err){err.textContent='Neteisingas vardas arba PIN.';err.style.display='block';}
+  }finally{ if(btn){btn.disabled=false;btn.textContent='Prisijungti';} }
+  return false;
+}
+
+// Warehouse calls carry the logged-in user's JWT (falls back to the anon
+// key only when nobody is logged in, e.g. before the gate appears).
+function whHeaders(){
+  var tok=(AUTH&&AUTH.access_token)?AUTH.access_token:WH_SB_KEY;
+  return {'apikey':WH_SB_KEY,'Authorization':'Bearer '+tok,'Content-Type':'application/json'};
+}
 function whStdSheetArea(){return 2800*2070/1e6;} // standard full sheet m² (for the count hint)
 // Real board area for a stock row — uses the warehouse dimensions, falls back to standard.
 function whStockArea(s){ return (s&&s.sheet_w&&s.sheet_h)?(s.sheet_w*s.sheet_h/1e6):whStdSheetArea(); }
@@ -2028,7 +2194,7 @@ async function reserveForCutting(){
   var total=lines.reduce(function(s,l){return s+l.qty_reserved;},0);
   if(!confirm('Rezervuoti pjovimui '+total+' lakšt. ('+lines.length+' medžiaga(-os))?\nProjektas: '+proj+'\n\nPatvirtinsite GVS → Sandėlis.'))return;
   var id='cj_'+Date.now()+'_'+Math.random().toString(36).slice(2,7);
-  var body=[{id:id,workspace_code:WH_WS||null,project_name:proj,gvs_project_id:GVS_PROJECT_ID||null,status:'reserved',lines:lines,offcuts:[],created_by:'nesting'}];
+  var body=[{id:id,workspace_code:WH_WS||null,project_name:proj,gvs_project_id:GVS_PROJECT_ID||null,status:'reserved',lines:lines,offcuts:[],created_by:((AUTH&&AUTH.name)?AUTH.name:'nesting')}];
   try{
     var r=await fetch(WH_SB_URL+'/rest/v1/fabflow_cut_jobs',{method:'POST',headers:Object.assign({},whHeaders(),{'Prefer':'return=minimal'}),body:JSON.stringify(body)});
     if(!r.ok){var t=await r.text();throw new Error(r.status+' '+t.slice(0,140));}
@@ -2721,8 +2887,11 @@ function formatRelativeTime(iso){
 // Try to reach cloud every 30s to flush pending saves if we went offline.
 setInterval(function(){drainPendingQueue();},30000);
 
-// On load: restore the most recently worked project.
-document.addEventListener('DOMContentLoaded',function(){
+// Restore the most recently worked project. Runs ONLY after a valid login
+// (see the DOMContentLoaded gate below) so the app never opens unauthenticated.
+function bootApp(){
+  // Load warehouse stock now that we're authenticated (carries the user's token).
+  if(typeof whLoadStock==='function') whLoadStock();
   // Restore last imported xlsm filename for Excel-based label printing
   try { window.activeXlsmName = localStorage.getItem('fabflow_xlsm_name') || ''; } catch(e) {}
   // Apply initial machine mode (default 'cnc' hides the saw kerf input)
@@ -2742,6 +2911,17 @@ document.addEventListener('DOMContentLoaded',function(){
   }
   // Otherwise show the startup picker: New Project vs. continue latest.
   showStartupModal();
+}
+
+// On load: require a valid shared login before the app boots.
+document.addEventListener('DOMContentLoaded',function(){
+  authLoad();
+  if(authValid()){ authStartRefreshTimer(); authRenderUser(); bootApp(); return; }
+  // A stored session may just be expired — try a silent refresh before asking.
+  authRefresh().then(function(ok){
+    if(ok){ authStartRefreshTimer(); authRenderUser(); bootApp(); }
+    else { showAuthOverlay(); }
+  });
 });
 
 // ── STARTUP PROJECT PICKER ─────────────────────────────────────────
