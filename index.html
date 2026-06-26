@@ -1799,7 +1799,7 @@ var LS_AUTH='fabflow_auth';         // localStorage session key
 var AUTH=null;                      // {access_token,refresh_token,expires_at,name,code,user}
 var _authTimer=null, _pin='';
 
-function authSlug(s){return String(s||'').trim().toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'');}
+function authSlug(s){var m={'ą':'a','č':'c','ę':'e','ė':'e','į':'i','š':'s','ų':'u','ū':'u','ž':'z'};return String(s||'').trim().toLowerCase().replace(/[ąčęėįšųūž]/g,function(c){return m[c]||c;}).replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'');}
 function authEmail(code,name){return authSlug(name)+'.'+authSlug(code)+'@'+AUTH_DOMAIN;}
 // A worker's 4-digit PIN becomes their real (longer) Supabase password.
 function authPinToPassword(pin){return String(pin)+AUTH_PIN_SALT;}
