@@ -556,6 +556,11 @@ body.print-mode{background:#fff}
   <div style="display:flex;gap:4px;margin-top:6px">
     <button class="btn bp" onclick="optimize()" data-i18n="optimize" style="flex:1;padding:9px;font-size:13px">▶ Optimize &amp; Cut</button>
     <button class="btn bs" onclick="openMergeDialog()" title="Find narrow parts (≤150mm) with matching length and merge them into strips up to 800mm wide. Saves kerf and improves nesting." style="padding:9px 10px;font-size:11px;color:#647488;border-color:#647488;white-space:nowrap">🔗 Merge narrow</button>
+    <select id="shapeQuality" title="Shape-nest quality — Fast: quick · Balanced: default · Best: tightest (slower)" style="padding:7px 6px;font-size:11px;border:1px solid #534AB7;border-radius:6px;color:#534AB7;background:#fff;width:auto;white-space:nowrap">
+      <option value="fast">⚡ Fast</option>
+      <option value="balanced" selected>⚖ Balanced</option>
+      <option value="best">🎯 Best</option>
+    </select>
     <button class="btn bs" onclick="runShapeNest()" title="True-shape nesting (SVGnest engine): nests irregular DXF shapes into each other's gaps with rotation, via no-fit-polygon + genetic algorithm. Best for non-rectangular parts." style="padding:9px 10px;font-size:11px;color:#534AB7;border-color:#534AB7;white-space:nowrap">🧩 Shape nest</button>
     <button class="btn bs" onclick="exportForDeepnest()" title="Export all shapes as one SVG for nesting in Deepnest/SVGnest (true-shape nesting with rotation)" style="padding:9px 12px;font-size:12px;color:#2f54eb;border-color:#2f54eb;white-space:nowrap">🔗 Deepnest</button>
   </div>
@@ -5807,6 +5812,33 @@ function onMachineModeChange(){
 
 // Build the part's outline + holes as y-DOWN, bbox-local mm polygons — the
 // same frame the canvas uses (xformShape flips stored y-up shapes to y-down).
+// Perpendicular distance from point p to segment a–b.
+function _segDist(p,a,b){
+  var dx=b.x-a.x, dy=b.y-a.y, len2=dx*dx+dy*dy;
+  if(len2===0) return Math.hypot(p.x-a.x,p.y-a.y);
+  var t=((p.x-a.x)*dx+(p.y-a.y)*dy)/len2; t=Math.max(0,Math.min(1,t));
+  return Math.hypot(p.x-(a.x+t*dx), p.y-(a.y+t*dy));
+}
+// Douglas–Peucker outline simplification. DXF arcs flatten into many segments;
+// trimming near-collinear points (tolerance well under the kerf) makes NFP far
+// faster without letting parts overlap. Used only for the geometry sent to the
+// nester — the full-resolution outline is kept for rendering/export.
+function _simplifyPoly(pts, tol){
+  if(!pts || pts.length<5) return pts;
+  function dp(ps){
+    if(ps.length<3) return ps;
+    var dmax=0, idx=0, end=ps.length-1, a=ps[0], b=ps[end];
+    for(var i=1;i<end;i++){ var d=_segDist(ps[i],a,b); if(d>dmax){dmax=d; idx=i;} }
+    if(dmax>tol){
+      var l=dp(ps.slice(0,idx+1)), r=dp(ps.slice(idx));
+      return l.slice(0,l.length-1).concat(r);
+    }
+    return [a,b];
+  }
+  var res=dp(pts.slice());
+  return (res.length>=3)?res:pts;
+}
+
 function _partNestGeom(part){
   if(part.shape && part.shape.length>=3){
     var outer=part.shape.map(function(pt){ return {x:pt.x, y:part.w-pt.y}; });
@@ -5826,7 +5858,11 @@ function runShapeNest(){
 
   var kerf=parseInt((document.getElementById('kerf')||{}).value)||3;
   var trim=parseInt((document.getElementById('trim')||{}).value)||0;
-  var gens=12;
+  // Quality preset → genetic-search budget + rotations + population.
+  var _qMap={fast:{gens:8,pop:10,rot:4}, balanced:{gens:18,pop:12,rot:8}, best:{gens:40,pop:16,rot:12}};
+  var _qSel=((document.getElementById('shapeQuality')||{}).value)||'balanced';
+  var Q=_qMap[_qSel]||_qMap.balanced;
+  var gens=Q.gens;
 
   // Group parts by material (each `parts` entry is one physical piece)
   var byMat={};
@@ -5850,12 +5886,16 @@ function runShapeNest(){
 
     // Build plain serialisable jobs; keep geometry + part refs on the MAIN side.
     var treeJobs=[], idMap={}, geomMap={}, id=0;
+    var simpTol=Math.min(0.5, Math.max(0.2, kerf*0.15)); // < kerf, so simplification can't cause overlaps
     mparts.forEach(function(p){
       var g=_partNestGeom(p);
-      treeJobs.push({ points:g.outer.map(function(pt){return {x:pt.x,y:pt.y};}), id:id });
+      var simp=_simplifyPoly(g.outer, simpTol); // fewer points → faster NFP; full-res g.outer kept for render
+      treeJobs.push({ points:simp.map(function(pt){return {x:pt.x,y:pt.y};}), id:id });
       geomMap[id]=g; idMap[id]=p; id++;
     });
-    var cfg={ rotations: grain?2:4, spacing:kerf, populationSize:10, mutationRate:10, exploreConcave:false, useHoles:false };
+    // exploreConcave: lets parts tuck into other parts' concave pockets — the biggest
+    // density win for irregular shapes. Rotations/population scale with the quality preset.
+    var cfg={ rotations: grain?2:Q.rot, spacing:kerf, populationSize:Q.pop, mutationRate:10, exploreConcave:true, useHoles:false };
 
     _nestProgressMat(mi, matKeys.length, bd.mat, 0);
 
