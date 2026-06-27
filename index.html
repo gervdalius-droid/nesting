@@ -1793,6 +1793,7 @@ var GVS_PROJECT_ID='';
 // ═══════════════════════════════════════════════════════════════
 var AUTH_DOMAIN='dedesbaldai.lt';   // synthetic email domain (no real mail is sent)
 var WORKSHOP_CODE='gvs';            // baked-in workshop code — workers never type it; keeps the hidden email unique
+var GVS_WORKSPACE_CODE='S4OQX';     // GVS team namespace in the warehouse project — login is restricted to this team
 var PIN_LEN=4;                      // PIN length (raise to 5–6 for more brute-force resistance)
 var AUTH_PIN_SALT='_dedes';         // appended to the PIN to form the real Supabase password (meets the 6-char minimum)
 var LS_AUTH='fabflow_auth';         // localStorage session key
@@ -1873,6 +1874,20 @@ function authRenderUser(){
   if(AUTH&&AUTH.name){el.style.display='inline-flex';var n=el.querySelector('.auth-chip-name');if(n)n.textContent=AUTH.name;}
   else{el.style.display='none';}
 }
+// Is this person on the GVS team? true = yes, false = no, null = couldn't check.
+// Reads the GVS workspace user list the db app maintains (same Supabase project).
+async function authIsGvsMember(name){
+  try{
+    var r=await fetch(WH_SB_URL+'/rest/v1/fabflow?key=eq.fab_'+GVS_WORKSPACE_CODE+'_users&select=value',{headers:whHeaders()});
+    if(!r.ok)return null;
+    var d=await r.json();
+    if(!d.length)return null;
+    var users=JSON.parse(d[0].value||'[]');
+    var k=String(name||'').trim().toLowerCase();
+    return users.some(function(u){return String((u&&u.name)||'').trim().toLowerCase()===k;});
+  }catch(e){return null;}
+}
+
 async function submitLogin(ev){
   if(ev&&ev.preventDefault)ev.preventDefault();
   var name=(document.getElementById('auth-name')||{}).value||'';
@@ -1883,6 +1898,14 @@ async function submitLogin(ev){
   if(btn){btn.disabled=true;btn.textContent='Jungiamasi…';}
   try{
     await authLogin(name,_pin);
+    // Gate: only people on the GVS team may use the app. (null = couldn't check → allow, since they already passed auth.)
+    var member=await authIsGvsMember(name);
+    if(member===false){
+      authClear();_pin='';pinRender();
+      if(err){err.textContent='Jūs nesate GVS komandoje. Kreipkitės į vadovą.';err.style.display='block';}
+      if(btn){btn.disabled=false;btn.textContent='Prisijungti';}
+      return false;
+    }
     hideAuthOverlay();authRenderUser();authStartRefreshTimer();bootApp();
   }catch(e){
     _pin='';pinRender();
