@@ -556,7 +556,7 @@ body.print-mode{background:#fff}
   <div style="display:flex;gap:4px;margin-top:6px">
     <button class="btn bp" onclick="optimize()" data-i18n="optimize" style="flex:1;padding:9px;font-size:13px">▶ Optimize &amp; Cut</button>
     <button class="btn bs" onclick="openMergeDialog()" title="Find narrow parts (≤150mm) with matching length and merge them into strips up to 800mm wide. Saves kerf and improves nesting." style="padding:9px 10px;font-size:11px;color:#647488;border-color:#647488;white-space:nowrap">🔗 Merge narrow</button>
-    <button class="btn bs" onclick="runShapeNest()" title="True-shape nesting (SVGnest engine): nests irregular DXF shapes into each other's gaps with rotation, via no-fit-polygon + genetic algorithm. Best for non-rectangular parts." style="padding:9px 10px;font-size:11px;color:#534AB7;border-color:#534AB7;white-space:nowrap">🧩 Shape nest</button>
+    <!-- 🧩 Shape nest (in-app SVGnest) hidden: produced overlapping / slow nests on irregular parts. Being replaced by a WASM nesting engine. Use 🔗 Deepnest export meanwhile. runShapeNest() remains defined but is not exposed. -->
     <button class="btn bs" onclick="exportForDeepnest()" title="Export all shapes as one SVG for nesting in Deepnest/SVGnest (true-shape nesting with rotation)" style="padding:9px 12px;font-size:12px;color:#2f54eb;border-color:#2f54eb;white-space:nowrap">🔗 Deepnest</button>
   </div>
 </div>
