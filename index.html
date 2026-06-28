@@ -3,6 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<!-- Enables cross-origin isolation so the WASM nesting engine (shared memory) can load on static hosting. On a real server, send COOP/COEP headers and remove this. -->
+<script src="coi-serviceworker.js"></script>
 <title>Dėdės Baldai — Nesting</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
@@ -553,11 +555,11 @@ body.print-mode{background:#fff}
     </div>
     <div id="ver-hint" style="font-size:10px;color:#667085;line-height:1.3"></div>
   </div>
-  <div style="display:flex;gap:4px;margin-top:6px">
-    <button class="btn bp" onclick="optimize()" data-i18n="optimize" style="flex:1;padding:9px;font-size:13px">▶ Optimize &amp; Cut</button>
-    <button class="btn bs" onclick="openMergeDialog()" title="Find narrow parts (≤150mm) with matching length and merge them into strips up to 800mm wide. Saves kerf and improves nesting." style="padding:9px 10px;font-size:11px;color:#647488;border-color:#647488;white-space:nowrap">🔗 Merge narrow</button>
-    <!-- 🧩 Shape nest (in-app SVGnest) hidden: produced overlapping / slow nests on irregular parts. Being replaced by a WASM nesting engine. Use 🔗 Deepnest export meanwhile. runShapeNest() remains defined but is not exposed. -->
-    <button class="btn bs" onclick="exportForDeepnest()" title="Export all shapes as one SVG for nesting in Deepnest/SVGnest (true-shape nesting with rotation)" style="padding:9px 12px;font-size:12px;color:#2f54eb;border-color:#2f54eb;white-space:nowrap">🔗 Deepnest</button>
+  <div style="display:flex;gap:5px;margin-top:6px;flex-wrap:wrap">
+    <button class="btn bp" onclick="optimize()" data-i18n="optimize" style="flex:1 1 100%;padding:9px;font-size:13px">▶ Optimize &amp; Cut</button>
+    <button class="btn bs" onclick="openMergeDialog()" title="Find narrow parts (≤150mm) with matching length and merge them into strips up to 800mm wide. Saves kerf and improves nesting." style="flex:1 1 auto;padding:8px 10px;font-size:11px;color:#647488;border-color:#647488;white-space:nowrap">🔗 Merge narrow</button>
+    <button class="btn bs" onclick="runShapeNestWasm()" title="True-shape nesting (WASM engine): nests irregular DXF parts into the sheet by their real outline, with rotation. Best for non-rectangular parts." style="flex:1 1 auto;padding:8px 10px;font-size:11px;color:#534AB7;border-color:#534AB7;white-space:nowrap">🧩 Shape nest</button>
+    <button class="btn bs" onclick="exportForDeepnest()" title="Export all shapes as one SVG for nesting in Deepnest/SVGnest (true-shape nesting with rotation)" style="flex:1 1 auto;padding:8px 12px;font-size:12px;color:#2f54eb;border-color:#2f54eb;white-space:nowrap">🔗 Deepnest</button>
   </div>
 </div>
 <div class="main">
@@ -5814,6 +5816,118 @@ function _partNestGeom(part){
     return {outer:outer, holes:holes};
   }
   return {outer:[{x:0,y:0},{x:part.l,y:0},{x:part.l,y:part.w},{x:0,y:part.w}], holes:[]};
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// TRUE-SHAPE NESTING via WASM engine (jagua-rs + LBF bin packing)
+// Replaces the old SVGnest port. Bin packing = fixed sheets, multi-sheet
+// overflow, no overlaps. Runs per material using that material's sheet size.
+// ════════════════════════════════════════════════════════════════════════
+var _wasmEngine=null, _wasmEngineLoading=null;
+async function loadNestEngine(){
+  if(_wasmEngine) return _wasmEngine;
+  if(!_wasmEngineLoading){
+    _wasmEngineLoading=(async function(){
+      var mod=await import('./engine/nestasm.js');
+      await mod.default();        // initialise the wasm module
+      _wasmEngine=mod; return mod;
+    })();
+  }
+  return _wasmEngineLoading;
+}
+
+// Build a jagua-rs bin-packing instance (ExtBPInstance) for one material.
+function _bpInstanceForMaterial(name, mparts, uw, uh, grain){
+  var orient = grain ? [0.0,180.0] : [0.0,90.0,180.0,270.0];
+  var items = mparts.map(function(p, idx){
+    var g=_partNestGeom(p); // {outer:[{x,y}], holes:[[{x,y}]]}  (y-up)
+    var outer = g.outer.map(function(pt){ return [pt.x, pt.y]; });
+    var shape;
+    if(g.holes && g.holes.length){
+      shape = { type:'polygon', data:{ outer:outer, inner:g.holes.map(function(h){ return h.map(function(pt){ return [pt.x,pt.y]; }); }) } };
+    } else {
+      shape = { type:'simple_polygon', data: outer };
+    }
+    return { id: idx, demand: 1, allowed_orientations: orient, shape: shape, min_quality: null };
+  });
+  var bin = { id:0, shape:{ type:'rectangle', data:{ x_min:0, y_min:0, width:uw, height:uh } },
+              stock: Math.max(1, mparts.length), cost: 1 };
+  return { name: name||'job', items: items, bins: [bin] };
+}
+
+async function runShapeNestWasm(){
+  if(!boards.length){ alert('Pridėkite medžiagos plokštę.'); return; }
+  if(!parts.length){ alert('Pridėkite detalių.'); return; }
+  if(_nestRunning) return;
+  if(layouts.length && !confirm('Pakeisti dabartinį išdėstymą tikros formos išdėstymu (Shape nest)?')) return;
+
+  var kerf=parseInt((document.getElementById('kerf')||{}).value)||3;
+  var trim=parseInt((document.getElementById('trim')||{}).value)||0;
+  var byMat={}; parts.forEach(function(p){ var m=normalizeMat(p.mat); (byMat[m]=byMat[m]||[]).push(p); });
+  var matKeys=Object.keys(byMat), newLayouts=[], unplaced=[];
+
+  _nestRunning=true; _nestCancelled=false; _nestShowProgress(matKeys.length);
+
+  var mod;
+  try{ mod=await loadNestEngine(); }
+  catch(e){
+    _nestRunning=false; _nestHideProgress();
+    alert('Nesting variklio nepavyko įkelti: '+((e&&e.message)||e)+(self.crossOriginIsolated?'':'\n\nPerkraukite puslapį (reikia saugios izoliuotos aplinkos) ir bandykite dar kartą.'));
+    return;
+  }
+
+  for(var mi=0; mi<matKeys.length; mi++){
+    if(_nestCancelled) break;
+    var mat=matKeys[mi], mparts=byMat[mat];
+    var bd=matchBoard(mat)||boards[0];
+    var uw=Math.max(10, bd.w-2*trim), uh=Math.max(10, bd.h-2*trim);
+    var grain=!!bd.grain;
+    _nestProgressMat(mi, matKeys.length, bd.mat, 0.15);
+    var inst=_bpInstanceForMaterial(mat, mparts, uw, uh, grain);
+    var sol=null;
+    try{
+      await new Promise(function(r){ setTimeout(r, 30); }); // let the overlay paint before the blocking solve
+      var resStr=mod.run_lbf_bpp(JSON.stringify(inst), BigInt(1), kerf);
+      sol=JSON.parse(resStr);
+    }catch(e){
+      console.error('shape-nest error', e);
+      mparts.forEach(function(p){ unplaced.push(p.origName||p.name||'?'); });
+      continue;
+    }
+    (sol.layouts||[]).forEach(function(lay){
+      var pls=[];
+      (lay.placed_items||[]).forEach(function(pi){
+        var part=mparts[pi.item_id]; if(!part) return;
+        var g=_partNestGeom(part);
+        var ang=(pi.transformation&&pi.transformation.rotation)||0;          // radians
+        var tr=(pi.transformation&&pi.transformation.translation)||[0,0];
+        var c=Math.cos(ang), s=Math.sin(ang), tx=tr[0], ty=tr[1];
+        function R(pt){ return {x: pt.x*c - pt.y*s + tx, y: pt.x*s + pt.y*c + ty}; }
+        var absOuter=g.outer.map(R);
+        var absHoles=(g.holes||[]).map(function(h){ return h.map(R); });
+        var minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+        absOuter.forEach(function(pt){ if(pt.x<minX)minX=pt.x; if(pt.y<minY)minY=pt.y; if(pt.x>maxX)maxX=pt.x; if(pt.y>maxY)maxY=pt.y; });
+        var pw=maxX-minX, ph=maxY-minY;
+        var localOuter=absOuter.map(function(pt){ return {x:pt.x-minX, y:pt.y-minY}; });
+        var localHoles=absHoles.map(function(h){ return h.map(function(pt){ return {x:pt.x-minX, y:pt.y-minY}; }); });
+        var px=minX, py=Math.max(0, uh-minY-ph);                              // flip to top-down render coords
+        var deg=ang*180/Math.PI;
+        pls.push({ part:part, x:px, y:py, pw:Math.round(pw), ph:Math.round(ph),
+                   rot:(Math.round(deg)%360!==0), color:(bd.color||'#888'),
+                   nestPoly:localOuter, nestHoles:localHoles, nestAngle:deg });
+      });
+      if(pls.length){
+        newLayouts.push({ idx:newLayouts.length, uw:uw, uh:uh, sw:bd.w, sh:bd.h, trim:trim,
+          matName:bd.mat, matColor:bd.color||'#888', grainLocked:grain,
+          placements:pls, kerf:kerf, machine:'cnc', shapeNest:true });
+      }
+    });
+    _nestProgressMat(mi, matKeys.length, bd.mat, 1);
+  }
+
+  _nestRunning=false; _nestHideProgress();
+  if(_nestCancelled) return;
+  _finishShapeNest(newLayouts, unplaced);
 }
 
 function runShapeNest(){
