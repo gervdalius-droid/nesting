@@ -3,6 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<!-- Enables cross-origin isolation so the WASM nesting engine (shared memory) can load on static hosting. On a real server, send COOP/COEP headers and remove this. -->
+<script src="coi-serviceworker.js"></script>
 <title>Dėdės Baldai — Nesting</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
@@ -553,11 +555,17 @@ body.print-mode{background:#fff}
     </div>
     <div id="ver-hint" style="font-size:10px;color:#667085;line-height:1.3"></div>
   </div>
-  <div style="display:flex;gap:4px;margin-top:6px">
-    <button class="btn bp" onclick="optimize()" data-i18n="optimize" style="flex:1;padding:9px;font-size:13px">▶ Optimize &amp; Cut</button>
-    <button class="btn bs" onclick="openMergeDialog()" title="Find narrow parts (≤150mm) with matching length and merge them into strips up to 800mm wide. Saves kerf and improves nesting." style="padding:9px 10px;font-size:11px;color:#647488;border-color:#647488;white-space:nowrap">🔗 Merge narrow</button>
-    <!-- 🧩 Shape nest (in-app SVGnest) hidden: produced overlapping / slow nests on irregular parts. Being replaced by a WASM nesting engine. Use 🔗 Deepnest export meanwhile. runShapeNest() remains defined but is not exposed. -->
-    <button class="btn bs" onclick="exportForDeepnest()" title="Export all shapes as one SVG for nesting in Deepnest/SVGnest (true-shape nesting with rotation)" style="padding:9px 12px;font-size:12px;color:#2f54eb;border-color:#2f54eb;white-space:nowrap">🔗 Deepnest</button>
+  <div style="display:flex;gap:5px;margin-top:6px;flex-wrap:wrap">
+    <button class="btn bp" onclick="optimize()" data-i18n="optimize" style="flex:1 1 100%;padding:9px;font-size:13px">▶ Optimize &amp; Cut</button>
+    <button class="btn bs" onclick="openMergeDialog()" title="Find narrow parts (≤150mm) with matching length and merge them into strips up to 800mm wide. Saves kerf and improves nesting." style="flex:1 1 auto;padding:8px 10px;font-size:11px;color:#647488;border-color:#647488;white-space:nowrap">🔗 Merge narrow</button>
+    <select id="nestRot" title="Pasukimo žingsnis — smulkesnis kampas = geriau telpa, bet lėčiau. (Su rąsto kryptimi/grain leidžiama tik 0°/180°.)" style="flex:0 1 auto;padding:8px 4px;font-size:11px;border:1px solid #534AB7;border-radius:6px;color:#534AB7;background:#fff">
+      <option value="90">↻ 90°</option>
+      <option value="45">↻ 45°</option>
+      <option value="15" selected>↻ 15°</option>
+      <option value="5">↻ 5°</option>
+      <option value="1">↻ 1°</option>
+    </select>
+    <button class="btn bs" onclick="runShapeNestWasm()" title="DXF nest: true-shape nesting (WASM engine) — nests irregular DXF parts into the sheet by their real outline, rotating to interlock. Best for non-rectangular parts." style="flex:1 1 auto;padding:8px 10px;font-size:11px;color:#534AB7;border-color:#534AB7;white-space:nowrap">🧩 DXF nest</button>
   </div>
 </div>
 <div class="main">
@@ -629,7 +637,7 @@ body.print-mode{background:#fff}
     <div class="cvw">
       <div class="cvb">
         <label><input type="checkbox" id="ssnap" checked> <span data-i18n="snap1mm">Snap 1mm</span></label>
-        <button class="rot-btn" id="rot-btn" onclick="rotateSel()" data-i18n-title="rotateTip" title="Rotate selected part 90° (R key)" style="display:none"><span data-i18n="rotateBtn">↻ Rotate (R)</span></button>
+        <button class="rot-btn" id="rot-btn" onclick="rotateSel()" data-i18n-title="rotateTip" title="Rotate selected part by the chosen ↻ step (R = clockwise, Shift+R = counter-clockwise). True shapes rotate by their real outline." style="display:none"><span data-i18n="rotateBtn">↻ Rotate (R)</span></button>
         <button class="rot-btn" id="mv-btn" onclick="openMovePopover(event)" data-i18n-title="moveTip" title="Move selected part to a different sheet" style="display:none;color:#2f54eb;border-color:#2f54eb"><span data-i18n="moveBtn">📋 Move…</span></button>
         <button class="rot-btn" id="pr-btn" onclick="printSel()" data-i18n-title="printTip" title="Print label for selected part (P key)" style="display:none;color:#2f54eb;border-color:#2f54eb"><span data-i18n="printBtn">🏷 Print (P)</span></button>
         <button class="btn bs" onclick="openBatchPrint()" data-i18n-title="printAllTip" title="Print labels for every part on this sheet (or all sheets)" style="margin-left:auto;font-size:10px;padding:3px 8px;color:#2f54eb;border-color:#2f54eb"><span data-i18n="printAllBtn">🏷 Print all labels</span></button>
@@ -1378,6 +1386,7 @@ var XLSX = (function(){
 var parts=[],layouts=[],curSheet=0,hovP=null,selP=null;
 var boards=[],bId=1;
 var dragging=false,dragP=null,dragOX=0,dragOY=0,SC=1;
+var _rotating=false,_rotBase=null,_rotCenter=null,_rotStartAng=0,_rotHandle=null;
 var opIdMap={}; // partName -> {op1, op2}
 var partGroups=[]; // [{id, name, color, partKeys:[]}]  — groupId stored on each part
 var gId=1;
@@ -5807,6 +5816,18 @@ function onMachineModeChange(){
 
 // Build the part's outline + holes as y-DOWN, bbox-local mm polygons — the
 // same frame the canvas uses (xformShape flips stored y-up shapes to y-down).
+// Real material area a placement uses: true polygon area (minus holes) for
+// shape-nested parts, bounding box for plain rectangular parts.
+function _placementUsedArea(p){
+  if(p.nestPoly && p.nestPoly.length>2){
+    function ringA(poly){ var ar=0,n=poly.length; for(var i=0;i<n;i++){ var a=poly[i], b=poly[(i+1)%n]; ar+=a.x*b.y-b.x*a.y; } return Math.abs(ar)/2; }
+    var area=ringA(p.nestPoly);
+    (p.nestHoles||[]).forEach(function(h){ if(h&&h.length>2) area-=ringA(h); });
+    return Math.max(0, area);
+  }
+  return p.pw*p.ph;
+}
+
 function _partNestGeom(part){
   if(part.shape && part.shape.length>=3){
     var outer=part.shape.map(function(pt){ return {x:pt.x, y:part.w-pt.y}; });
@@ -5814,6 +5835,140 @@ function _partNestGeom(part){
     return {outer:outer, holes:holes};
   }
   return {outer:[{x:0,y:0},{x:part.l,y:0},{x:part.l,y:part.w},{x:0,y:part.w}], holes:[]};
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// TRUE-SHAPE NESTING via WASM engine (jagua-rs + LBF bin packing)
+// Replaces the old SVGnest port. Bin packing = fixed sheets, multi-sheet
+// overflow, no overlaps. Runs per material using that material's sheet size.
+// ════════════════════════════════════════════════════════════════════════
+// The nesting engine runs in a Web Worker, so the UI (and the loading spinner)
+// stays responsive while the WASM solves — it never looks frozen.
+var _nestWk=null, _nestWkReady=null;
+function getNestWorker(){
+  if(_nestWkReady) return _nestWkReady;
+  _nestWk=new Worker('./engine/nest-worker.js', {type:'module'});
+  _nestWkReady=new Promise(function(resolve,reject){
+    var to=setTimeout(function(){reject(new Error('engine load timeout'));}, 30000);
+    _nestWk.addEventListener('message',function onready(e){
+      if(e.data&&e.data.type==='ready'){ clearTimeout(to); _nestWk.removeEventListener('message',onready); resolve(_nestWk); }
+      else if(e.data&&e.data.type==='error'){ clearTimeout(to); reject(new Error(e.data.msg||'engine error')); }
+    });
+    _nestWk.addEventListener('error',function(err){ clearTimeout(to); reject(new Error(err.message||'worker error')); });
+  });
+  return _nestWkReady;
+}
+function nestSolve(instJson, kerf){
+  return new Promise(function(resolve,reject){
+    var w=_nestWk;
+    function onmsg(e){
+      var d=e.data;
+      if(d&&d.type==='result'){ w.removeEventListener('message',onmsg); resolve(d.json); }
+      else if(d&&d.type==='error'){ w.removeEventListener('message',onmsg); reject(new Error(d.msg||'solve error')); }
+    }
+    w.addEventListener('message', onmsg);
+    w.postMessage({type:'solve', inst:instJson, kerf:kerf});
+  });
+}
+
+// Build a jagua-rs bin-packing instance (ExtBPInstance) for one material.
+function _bpInstanceForMaterial(name, mparts, uw, uh, grain){
+  // Rotation step from the selector. Grain-locked boards may only flip 0°/180°
+  // (preserves grain direction); otherwise snap at the chosen angle increment.
+  var step = parseInt((document.getElementById('nestRot')||{}).value) || 45;
+  var orient;
+  if(grain){ orient=[0.0,180.0]; }
+  else { orient=[]; for(var a=0; a<360; a+=step) orient.push(a); }
+  var items = mparts.map(function(p, idx){
+    var g=_partNestGeom(p); // {outer:[{x,y}], holes:[[{x,y}]]}  (y-up)
+    var outer = g.outer.map(function(pt){ return [pt.x, pt.y]; });
+    var shape;
+    if(g.holes && g.holes.length){
+      shape = { type:'polygon', data:{ outer:outer, inner:g.holes.map(function(h){ return h.map(function(pt){ return [pt.x,pt.y]; }); }) } };
+    } else {
+      shape = { type:'simple_polygon', data: outer };
+    }
+    return { id: idx, demand: 1, allowed_orientations: orient, shape: shape, min_quality: null };
+  });
+  var bin = { id:0, shape:{ type:'rectangle', data:{ x_min:0, y_min:0, width:uw, height:uh } },
+              stock: Math.max(1, mparts.length), cost: 1 };
+  return { name: name||'job', items: items, bins: [bin] };
+}
+
+async function runShapeNestWasm(){
+  if(!boards.length){ alert('Pridėkite medžiagos plokštę.'); return; }
+  if(!parts.length){ alert('Pridėkite detalių.'); return; }
+  if(_nestRunning) return;
+  if(layouts.length && !confirm('Pakeisti dabartinį išdėstymą tikros formos išdėstymu (Shape nest)?')) return;
+
+  var kerf=parseInt((document.getElementById('kerf')||{}).value)||3;
+  var trim=parseInt((document.getElementById('trim')||{}).value)||0;
+  var byMat={}; parts.forEach(function(p){ var m=normalizeMat(p.mat); (byMat[m]=byMat[m]||[]).push(p); });
+  var matKeys=Object.keys(byMat), newLayouts=[], unplaced=[];
+
+  _nestRunning=true; _nestCancelled=false; _nestShowProgress(matKeys.length);
+
+  try{ await getNestWorker(); }
+  catch(e){
+    _nestRunning=false; _nestHideProgress();
+    alert('Nesting variklio nepavyko įkelti: '+((e&&e.message)||e)+(self.crossOriginIsolated?'':'\n\nPerkraukite puslapį (reikia saugios izoliuotos aplinkos) ir bandykite dar kartą.'));
+    return;
+  }
+
+  for(var mi=0; mi<matKeys.length; mi++){
+    if(_nestCancelled) break;
+    var mat=matKeys[mi], mparts=byMat[mat];
+    var bd=matchBoard(mat)||boards[0];
+    var uw=Math.max(10, bd.w-2*trim), uh=Math.max(10, bd.h-2*trim);
+    var grain=!!bd.grain;
+    _nestProgressMat(mi, matKeys.length, bd.mat, 0.15);
+    var inst=_bpInstanceForMaterial(mat, mparts, uw, uh, grain);
+    var sol=null;
+    try{
+      var resStr=await nestSolve(JSON.stringify(inst), kerf);
+      sol=JSON.parse(resStr);
+    }catch(e){
+      console.error('shape-nest error', e);
+      mparts.forEach(function(p){ unplaced.push(p.origName||p.name||'?'); });
+      continue;
+    }
+    (sol.layouts||[]).forEach(function(lay){
+      var pls=[];
+      (lay.placed_items||[]).forEach(function(pi){
+        var part=mparts[pi.item_id]; if(!part) return;
+        var g=_partNestGeom(part);
+        var ang=(pi.transformation&&pi.transformation.rotation)||0;          // radians
+        var tr=(pi.transformation&&pi.transformation.translation)||[0,0];
+        var c=Math.cos(ang), s=Math.sin(ang), tx=tr[0], ty=tr[1];
+        function R(pt){ return {x: pt.x*c - pt.y*s + tx, y: pt.x*s + pt.y*c + ty}; }
+        // Place in the engine's (y-up) frame, then flip the whole layout to the app's
+        // y-down sheet frame. A single global flip preserves the engine's no-overlap
+        // guarantee, and leaves nestPoly in the y-down local coords the renderer expects.
+        var sOuter=g.outer.map(function(pt){ var q=R(pt); return {x:q.x, y:uh-q.y}; });
+        var sHoles=(g.holes||[]).map(function(h){ return h.map(function(pt){ var q=R(pt); return {x:q.x, y:uh-q.y}; }); });
+        var minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+        sOuter.forEach(function(pt){ if(pt.x<minX)minX=pt.x; if(pt.y<minY)minY=pt.y; if(pt.x>maxX)maxX=pt.x; if(pt.y>maxY)maxY=pt.y; });
+        var pw=maxX-minX, ph=maxY-minY;
+        var localOuter=sOuter.map(function(pt){ return {x:pt.x-minX, y:pt.y-minY}; });
+        var localHoles=sHoles.map(function(h){ return h.map(function(pt){ return {x:pt.x-minX, y:pt.y-minY}; }); });
+        var px=minX, py=minY;
+        var deg=ang*180/Math.PI;
+        pls.push({ part:part, x:px, y:py, pw:Math.round(pw), ph:Math.round(ph),
+                   rot:(Math.round(deg)%360!==0), color:(bd.color||'#888'),
+                   nestPoly:localOuter, nestHoles:localHoles, nestAngle:deg });
+      });
+      if(pls.length){
+        newLayouts.push({ idx:newLayouts.length, uw:uw, uh:uh, sw:bd.w, sh:bd.h, trim:trim,
+          matName:bd.mat, matColor:bd.color||'#888', grainLocked:grain,
+          placements:pls, kerf:kerf, machine:'cnc', shapeNest:true });
+      }
+    });
+    _nestProgressMat(mi, matKeys.length, bd.mat, 1);
+  }
+
+  _nestRunning=false; _nestHideProgress();
+  if(_nestCancelled) return;
+  _finishShapeNest(newLayouts, unplaced);
 }
 
 function runShapeNest(){
@@ -5968,11 +6123,15 @@ function _nestShowProgress(matCount){
     ov.id='nest-prog-ov';
     ov.style.cssText='position:fixed;inset:0;background:rgba(28,26,20,.55);z-index:99999;display:flex;align-items:center;justify-content:center;font-family:sans-serif';
     ov.innerHTML=
-      '<div style="background:#fff;border-radius:14px;padding:24px 28px;min-width:340px;max-width:90vw;box-shadow:0 12px 40px rgba(0,0,0,.3)">'
-      +'<div style="font-size:15px;font-weight:600;color:#1b1e26;margin-bottom:4px">🧩 Shape nesting…</div>'
-      +'<div id="nest-prog-sub" style="font-size:12px;color:#667085;margin-bottom:14px">Starting…</div>'
+      '<style>@keyframes nestspin{to{transform:rotate(360deg)}}</style>'
+      +'<div style="background:#fff;border-radius:14px;padding:24px 28px;min-width:340px;max-width:90vw;box-shadow:0 12px 40px rgba(0,0,0,.3)">'
+      +'<div style="display:flex;align-items:center;gap:12px;margin-bottom:6px">'
+        +'<div style="width:22px;height:22px;border:3px solid #e3e0f5;border-top-color:#534AB7;border-radius:50%;animation:nestspin .8s linear infinite;flex-shrink:0"></div>'
+        +'<div style="font-size:15px;font-weight:600;color:#1b1e26">🧩 DXF nesting…</div>'
+      +'</div>'
+      +'<div id="nest-prog-sub" style="font-size:12px;color:#667085;margin-bottom:14px">Pradedama…</div>'
       +'<div style="height:10px;background:#e9edf3;border-radius:6px;overflow:hidden"><div id="nest-prog-bar" style="height:100%;width:0;background:#534AB7;transition:width .2s"></div></div>'
-      +'<div style="display:flex;justify-content:flex-end;margin-top:16px"><button id="nest-prog-cancel" style="padding:7px 16px;border:1px solid #B84040;color:#B84040;background:#fff;border-radius:8px;font-size:13px;cursor:pointer">Cancel</button></div>'
+      +'<div style="display:flex;justify-content:flex-end;margin-top:16px"><button id="nest-prog-cancel" style="padding:7px 16px;border:1px solid #B84040;color:#B84040;background:#fff;border-radius:8px;font-size:13px;cursor:pointer">Atšaukti</button></div>'
       +'</div>';
     document.body.appendChild(ov);
     ov.querySelector('#nest-prog-cancel').onclick=_nestCancel;
@@ -7189,7 +7348,7 @@ function renderCanvas(idx){
 function draw(lay){
   var cv=document.getElementById('cv'),W=cv.width,H=cv.height,ctx=cv.getContext('2d');
   var tx=lay.trim*SC,ty=lay.trim*SC,uw=lay.uw*SC,uh=lay.uh*SC;
-  ctx.clearRect(0,0,W,H);ctx.fillStyle='#CEC9BB';ctx.fillRect(0,0,W,H);
+  ctx.clearRect(0,0,W,H);ctx.fillStyle='#CEC9BB';ctx.fillRect(0,0,W,H);_rotHandle=null;
   if(lay.trim>0){ctx.fillStyle='rgba(0,0,0,.05)';ctx.fillRect(0,0,W,ty);ctx.fillRect(0,H-ty,W,ty);ctx.fillRect(0,0,tx,H);ctx.fillRect(W-tx,0,tx,H);}
   ctx.fillStyle='#EDE9DF';ctx.fillRect(tx,ty,uw,uh);
   if(lay.trim>0){ctx.strokeStyle='#B0A898';ctx.lineWidth=1;ctx.setLineDash([4,4]);ctx.strokeRect(tx+.5,ty+.5,uw-1,uh-1);ctx.setLineDash([]);ctx.fillStyle='rgba(0,0,0,.25)';ctx.font='9px monospace';ctx.textAlign='left';ctx.textBaseline='top';ctx.fillText('trim '+lay.trim+'mm',3,2);}
@@ -7315,9 +7474,6 @@ function draw(lay){
     var fillColor = isMerged ? '#C28F5E' : p.color;
     ctx.fillStyle=fillColor+fillAlpha;
     if(hasShape){
-      // Faint bbox fill so the nested area is still visible
-      ctx.fillStyle=p.color+'22';
-      ctx.fillRect(x,y,w,h);
       // Fill outline with holes punched out (even-odd rule)
       traceShapePathWithHoles(ctx,p,x,y,SC);
       ctx.fillStyle=p.color+fillAlpha;
@@ -7339,9 +7495,6 @@ function draw(lay){
           ctx.stroke();
         }
       }
-      // Dashed bbox outline so user can see the nesting footprint
-      ctx.strokeStyle='rgba(0,0,0,.18)';ctx.lineWidth=1;ctx.setLineDash([3,3]);
-      ctx.strokeRect(x+.5,y+.5,w-1,h-1);ctx.setLineDash([]);
     } else {
       ctx.fillRect(x,y,w,h);
       if(grp){ctx.strokeStyle=grp.color;ctx.lineWidth=isSel?3:2;ctx.strokeRect(x+1,y+1,w-2,h-2);}
@@ -7442,15 +7595,16 @@ function draw(lay){
       ctx.font=fs+'px monospace';ctx.fillStyle='rgba(0,0,0,.45)';ctx.fillText(p.pw+'×'+p.ph,x+w/2,y+h/2+(fs*.6),w-8);
     }
     // Collision flash for dragged piece
-    if(isDragged&&checkCollision(lay,p,p.x,p.y)){
+    if(isDragged&&!p.nestPoly&&checkCollision(lay,p,p.x,p.y)){
       ctx.fillStyle='rgba(200,40,40,.18)';ctx.fillRect(x,y,w,h);
       ctx.strokeStyle='#c82828';ctx.lineWidth=2;ctx.strokeRect(x+.5,y+.5,w-1,h-1);
     }
-    if(isSel)[[x,y],[x+w,y],[x+w,y+h],[x,y+h]].forEach(function(pt){ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(pt[0],pt[1],3.5,0,Math.PI*2);ctx.fill();ctx.strokeStyle='#333';ctx.lineWidth=1;ctx.stroke();});
+    if(isSel&&!p.nestPoly)[[x,y],[x+w,y],[x+w,y+h],[x,y+h]].forEach(function(pt){ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(pt[0],pt[1],3.5,0,Math.PI*2);ctx.fill();ctx.strokeStyle='#333';ctx.lineWidth=1;ctx.stroke();});
+    if(isSel && p.nestPoly){ var _rhx=x+w,_rhy=y,_rhr=9; ctx.beginPath(); ctx.arc(_rhx,_rhy,_rhr,0,Math.PI*2); ctx.fillStyle='#2f54eb'; ctx.fill(); ctx.lineWidth=2; ctx.strokeStyle='#fff'; ctx.stroke(); ctx.fillStyle='#fff'; ctx.font='bold 12px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('↻',_rhx,_rhy+0.5); _rotHandle={x:_rhx,y:_rhy,r:_rhr+7}; }
     // Group label badge in corner
     if(grp&&w>30&&h>16){ctx.fillStyle=grp.color;ctx.fillRect(x+1,y+1,Math.min(w-2,grp.name.length*6+6),11);ctx.fillStyle='#fff';ctx.font='bold 8px sans-serif';ctx.textAlign='left';ctx.textBaseline='top';ctx.fillText(grp.name,x+3,y+2);}
   });
-  var used=lay.placements.reduce(function(a,p){return a+p.pw*p.ph;},0);
+  var used=lay.placements.reduce(function(a,p){return a+_placementUsedArea(p);},0);
   var eff=lay.uw*lay.uh>0?Math.round(used/(lay.uw*lay.uh)*100):0;
   ctx.fillStyle='rgba(0,0,0,.2)';ctx.fillRect(W-60,H-13,58,10);
   ctx.fillStyle=eff>75?'#4A9E5C':eff>50?'#B87030':'#B84040';ctx.fillRect(W-60,H-13,Math.round(58*eff/100),10);
@@ -7480,6 +7634,8 @@ function getLayoutKerf(lay){
 
 // ── Snap to grid of candidate positions (corners of all other parts + kerf) ──
 function snapToCorner(lay,movingP,rawX,rawY){
+  // True-shape parts place freely (no bounding-box snapping) so they can tuck into curves.
+  if(movingP&&movingP.nestPoly){ return {x:Math.max(0,Math.min(lay.uw-movingP.pw,rawX)), y:Math.max(0,Math.min(lay.uh-movingP.ph,rawY))}; }
   var K=getLayoutKerf(lay);
   var UW=lay.uw,UH=lay.uh,pw=movingP.pw,ph=movingP.ph;
   // Build candidate X and Y coords from all other part edges + kerf
@@ -7509,6 +7665,8 @@ function snapToCorner(lay,movingP,rawX,rawY){
 
 // ── Push-away: resolve collision by nudging to nearest free spot ──
 function resolveCollision(lay,movingP,rawX,rawY){
+  // True-shape parts: free placement (bounding-box collision would block tucking into curves).
+  if(movingP&&movingP.nestPoly){ return {x:Math.max(0,Math.min(lay.uw-movingP.pw,rawX)), y:Math.max(0,Math.min(lay.uh-movingP.ph,rawY))}; }
   var K=getLayoutKerf(lay),pw=movingP.pw,ph=movingP.ph,UW=lay.uw,UH=lay.uh;
   if(!checkCollision(lay,movingP,rawX,rawY))return{x:rawX,y:rawY};
   // Try snap-to-corner first
@@ -7539,7 +7697,17 @@ function bindCanvas(lay){
   function hit(mx,my){var tx=lay.trim*SC,ty=lay.trim*SC,f=null;lay.placements.forEach(function(p){var x=tx+p.x*SC,y=ty+p.y*SC,w=p.pw*SC,h=p.ph*SC;if(mx>=x&&mx<=x+w&&my>=y&&my<=y+h)f=p;});return f;}
   var _dragMoved=false;
   cv.onmousemove=function(e){
-    var pos=gp(e),h=hit(pos.mx,pos.my);
+    var pos=gp(e);
+    if(_rotating&&selP){
+      _dragMoved=true;
+      var smx=(pos.mx-lay.trim*SC)/SC, smy=(pos.my-lay.trim*SC)/SC;
+      var ang=Math.atan2(smy-_rotCenter.y, smx-_rotCenter.x);
+      var deltaDeg=(ang-_rotStartAng)*180/Math.PI;
+      if(!e.shiftKey){ var st=parseInt((document.getElementById('nestRot')||{}).value)||15; deltaDeg=Math.round(deltaDeg/st)*st; }
+      _applyRotateFromBase(selP,_rotBase,deltaDeg,_rotCenter.x,_rotCenter.y);
+      draw(lay); return;
+    }
+    var h=hit(pos.mx,pos.my);
     if(!dragging&&h!==hovP){hovP=h;draw(lay);}
     if(dragging&&dragP){
       _dragMoved=true;
@@ -7566,9 +7734,24 @@ function bindCanvas(lay){
     }else if(!dragging){if(tip)tip.style.display='none';cv.style.cursor=h?'grab':'crosshair';}
   };
   cv.onmousedown=function(e){
-    console.log('[FF] mousedown button='+e.button);
     if(e.button!==0)return;
-    var pos=gp(e),h=hit(pos.mx,pos.my);
+    var pos=gp(e);
+    // Rotation handle grabbed? (true-shape parts only)
+    if(_rotHandle && selP && selP.nestPoly){
+      var _ddx=pos.mx-_rotHandle.x, _ddy=pos.my-_rotHandle.y;
+      if(_ddx*_ddx+_ddy*_ddy <= _rotHandle.r*_rotHandle.r){
+        _rotating=true; _dragMoved=false;
+        var _cxA=selP.x+selP.pw/2, _cyA=selP.y+selP.ph/2;
+        _rotCenter={x:_cxA,y:_cyA};
+        _rotBase={ poly:selP.nestPoly.map(function(q){return {x:q.x,y:q.y};}),
+                   holes:(selP.nestHoles||[]).map(function(h){return h.map(function(q){return {x:q.x,y:q.y};});}),
+                   pw:selP.pw, ph:selP.ph, angle:selP.nestAngle||0 };
+        var _smx=(pos.mx-lay.trim*SC)/SC, _smy=(pos.my-lay.trim*SC)/SC;
+        _rotStartAng=Math.atan2(_smy-_cyA,_smx-_cxA);
+        cv.style.cursor='grabbing'; e.preventDefault(); return;
+      }
+    }
+    var h=hit(pos.mx,pos.my);
     _dragMoved=false;
     if(h){
       selP=h;dragP=h;dragging=true;
@@ -7591,7 +7774,13 @@ function bindCanvas(lay){
     e.preventDefault();
   };
   cv.onmouseup=function(e){
-    console.log('[FF] mouseup button='+(e&&e.button)+' moved='+_dragMoved);
+    if(_rotating){
+      _rotating=false;
+      var rr=resolveCollision(lay,selP,selP.x,selP.y);
+      selP.x=rr.x; selP.y=rr.y;
+      draw(lay);scheduleExportRebuild();scheduleSave();
+      cv.style.cursor='crosshair'; return;
+    }
     if(dragging&&dragP){
       if(_dragMoved){
         var resolved=resolveCollision(lay,dragP,dragP.x,dragP.y);
@@ -7617,6 +7806,7 @@ function bindCanvas(lay){
     if(h){e.preventDefault();openModal(h,lay);return false;}
   };
   cv.onmouseleave=function(){
+    if(_rotating){ _rotating=false; var rl=resolveCollision(lay,selP,selP.x,selP.y); selP.x=rl.x; selP.y=rl.y; draw(lay);scheduleExportRebuild();scheduleSave(); }
     if(dragging&&dragP){
       var r=resolveCollision(lay,dragP,dragP.x,dragP.y);
       dragP.x=r.x;dragP.y=r.y;
@@ -7628,17 +7818,61 @@ function bindCanvas(lay){
 }
 
 // ── Rotation ──
-function rotateSel(){
+// Rotate a true-shape placement's actual outline (+ holes) about its centre by
+// deltaDeg, recomputing its bounding box and keeping it pinned in place.
+function _rotatePlacementShape(p, deltaDeg){
+  var th=deltaDeg*Math.PI/180, c=Math.cos(th), s=Math.sin(th);
+  var cx=p.pw/2, cy=p.ph/2;
+  function rot(pt){ var dx=pt.x-cx, dy=pt.y-cy; return {x: cx+dx*c-dy*s, y: cy+dx*s+dy*c}; }
+  var outer=(p.nestPoly||[]).map(rot);
+  var holes=(p.nestHoles||[]).map(function(h){ return h.map(rot); });
+  var minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+  outer.forEach(function(q){ if(q.x<minX)minX=q.x; if(q.y<minY)minY=q.y; if(q.x>maxX)maxX=q.x; if(q.y>maxY)maxY=q.y; });
+  if(!isFinite(minX)) return;
+  var absCX=p.x+p.pw/2, absCY=p.y+p.ph/2;          // keep centre fixed
+  p.nestPoly=outer.map(function(q){ return {x:q.x-minX, y:q.y-minY}; });
+  p.nestHoles=holes.map(function(h){ return h.map(function(q){ return {x:q.x-minX, y:q.y-minY}; }); });
+  p.pw=Math.round(maxX-minX); p.ph=Math.round(maxY-minY);
+  p.x=absCX-p.pw/2; p.y=absCY-p.ph/2;
+  p.nestAngle=(((p.nestAngle||0)+deltaDeg)%360+360)%360;
+  p.rot=(Math.round(p.nestAngle)%360!==0);
+}
+
+// Rotate a placement's outline to base-angle + deltaDeg, pivoting about a fixed
+// sheet-space centre. `base` is a snapshot taken when the drag started, so the
+// result doesn't drift as the mouse moves.
+function _applyRotateFromBase(p, base, deltaDeg, cxAbs, cyAbs){
+  var th=deltaDeg*Math.PI/180, c=Math.cos(th), s=Math.sin(th);
+  var bcx=base.pw/2, bcy=base.ph/2;
+  function rot(pt){ var dx=pt.x-bcx, dy=pt.y-bcy; return {x:bcx+dx*c-dy*s, y:bcy+dx*s+dy*c}; }
+  var outer=base.poly.map(rot);
+  var holes=base.holes.map(function(h){ return h.map(rot); });
+  var minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+  outer.forEach(function(q){ if(q.x<minX)minX=q.x; if(q.y<minY)minY=q.y; if(q.x>maxX)maxX=q.x; if(q.y>maxY)maxY=q.y; });
+  if(!isFinite(minX))return;
+  p.nestPoly=outer.map(function(q){ return {x:q.x-minX, y:q.y-minY}; });
+  p.nestHoles=holes.map(function(h){ return h.map(function(q){ return {x:q.x-minX, y:q.y-minY}; }); });
+  p.pw=Math.round(maxX-minX); p.ph=Math.round(maxY-minY);
+  p.x=cxAbs-p.pw/2; p.y=cyAbs-p.ph/2;
+  p.nestAngle=(((base.angle+deltaDeg)%360)+360)%360;
+  p.rot=(Math.round(p.nestAngle)%360!==0);
+}
+
+function rotateSel(dir){
   if(!selP)return;
   var lay=layouts[curSheet];if(!lay)return;
-  // Check if part's group has grain lock — warn but allow override
-  var grp=selP.part.groupId?partGroups.find(function(g){return g.id===selP.part.groupId;}):null;
-  // Swap pw/ph
-  var tmp=selP.pw;selP.pw=selP.ph;selP.ph=tmp;
-  selP.rot=!selP.rot;
+  if(selP.nestPoly){
+    // True shape: rotate the real outline by the chosen snap step (Shift = reverse).
+    var step=parseInt((document.getElementById('nestRot')||{}).value)||15;
+    _rotatePlacementShape(selP, (dir<0?-step:step));
+  } else {
+    // Rectangular part: keep the simple 90° box swap.
+    var tmp=selP.pw;selP.pw=selP.ph;selP.ph=tmp;
+    selP.rot=!selP.rot;
+  }
   // Clamp to board
-  selP.x=Math.max(0,Math.min(lay.uw-selP.pw,selP.x));
-  selP.y=Math.max(0,Math.min(lay.uh-selP.ph,selP.y));
+  selP.x=Math.max(0,Math.min(Math.max(0,lay.uw-selP.pw),selP.x));
+  selP.y=Math.max(0,Math.min(Math.max(0,lay.uh-selP.ph),selP.y));
   // Resolve collision after rotate
   var resolved=resolveCollision(lay,selP,selP.x,selP.y);
   selP.x=resolved.x;selP.y=resolved.y;
@@ -7661,7 +7895,22 @@ document.addEventListener('keydown',function(e){
     if((k==='z' && e.shiftKey) || k==='y'){ if(inField)return; e.preventDefault(); redo(); return; }
   }
   if(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA')return;
-  if(e.key==='r'||e.key==='R'){e.preventDefault();rotateSel();}
+  if(e.key==='r'||e.key==='R'){e.preventDefault();rotateSel(e.shiftKey?-1:1);}
+  // Arrow keys nudge the selected part (1mm; Shift = 10mm).
+  if(selP && (e.key==='ArrowUp'||e.key==='ArrowDown'||e.key==='ArrowLeft'||e.key==='ArrowRight')){
+    e.preventDefault();
+    var layA=layouts[curSheet];
+    if(layA){
+      var stepmm=e.shiftKey?10:1;
+      if(e.key==='ArrowLeft')selP.x-=stepmm;
+      else if(e.key==='ArrowRight')selP.x+=stepmm;
+      else if(e.key==='ArrowUp')selP.y-=stepmm;
+      else if(e.key==='ArrowDown')selP.y+=stepmm;
+      selP.x=Math.max(0,Math.min(Math.max(0,layA.uw-selP.pw),selP.x));
+      selP.y=Math.max(0,Math.min(Math.max(0,layA.uh-selP.ph),selP.y));
+      draw(layA);scheduleExportRebuild();scheduleSave();
+    }
+  }
   if(e.key==='p'||e.key==='P'){e.preventDefault();printSel();}
   if(e.key==='Escape'){selP=null;var lay=layouts[curSheet];if(lay)draw(lay);}
   if((e.key==='Delete'||e.key==='Backspace')&&selP){
