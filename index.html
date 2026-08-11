@@ -715,6 +715,15 @@ body.print-mode{background:#fff}
     <span id="pw-sel-count" style="font-size:11px;color:#667085;font-family:monospace"></span>
     <button class="btn bs" onclick="pwSwapSelected()" title="Swap L and W for all selected parts (also rotates DXF shapes 90°)">⇆ Swap L/W</button>
     <button class="btn bs" onclick="pwMergeSelected()" title="Merge the selected parts into one strip (they must share a width or a length)" style="color:#647488;border-color:#647488">🔗 Merge selected</button>
+    <label style="display:flex;align-items:center;gap:4px;font-size:11px;color:#667085;white-space:nowrap" title="Blade width consumed between the pieces inside a merged strip. Decimals allowed — a 3.2 mm blade with set often measures ~3.3 mm. Blank = use the saw kerf above.">
+      ✂ merge kerf
+      <input id="pw-merge-kerf" type="number" step="0.1" min="0" max="20" placeholder="3" style="width:58px;padding:2px 4px;font-size:11px;text-align:center" onchange="pwSetMergeKerf(this.value)">
+      <span style="color:#98a2b3">mm</span>
+    </label>
+    <!-- Replace rectangles from a report list with real DXF outlines -->
+    <button class="btn bs" onclick="pwAssignDXFPick()" title="Give the selected parts their true shape from DXF files. Files are matched to parts by name; nesting then uses the real outline instead of the bounding rectangle." style="color:#2f54eb;border-color:#2f54eb">📐 Assign DXF shape</button>
+    <button class="btn bs" onclick="pwRemoveShape()" title="Drop the DXF outline from the selected parts and go back to a plain rectangle">▭ Remove shape</button>
+    <input type="file" id="pw-dxf-in" accept=".dxf,.DXF" multiple style="display:none" onchange="pwAssignDXFFiles(this)">
     <div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap">
       <span style="font-size:11px;color:#667085">Rotation:</span>
       <button class="btn bs" onclick="pwSetRotation('auto')" title="Selected parts follow the material's grain setting (default)">⟳ Auto</button>
@@ -751,6 +760,34 @@ body.print-mode{background:#fff}
   <div class="dxf-foot">
     <button class="btn bs" onclick="closeDXFImportDialog()">Cancel</button>
     <button class="btn bp" onclick="confirmDXFImport()" style="flex:1">✓ Import parts</button>
+  </div>
+</div>
+</div>
+
+<!-- ASSIGN DXF SHAPE TO EXISTING PARTS -->
+<div class="dxf-overlay" id="dxfassign-overlay" onclick="if(event.target===this)closeDXFAssignDialog()">
+<div class="dxf-box" style="width:820px;max-width:96vw">
+  <div class="dxf-head">
+    <span style="font-size:16px">📐</span>
+    <h3 style="flex:1;font-size:14px;font-weight:600" data-i18n="dxfAssignTitle">Assign DXF shapes to parts</h3>
+    <button class="btn bs br" onclick="closeDXFAssignDialog()">✕</button>
+  </div>
+  <div id="dxfassign-intro" style="padding:10px 16px 0;font-size:11px;color:#667085"></div>
+  <div style="padding:8px 16px;display:flex;gap:16px;align-items:center;flex-wrap:wrap;border-bottom:1px solid #e9edf3">
+    <label style="display:flex;align-items:center;gap:5px;font-size:11px;cursor:pointer">
+      <input type="checkbox" id="dxfassign-setlw" checked style="width:auto" onchange="renderDXFAssign()">
+      <span data-i18n="dxfAssignSetLW">Take L/W from the DXF outline</span>
+    </label>
+    <label style="display:flex;align-items:center;gap:5px;font-size:11px;cursor:pointer">
+      <input type="checkbox" id="dxfassign-autorot" checked style="width:auto" onchange="dxfAssignAutoRotate()">
+      <span data-i18n="dxfAssignAutoRot">Auto-rotate 90° when that matches the part better</span>
+    </label>
+    <span id="dxfassign-stat" style="font-size:11px;font-family:monospace;color:#667085;margin-left:auto"></span>
+  </div>
+  <div class="dxf-body" id="dxfassign-rows" style="padding:0"></div>
+  <div class="dxf-foot">
+    <button class="btn bs" onclick="closeDXFAssignDialog()">Cancel</button>
+    <button class="btn bp" onclick="confirmDXFAssign()" style="flex:1" data-i18n="dxfAssignApply">✓ Apply shapes</button>
   </div>
 </div>
 </div>
@@ -1538,7 +1575,30 @@ var I18N={
     confirmDeleteSelected:'Delete {n} selected parts?',
     confirmDeleteProject:'Delete project "{name}"? This cannot be undone.',
     enterValidNumber:'Enter a valid number',
-    lwLocked:'Length/width are locked for DXF-imported parts (they come from the shape). Re-import the DXF if dimensions need to change.',
+    lwLocked:'Length/width come from the DXF outline for shaped parts. Use "▭ Remove shape" in the Parts Manager to go back to a plain rectangle, or assign a different DXF.',
+    dxfAssignTitle:'Assign DXF shapes to parts',
+    dxfAssignSetLW:'Take L/W from the DXF outline',
+    dxfAssignAutoRot:'Auto-rotate 90° when that matches the part better',
+    dxfAssignApply:'✓ Apply shapes',
+    dxfAssignIntroSel:'Matching {n} DXF file(s) against the {m} selected part(s). Each file replaces that part\u2019s rectangle with its real outline — name, material, quantity and edgebands stay as they are.',
+    dxfAssignIntroAll:'Nothing was selected, so all {m} part(s) are candidates. Each file replaces that part\u2019s rectangle with its real outline — name, material, quantity and edgebands stay as they are.',
+    dxfAssignSuspect:'⚠ outline read as {ol}×{ow} but the drawing spans {dl}×{dw} — the real outline may not close (unsupported entity or a gap)',
+    dxfAssignSkip:'— skip this file —',
+    dxfAssignMatch:'✓ matches',
+    dxfAssignRotated:'↻ rotated to match',
+    dxfAssignResize:'⚠ resizes {ol}×{ow} → {nl}×{nw}',
+    dxfAssignNoTarget:'no part chosen',
+    dxfAssignDup:'⚠ same part chosen twice',
+    dxfAssignNone:'Choose at least one part to apply a shape to.',
+    dxfAssignDone:'✓ {n} part(s) given a DXF shape',
+    dxfAssignNoSel:'No shapes to apply — every file is set to skip.',
+    dxfAssignParseFail:'⚠ {f}: no closed shape found in this DXF',
+    dxfAssignHoles:'{n} hole(s)',
+    removeShapeNone:'Select the parts whose DXF shape you want to drop, then click ▭ Remove shape.',
+    removeShapeNoneShaped:'None of the selected parts has a DXF shape.',
+    removeShapeDone:'✓ {n} part(s) back to a plain rectangle',
+    removeShapeConfirm:'Drop the DXF outline from {n} part(s)? They go back to plain {l}×{w} rectangles.',
+    assignDXFNoSel:'Select the parts you want to shape first — or clear the selection to match against every part.',
     enterLW:'Enter length and width',
     undoTip:'Undo (Ctrl+Z)',
     redoTip:'Redo (Ctrl+Shift+Z)',
@@ -1682,7 +1742,30 @@ var I18N={
     confirmDeleteSelected:'Ištrinti {n} pažymėtas detales?',
     confirmDeleteProject:'Ištrinti projektą „{name}"? Veiksmas negrįžtamas.',
     enterValidNumber:'Įveskite teisingą skaičių',
-    lwLocked:'Ilgis ir plotis užrakinti iš DXF importuotoms detalėms (jie paimti iš formos). Jei reikia kitų matmenų — importuokite DXF iš naujo.',
+    lwLocked:'Detalėms su forma ilgis ir plotis imami iš DXF kontūro. Norėdami grąžinti paprastą stačiakampį, spauskite „▭ Pašalinti formą" detalių valdyme, arba priskirkite kitą DXF.',
+    dxfAssignTitle:'Priskirti DXF formas detalėms',
+    dxfAssignSetLW:'Imti ilgį/plotį iš DXF kontūro',
+    dxfAssignAutoRot:'Automatiškai pasukti 90°, jei taip labiau atitinka detalę',
+    dxfAssignApply:'✓ Priskirti formas',
+    dxfAssignIntroSel:'Derinama {n} DXF failas(-ai) su {m} pažymėta(-omis) detale(-ėmis). Kiekvienas failas pakeičia detalės stačiakampį tikruoju kontūru — pavadinimas, medžiaga, kiekis ir briaunos nesikeičia.',
+    dxfAssignIntroAll:'Nieko nepažymėta, todėl tinka visos {m} detalės. Kiekvienas failas pakeičia detalės stačiakampį tikruoju kontūru — pavadinimas, medžiaga, kiekis ir briaunos nesikeičia.',
+    dxfAssignSuspect:'⚠ kontūras nuskaitytas {ol}×{ow}, bet brėžinys apima {dl}×{dw} — tikrasis kontūras greičiausiai neužsidaro (nepalaikomas elementas arba tarpas)',
+    dxfAssignSkip:'— praleisti šį failą —',
+    dxfAssignMatch:'✓ sutampa',
+    dxfAssignRotated:'↻ pasukta, kad sutaptų',
+    dxfAssignResize:'⚠ keisis {ol}×{ow} → {nl}×{nw}',
+    dxfAssignNoTarget:'detalė nepasirinkta',
+    dxfAssignDup:'⚠ ta pati detalė pasirinkta du kartus',
+    dxfAssignNone:'Pasirinkite bent vieną detalę, kuriai priskirti formą.',
+    dxfAssignDone:'✓ {n} detalei(-ėms) priskirta DXF forma',
+    dxfAssignNoSel:'Nėra ką priskirti — visi failai pažymėti praleisti.',
+    dxfAssignParseFail:'⚠ {f}: šiame DXF nerasta uždaro kontūro',
+    dxfAssignHoles:'{n} skylė(-ės)',
+    removeShapeNone:'Pažymėkite detales, kurių DXF formą norite pašalinti, tada spauskite ▭ Pašalinti formą.',
+    removeShapeNoneShaped:'Nė viena pažymėta detalė neturi DXF formos.',
+    removeShapeDone:'✓ {n} detalė(-ės) grąžintos į paprastą stačiakampį',
+    removeShapeConfirm:'Pašalinti DXF kontūrą iš {n} detalės(-ių)? Jos taps paprastais {l}×{w} stačiakampiais.',
+    assignDXFNoSel:'Pirma pažymėkite detales, kurioms norite priskirti formą — arba nuimkite žymėjimą, kad būtų tikrinamos visos detalės.',
     enterLW:'Įveskite ilgį ir plotį',
     undoTip:'Atšaukti (Ctrl+Z)',
     redoTip:'Pakartoti (Ctrl+Shift+Z)',
@@ -2057,7 +2140,7 @@ function whComboClose(){ var p=document.getElementById('wh-dd'); if(p)p.style.di
 // Seeds new boards, new-project cut settings, currency, prices, and the
 // measurement unit used for board sheet dimensions.
 // ════════════════════════════════════════════════════════════════
-var ND_DEFAULTS={unit:'mm',boardW:2800,boardH:2070,thickness:18,qty:15,kerf:3,kerfCnc:4,trim:15,trimCnc:15,machineMode:'cnc',currency:'€',priceM2:0,priceMatMarkup:0,priceCutM:0,pricePart:0,priceEdge:0};
+var ND_DEFAULTS={unit:'mm',boardW:2800,boardH:2070,thickness:18,qty:15,kerf:3,kerfCnc:4,mergeKerf:null,trim:15,trimCnc:15,machineMode:'cnc',currency:'€',priceM2:0,priceMatMarkup:0,priceCutM:0,pricePart:0,priceEdge:0};
 var ND=(function(){try{return Object.assign({},ND_DEFAULTS,JSON.parse(localStorage.getItem('nestDefaults')||'{}'));}catch(e){return Object.assign({},ND_DEFAULTS);}})();
 function saveND(){try{localStorage.setItem('nestDefaults',JSON.stringify(ND));}catch(e){}}
 // Unit conversion — mm is the internal/canonical unit everywhere; these only
@@ -3461,7 +3544,7 @@ function parseDXFText(text){
   function commit(){
     if(!cur)return;
     if(cur.type==='POLYLINE'){cur.vertices=verts||[];entities.push(cur);}
-    else if(cur.type==='LWPOLYLINE'||cur.type==='LINE'||cur.type==='ARC'||cur.type==='CIRCLE')entities.push(cur);
+    else if(cur.type==='LWPOLYLINE'||cur.type==='LINE'||cur.type==='ARC'||cur.type==='CIRCLE'||cur.type==='SPLINE')entities.push(cur);
     cur=null;verts=null;
   }
   while(idx<pairs.length){
@@ -3483,6 +3566,7 @@ function parseDXFText(text){
       commit();
       if(v==='POLYLINE'){cur={type:'POLYLINE',closed:false};verts=[];}
       else if(v==='LWPOLYLINE')cur={type:'LWPOLYLINE',vertices:[],closed:false};
+      else if(v==='SPLINE')cur={type:'SPLINE',cps:[],fits:[],knots:[],weights:[],deg:3,flags:0};
       else if(v==='LINE'||v==='ARC'||v==='CIRCLE')cur={type:v};
       idx++;continue;
     }
@@ -3503,6 +3587,17 @@ function parseDXFText(text){
       if(c===10)cur.cx=parseFloat(v);
       else if(c===20)cur.cy=parseFloat(v);
       else if(c===40)cur.r=parseFloat(v);
+    } else if(cur.type==='SPLINE'){
+      // 70 flags (bit1=closed) · 71 degree · 40 knots · 41 weights
+      // 10/20 control points · 11/21 fit points
+      if(c===70)cur.flags=parseInt(v,10)||0;
+      else if(c===71)cur.deg=parseInt(v,10)||3;
+      else if(c===40)cur.knots.push(parseFloat(v));
+      else if(c===41)cur.weights.push(parseFloat(v));
+      else if(c===10)cur._cx=parseFloat(v);
+      else if(c===20)cur.cps.push({x:cur._cx,y:parseFloat(v)});
+      else if(c===11)cur._fx=parseFloat(v);
+      else if(c===21)cur.fits.push({x:cur._fx,y:parseFloat(v)});
     } else if(cur.type==='POLYLINE'){
       if(c===70)cur.closed=!!(parseInt(v,10)&1);
     } else if(cur.type==='LWPOLYLINE'){
@@ -3533,6 +3628,59 @@ function _tessBulge(p1,p2,b){
   var sw=a2-a1;
   if(b>0){while(sw<0)sw+=2*Math.PI;}else{while(sw>0)sw-=2*Math.PI;}
   var out=[];for(var i=0;i<=n;i++){var a=a1+sw*i/n;out.push({x:cx+r*Math.cos(a),y:cy+r*Math.sin(a)});}
+  return out;
+}
+// ── SPLINE (NURBS) support ─────────────────────────────────────────────────
+// CAD exports routinely draw curved part edges as SPLINE rather than as arcs or
+// polylines. Without this the outline chain breaks at every spline, never
+// closes, and the part falls back to whatever small closed shape exists — a
+// dowel hole — which is why such a part measured 8×8 mm.
+// Evaluate one point of a (possibly rational) B-spline with de Boor's algorithm.
+function _deBoorPoint(u,p,cps,knots,wts){
+  var n=cps.length, k=p;
+  while(k<n-1 && u>=knots[k+1]) k++;
+  var d=[],j,idx,c,w;
+  for(j=0;j<=p;j++){
+    idx=j+k-p;
+    c=cps[idx]; w=wts?wts[idx]:1;
+    d.push({x:c.x*w, y:c.y*w, w:w});
+  }
+  for(var r=1;r<=p;r++){
+    for(j=p;j>=r;j--){
+      var i2=j+k-p;
+      var den=knots[i2+p-r+1]-knots[i2];
+      var a=den>1e-12?(u-knots[i2])/den:0;
+      d[j]={x:(1-a)*d[j-1].x+a*d[j].x, y:(1-a)*d[j-1].y+a*d[j].y, w:(1-a)*d[j-1].w+a*d[j].w};
+    }
+  }
+  var res=d[p];
+  return {x:res.w?res.x/res.w:res.x, y:res.w?res.y/res.w:res.y};
+}
+// Tessellate a SPLINE entity into points. Falls back to fit points, then to the
+// control polygon, when the knot vector is not one we can evaluate.
+function _tessSpline(sp){
+  var cps=sp.cps||[], deg=sp.deg||3, knots=sp.knots||[];
+  var wts=(sp.weights&&sp.weights.length===cps.length)?sp.weights:null;
+  if(cps.length<2) return (sp.fits&&sp.fits.length>=2)?sp.fits.slice():[];
+  if(cps.length===2) return [cps[0],cps[1]];
+  if(deg<1) deg=1;
+  if(knots.length!==cps.length+deg+1){
+    if(sp.fits&&sp.fits.length>=2) return sp.fits.slice();
+    return cps.slice();
+  }
+  var u0=knots[deg], u1=knots[cps.length];
+  if(!(u1>u0)) return cps.slice();
+  // ~0.5 mm per segment, sized off the control-polygon length
+  var clen=0;
+  for(var i=1;i<cps.length;i++) clen+=Math.hypot(cps[i].x-cps[i-1].x, cps[i].y-cps[i-1].y);
+  var n=Math.max(16, Math.ceil(clen/0.5));
+  if(n>DXF_TESS_MAX_SEGS) n=DXF_TESS_MAX_SEGS;
+  var out=[];
+  for(var s=0;s<=n;s++){
+    var u=u0+(u1-u0)*s/n;
+    if(s===n) u=u1-1e-9; // stay inside the final span
+    out.push(_deBoorPoint(u,deg,cps,knots,wts));
+  }
   return out;
 }
 function _tessArc(a){
@@ -3571,6 +3719,12 @@ function entitiesToPolygons(ents){
       segs.push({type:'LINE',p1:{x:e.x1,y:e.y1},p2:{x:e.x2,y:e.y2}});
     } else if(e.type==='ARC'){
       var pts=_tessArc(e);segs.push({type:'ARC',p1:pts[0],p2:pts[pts.length-1],pts:pts});
+    } else if(e.type==='SPLINE'){
+      var spts=_tessSpline(e);
+      if(spts.length>=2){
+        if(e.flags&1) polys.push({pts:spts,closed:true});           // closed spline = its own loop
+        else segs.push({type:'SPLINE',p1:spts[0],p2:spts[spts.length-1],pts:spts});
+      }
     }
   });
   if(segs.length){
@@ -3635,6 +3789,7 @@ function _polyContains(outerPts,innerPts){
 // of a POLYLINE). That on-entity point is then checked against the outline polygon.
 function _entityRepresentativePoint(e){
   if(e.type==='LINE')return {x:(e.x1+e.x2)/2,y:(e.y1+e.y2)/2};
+  if(e.type==='SPLINE'){var sp=_tessSpline(e);return sp.length?sp[Math.floor(sp.length/2)]:null;}
   if(e.type==='CIRCLE'){
     // A point on the circle itself (not the center)
     return {x:e.cx+e.r,y:e.cy};
@@ -3676,7 +3831,7 @@ function _classifyEntities(ents,outlinePts){
     return false;
   }
   ents.forEach(function(e){
-    if(!(e.type==='LINE'||e.type==='ARC'||e.type==='CIRCLE'||e.type==='LWPOLYLINE'||e.type==='POLYLINE'))return;
+    if(!(e.type==='LINE'||e.type==='ARC'||e.type==='CIRCLE'||e.type==='LWPOLYLINE'||e.type==='POLYLINE'||e.type==='SPLINE'))return;
     var p=_entityRepresentativePoint(e);
     if(!p)return;
     if(onOutline(p)){
@@ -3729,7 +3884,61 @@ function _shiftEntity(e,dx,dy){
     c.closed=!!e.closed;
     c.vertices=(e.vertices||[]).map(function(v){return {x:v.x-dx,y:v.y-dy,bulge:v.bulge||0};});
   }
+  else if(e.type==='SPLINE'){
+    // Knots and weights are parameter-space data — only the points move.
+    c.deg=e.deg;c.flags=e.flags;c.knots=(e.knots||[]).slice();c.weights=(e.weights||[]).slice();
+    c.cps=(e.cps||[]).map(function(v){return {x:v.x-dx,y:v.y-dy};});
+    c.fits=(e.fits||[]).map(function(v){return {x:v.x-dx,y:v.y-dy};});
+  }
   return c;
+}
+
+// Parse ONE DXF file into a shape descriptor:
+//   {name, shape, holes, l, w, outlineEnts, holeEnts}
+// Shared by the "import as new parts" flow and the Parts Manager "assign shape to
+// an existing part" flow, so both read a DXF exactly the same way.
+// Throws on a read/parse error; returns null when the file holds no closed shape.
+async function _dxfFileToShape(file){
+  var text=await file.text();
+  var ents=parseDXFText(text);
+  var polys=entitiesToPolygons(ents).filter(function(p){return p.closed&&p.pts.length>=3;});
+  if(!polys.length)return null;
+  // Pick the largest-area polygon as the outline, the rest become hole candidates.
+  polys.sort(function(a,b){return _polyArea(b.pts)-_polyArea(a.pts);});
+  var outline=polys[0].pts;
+  // Only polygons that lie *inside* the outline are treated as holes.
+  var holes=[];
+  for(var h=1;h<polys.length;h++){
+    if(_polyContains(outline,polys[h].pts)){holes.push(polys[h].pts);}
+  }
+  var bb=_polyBBox(outline);
+  // Normalize all points so outline bbox min is at (0,0).
+  function norm(pts){return pts.map(function(p){return {x:p.x-bb.minX,y:p.y-bb.minY};});}
+  var normOutline=norm(outline);
+  var normHoles=holes.map(norm);
+  // Categorize the original entities: which ones are outline, which belong to each hole.
+  // These are preserved verbatim for DXF export, so curves stay smooth (not tessellated).
+  var classified=_classifyEntities(ents,outline);
+  var holeEntGroups=_groupInnerEntsByHole(classified.innerEnts,holes);
+  // Shift all entities into the same local coordinate frame as the polygons
+  // (subtract bbox min). Do not mutate the originals.
+  var outlineEnts=classified.outline.map(function(e){return _shiftEntity(e,bb.minX,bb.minY);});
+  var holeEnts=holeEntGroups.map(function(grp){return grp.map(function(e){return _shiftEntity(e,bb.minX,bb.minY);});});
+  var partName=file.name.replace(/\.[dD][xX][fF]$/,'').replace(/[^A-Za-z0-9_\-]/g,'_').substring(0,32)||'SHAPE';
+  // Sanity net: if the outline we settled on is much smaller than the drawing as a
+  // whole, the real outline probably failed to close (an entity type we cannot read,
+  // or a gap) and we have latched onto an inner shape such as a dowel hole. Flag it
+  // rather than silently reporting an 8×8 mm part.
+  var allPts=[];
+  polys.forEach(function(pl){ allPts=allPts.concat(pl.pts); });
+  var suspect=null;
+  if(allPts.length){
+    var abb=_polyBBox(allPts);
+    if(abb.w*abb.h > 0 && (bb.w*bb.h) < 0.25*(abb.w*abb.h)){
+      suspect={outline:[Math.round(bb.w),Math.round(bb.h)],drawing:[Math.round(abb.w),Math.round(abb.h)]};
+    }
+  }
+  return {file:file,name:partName,shape:normOutline,holes:normHoles,l:Math.round(bb.w),w:Math.round(bb.h),outlineEnts:outlineEnts,holeEnts:holeEnts,suspect:suspect};
 }
 
 // Dialog flow: user drops N DXFs → modal asks material + qty (per file), then imports all.
@@ -3740,33 +3949,9 @@ async function processDXFFiles(files){
   var parsed=[];
   for(var i=0;i<files.length;i++){
     try{
-      var text=await files[i].text();
-      var ents=parseDXFText(text);
-      var polys=entitiesToPolygons(ents).filter(function(p){return p.closed&&p.pts.length>=3;});
-      if(!polys.length){st.style.color='#B84040';st.textContent='⚠ '+files[i].name+': no closed shape';continue;}
-      // Pick the largest-area polygon as the outline, the rest become hole candidates.
-      polys.sort(function(a,b){return _polyArea(b.pts)-_polyArea(a.pts);});
-      var outline=polys[0].pts;
-      // Only polygons that lie *inside* the outline are treated as holes.
-      var holes=[];
-      for(var h=1;h<polys.length;h++){
-        if(_polyContains(outline,polys[h].pts)){holes.push(polys[h].pts);}
-      }
-      var bb=_polyBBox(outline);
-      // Normalize all points so outline bbox min is at (0,0).
-      function norm(pts){return pts.map(function(p){return {x:p.x-bb.minX,y:p.y-bb.minY};});}
-      var normOutline=norm(outline);
-      var normHoles=holes.map(norm);
-      // Categorize the original entities: which ones are outline, which belong to each hole.
-      // These are preserved verbatim for DXF export, so curves stay smooth (not tessellated).
-      var classified=_classifyEntities(ents,outline);
-      var holeEntGroups=_groupInnerEntsByHole(classified.innerEnts,holes);
-      // Shift all entities into the same local coordinate frame as the polygons
-      // (subtract bbox min). Do not mutate the originals.
-      var outlineEnts=classified.outline.map(function(e){return _shiftEntity(e,bb.minX,bb.minY);});
-      var holeEnts=holeEntGroups.map(function(grp){return grp.map(function(e){return _shiftEntity(e,bb.minX,bb.minY);});});
-      var partName=files[i].name.replace(/\.[dD][xX][fF]$/,'').replace(/[^A-Za-z0-9_\-]/g,'_').substring(0,32)||'SHAPE';
-      parsed.push({file:files[i],name:partName,shape:normOutline,holes:normHoles,l:Math.round(bb.w),w:Math.round(bb.h),outlineEnts:outlineEnts,holeEnts:holeEnts});
+      var pr=await _dxfFileToShape(files[i]);
+      if(!pr){st.style.color='#B84040';st.textContent='⚠ '+files[i].name+': no closed shape';continue;}
+      parsed.push(pr);
     }catch(err){console.error(err);st.style.color='#B84040';st.textContent='⚠ '+files[i].name+': '+err.message;}
   }
   if(!parsed.length){if(st.textContent==='Parsing DXF…')st.textContent='';return;}
@@ -4234,6 +4419,12 @@ var _pwSort='name';
 
 function openPartsWindow(){
   var ov=document.getElementById('pw-overlay');ov.classList.add('open');
+  // Show the saved merge kerf; placeholder falls back to the saw kerf when blank
+  var mk=document.getElementById('pw-merge-kerf');
+  if(mk){
+    mk.value=(ND.mergeKerf!=null)?ND.mergeKerf:'';
+    mk.placeholder=String(parseFloat((document.getElementById('kerf')||{}).value)||3);
+  }
   // Populate group filters and assign dropdown
   refreshGroupSelects();
   // Materials dropdown is refreshed inside renderPartsWindow on every render
@@ -4337,7 +4528,7 @@ function renderPartsWindow(){
     var bd=matchBoard(p.mat);
     var dot=bd?'<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:'+bd.color+';margin-right:4px;flex-shrink:0;vertical-align:middle"></span>':'';
     var isMerged=!!p.__merged;
-    var mergeIcon=isMerged?'<span title="Merged strip — '+(p.__mergedFrom?p.__mergedFrom.length:'?')+' pieces" style="font-size:10px;color:#647488;flex-shrink:0;font-weight:700">🔗</span>':'';
+    var mergeIcon=isMerged?'<span title="Merged strip — '+(p.__mergedFrom?p.__mergedFrom.length:'?')+' pieces'+(p.__mergedKerf!=null?', '+p.__mergedKerf+'mm kerf between them':'')+'" style="font-size:10px;color:#647488;flex-shrink:0;font-weight:700">🔗</span>':'';
     // Build material select with current value preselected
     var matSel='<select class="pw-edit pw-edit-mat" data-id="'+sid+'" onchange="pwEditField(\''+sid+'\',\'mat\',this.value)">'
       +allMats.map(function(m){return'<option value="'+esc(m)+'"'+(m===p.mat?' selected':'')+'>'+esc(m)+'</option>';}).join('')
@@ -4531,20 +4722,50 @@ function pwMultiplyAll(){
 
 // Swap L and W of a single part. If the part has a DXF shape polygon,
 // the shape is rotated 90° CW so the outline matches the new L×W bounding box.
+// Rotate one DXF entity 90° CW inside a bbox of length L: (x, y) → (y, L - x).
+// That is a rotation by -90° plus a translation, so it preserves orientation:
+// arc angles shift by -90° and polyline bulges (signed by direction) are unchanged.
+function _rotEntity90(e,L){
+  function m(x,y){ return {x:y, y:L-x}; }
+  var c={type:e.type};
+  if(e.type==='LINE'){
+    var a=m(e.x1,e.y1), b=m(e.x2,e.y2);
+    c.x1=a.x;c.y1=a.y;c.x2=b.x;c.y2=b.y;
+  } else if(e.type==='CIRCLE'){
+    var q=m(e.cx,e.cy); c.cx=q.x;c.cy=q.y;c.r=e.r;
+  } else if(e.type==='ARC'){
+    var q2=m(e.cx,e.cy); c.cx=q2.x;c.cy=q2.y;c.r=e.r;c.a1=e.a1-90;c.a2=e.a2-90;
+  } else if(e.type==='LWPOLYLINE'||e.type==='POLYLINE'){
+    c.closed=!!e.closed;
+    c.vertices=(e.vertices||[]).map(function(v){ var q3=m(v.x,v.y); return {x:q3.x,y:q3.y,bulge:v.bulge||0}; });
+  } else if(e.type==='SPLINE'){
+    c.deg=e.deg;c.flags=e.flags;c.knots=(e.knots||[]).slice();c.weights=(e.weights||[]).slice();
+    c.cps=(e.cps||[]).map(function(v){ var q4=m(v.x,v.y); return {x:q4.x,y:q4.y}; });
+    c.fits=(e.fits||[]).map(function(v){ var q5=m(v.x,v.y); return {x:q5.x,y:q5.y}; });
+  }
+  return c;
+}
+// Rotate a whole shape descriptor (polygon + holes + source entities) 90° CW and
+// swap its l/w. Works on anything carrying {l,w,shape,holes,outlineEnts,holeEnts}
+// — both a live part and a freshly parsed DXF.
+function rotateShape90(o){
+  var oldL=o.l;
+  function rot(pts){ return pts.map(function(pt){ return {x:pt.y, y:oldL-pt.x}; }); }
+  if(o.shape&&o.shape.length)o.shape=rot(o.shape);
+  if(o.holes)o.holes=o.holes.map(rot);
+  if(o.outlineEnts)o.outlineEnts=o.outlineEnts.map(function(e){return _rotEntity90(e,oldL);});
+  if(o.holeEnts)o.holeEnts=o.holeEnts.map(function(g){return g.map(function(e){return _rotEntity90(e,oldL);});});
+  var tmp=o.l; o.l=o.w; o.w=tmp;
+  return o;
+}
+
 function swapPartDims(p){
   if(p.shape && p.shape.length){
-    // Rotate shape 90° CW: (x, y) → (y, l - x) so new bbox becomes (w, l)
-    var oldL=p.l;
-    p.shape=p.shape.map(function(pt){
-      return { x: pt.y, y: oldL - pt.x };
-    });
-    if(p.holes){
-      p.holes=p.holes.map(function(hole){
-        return hole.map(function(pt){
-          return { x: pt.y, y: oldL - pt.x };
-        });
-      });
-    }
+    // Rotate outline, holes AND the source entities together. The DXF export is
+    // built from outlineEnts when present, so rotating only the polygon would
+    // export a swapped part with its original orientation.
+    rotateShape90(p);
+    return;
   }
   var tmp=p.l; p.l=p.w; p.w=tmp;
 }
@@ -4558,6 +4779,226 @@ function pwSwapSelected(){
   });
   renderParts();
   renderPartsWindow();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ASSIGN DXF SHAPES TO EXISTING PARTS
+// A report-list import gives every part a plain rectangle. Many of those parts
+// are really irregular (notches, radii, cutouts). This lets the user pick the
+// rows that need a true shape and drop the matching DXF files on them: the
+// part keeps its name / material / quantity / edgebands / group and only gains
+// an outline (+ holes), so true-shape nesting can use the real geometry.
+// ═══════════════════════════════════════════════════════════════════════════
+var _dxfAssignQueue=null;   // [{pr, targetKey, rotated}]
+var _dxfAssignCands=null;   // [{key, part, label}] — one entry per part row (group)
+
+// Candidate rows: the selected groups, or every group when nothing is selected.
+function _pwCandidateGroups(){
+  var seen={},out=[];
+  var useSel=pwSel.size>0;
+  parts.forEach(function(p){
+    if(useSel&&!pwSel.has(String(p.id)))return;
+    var k=partGroupKey(p);
+    if(seen[k])return;
+    seen[k]=true;
+    out.push({key:k,part:p,label:(p.origName||p.name||'?')+'  ·  '+p.l+'×'+p.w+'  ·  '+(p.mat||'')});
+  });
+  out.sort(function(a,b){return a.label.localeCompare(b.label);});
+  return out;
+}
+// Loose name key so "DOOR-01.dxf", "door_01" and "Door 01" all collapse together.
+function _normNameKey(s){
+  return String(s||'').toLowerCase().replace(/\.[^.]+$/,'').replace(/[^a-z0-9]+/g,'');
+}
+// Best candidate for one parsed DXF: exact name → name contains → dimensions
+// (either orientation). Candidates already taken by an earlier file are skipped
+// so N files spread across N rows instead of all landing on the same one.
+function _autoMatchTarget(pr,cands,taken){
+  var want=_normNameKey(pr.name);
+  var free=cands.filter(function(c){return !taken[c.key];});
+  var hit=free.filter(function(c){return _normNameKey(c.part.origName||c.part.name)===want;})[0];
+  if(hit)return hit.key;
+  if(want.length>=3){
+    hit=free.filter(function(c){
+      var n=_normNameKey(c.part.origName||c.part.name);
+      return n.length>=3&&(n.indexOf(want)>=0||want.indexOf(n)>=0);
+    })[0];
+    if(hit)return hit.key;
+  }
+  hit=free.filter(function(c){
+    var dl=Math.abs(c.part.l-pr.l)+Math.abs(c.part.w-pr.w);
+    var ds=Math.abs(c.part.l-pr.w)+Math.abs(c.part.w-pr.l);
+    return Math.min(dl,ds)<=2;
+  })[0];
+  return hit?hit.key:'';
+}
+// Rotate the parsed shape when the part's L/W is the other way round.
+function _dxfAssignFitRotation(row){
+  if(!row.targetKey)return;
+  var c=_dxfAssignCands.filter(function(x){return x.key===row.targetKey;})[0];
+  if(!c)return;
+  var asIs=Math.abs(c.part.l-row.pr.l)+Math.abs(c.part.w-row.pr.w);
+  var turned=Math.abs(c.part.l-row.pr.w)+Math.abs(c.part.w-row.pr.l);
+  if(turned<asIs-0.5){ rotateShape90(row.pr); row.rotated=!row.rotated; }
+}
+
+function pwAssignDXFPick(){
+  if(!parts.length){alert(t('dxfAssignNone'));return;}
+  document.getElementById('pw-dxf-in').click();
+}
+
+// Thin wrapper so an unexpected failure is reported instead of dying silently in
+// the file-input's async handler (where nothing is listening for the rejection).
+function pwAssignDXFFiles(inputEl){
+  return _pwAssignDXFFiles(inputEl).catch(function(err){
+    console.error('assign DXF', err);
+    alert('Could not assign the DXF: '+((err&&err.message)||err));
+    closeDXFAssignDialog();
+  });
+}
+
+async function _pwAssignDXFFiles(inputEl){
+  var files=Array.prototype.slice.call(inputEl.files||[]);
+  inputEl.value=''; // let the same file be picked again later
+  if(!files.length)return;
+  var cands=_pwCandidateGroups();
+  if(!cands.length){alert(t('assignDXFNoSel'));return;}
+  var queue=[],failed=[];
+  for(var i=0;i<files.length;i++){
+    try{
+      var pr=await _dxfFileToShape(files[i]);
+      if(!pr){failed.push(files[i].name);continue;}
+      queue.push({pr:pr,targetKey:'',rotated:false});
+    }catch(err){console.error(err);failed.push(files[i].name+' — '+err.message);}
+  }
+  if(!queue.length){alert(t('dxfAssignParseFail',{f:failed.join(', ')||'?'}));return;}
+  // Publish the queue + candidates BEFORE auto-matching: _dxfAssignFitRotation
+  // resolves the chosen row through _dxfAssignCands.
+  _dxfAssignQueue=queue;
+  _dxfAssignCands=cands;
+  // Auto-match each file to a row, then fit its orientation to that row.
+  var taken={};
+  queue.forEach(function(row){
+    row.targetKey=_autoMatchTarget(row.pr,cands,taken);
+    if(row.targetKey)taken[row.targetKey]=true;
+    _dxfAssignFitRotation(row);
+  });
+  if(failed.length)alert(t('dxfAssignParseFail',{f:failed.join(', ')}));
+  document.getElementById('dxfassign-overlay').classList.add('open');
+  renderDXFAssign();
+}
+
+function closeDXFAssignDialog(){
+  document.getElementById('dxfassign-overlay').classList.remove('open');
+  _dxfAssignQueue=null;_dxfAssignCands=null;
+}
+function dxfAssignSetTarget(i,key){
+  if(!_dxfAssignQueue||!_dxfAssignQueue[i])return;
+  _dxfAssignQueue[i].targetKey=key;
+  if(document.getElementById('dxfassign-autorot').checked)_dxfAssignFitRotation(_dxfAssignQueue[i]);
+  renderDXFAssign();
+}
+function dxfAssignRotate(i){
+  if(!_dxfAssignQueue||!_dxfAssignQueue[i])return;
+  rotateShape90(_dxfAssignQueue[i].pr);
+  _dxfAssignQueue[i].rotated=!_dxfAssignQueue[i].rotated;
+  renderDXFAssign();
+}
+function dxfAssignAutoRotate(){
+  if(!_dxfAssignQueue)return;
+  if(document.getElementById('dxfassign-autorot').checked)_dxfAssignQueue.forEach(_dxfAssignFitRotation);
+  renderDXFAssign();
+}
+
+function renderDXFAssign(){
+  if(!_dxfAssignQueue)return;
+  var usedSel=pwSel.size>0;
+  document.getElementById('dxfassign-intro').textContent=
+    usedSel?t('dxfAssignIntroSel',{n:_dxfAssignQueue.length,m:_dxfAssignCands.length})
+           :t('dxfAssignIntroAll',{m:_dxfAssignCands.length});
+  var counts={};
+  _dxfAssignQueue.forEach(function(r){ if(r.targetKey)counts[r.targetKey]=(counts[r.targetKey]||0)+1; });
+  var applying=Object.keys(counts).length;
+  document.getElementById('dxfassign-stat').textContent=applying+' / '+_dxfAssignQueue.length;
+  var opts=_dxfAssignCands.map(function(c){return {k:c.key,l:c.label};});
+  document.getElementById('dxfassign-rows').innerHTML=
+    '<table class="pw-tbl" style="width:100%">'
+    +'<thead><tr><th>DXF file</th><th style="width:120px">Outline</th><th style="width:34px"></th><th style="width:300px">Assign to part</th><th style="width:170px">Result</th></tr></thead><tbody>'
+    +_dxfAssignQueue.map(function(row,i){
+      var pr=row.pr;
+      var c=row.targetKey?_dxfAssignCands.filter(function(x){return x.key===row.targetKey;})[0]:null;
+      var status,color='#667085';
+      if(pr.suspect){
+        // Outline far smaller than the drawing → almost certainly not the real outline.
+        status=t('dxfAssignSuspect',{ol:pr.suspect.outline[0],ow:pr.suspect.outline[1],
+                                     dl:pr.suspect.drawing[0],dw:pr.suspect.drawing[1]});
+        color='#B84040';
+      }
+      else if(!c){ status=t('dxfAssignNoTarget'); color='#98a2b3'; }
+      else if(counts[row.targetKey]>1){ status=t('dxfAssignDup'); color='#B84040'; }
+      else if(Math.abs(c.part.l-pr.l)<=1&&Math.abs(c.part.w-pr.w)<=1){
+        status=row.rotated?t('dxfAssignRotated'):t('dxfAssignMatch'); color='#1a7f4b';
+      } else {
+        status=t('dxfAssignResize',{ol:c.part.l,ow:c.part.w,nl:pr.l,nw:pr.w}); color='#8a6d1a';
+      }
+      var holes=(pr.holes&&pr.holes.length)?' · '+t('dxfAssignHoles',{n:pr.holes.length}):'';
+      return '<tr>'
+        +'<td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(pr.file.name)+'">📐 '+esc(pr.file.name)+'</td>'
+        +'<td style="font-family:monospace;font-size:10px;color:#667085">'+pr.l+'×'+pr.w+esc(holes)+'</td>'
+        +'<td style="text-align:center;padding:0"><button class="pw-swap-btn" title="Rotate this outline 90°" onclick="dxfAssignRotate('+i+')">↻</button></td>'
+        +'<td><select style="width:100%;font-size:11px" onchange="dxfAssignSetTarget('+i+',this.value)">'
+          +'<option value="">'+esc(t('dxfAssignSkip'))+'</option>'
+          +opts.map(function(o){return '<option value="'+esc(o.k)+'"'+(o.k===row.targetKey?' selected':'')+'>'+esc(o.l)+'</option>';}).join('')
+        +'</select></td>'
+        +'<td style="font-size:10px;color:'+color+'">'+esc(status)+'</td>'
+        +'</tr>';
+    }).join('')
+    +'</tbody></table>';
+}
+
+function confirmDXFAssign(){
+  if(!_dxfAssignQueue)return;
+  var rows=_dxfAssignQueue.filter(function(r){return r.targetKey;});
+  if(!rows.length){alert(t('dxfAssignNoSel'));return;}
+  var setLW=document.getElementById('dxfassign-setlw').checked;
+  snapshotParts();
+  var touched=0;
+  rows.forEach(function(row){
+    var pr=row.pr;
+    // The row stands for a whole group of identical parts — shape them all,
+    // otherwise the group splits and half the copies stay rectangles.
+    var group=parts.filter(function(p){return partGroupKey(p)===row.targetKey;});
+    group.forEach(function(p){
+      // Deep-copy per part: parts must never share mutable geometry arrays.
+      p.shape=pr.shape.map(function(pt){return {x:pt.x,y:pt.y};});
+      p.holes=(pr.holes||[]).map(function(h){return h.map(function(pt){return {x:pt.x,y:pt.y};});});
+      p.outlineEnts=pr.outlineEnts?JSON.parse(JSON.stringify(pr.outlineEnts)):null;
+      p.holeEnts=pr.holeEnts?JSON.parse(JSON.stringify(pr.holeEnts)):null;
+      if(setLW){ p.l=pr.l; p.w=pr.w; }
+      touched++;
+    });
+  });
+  closeDXFAssignDialog();
+  renderParts();
+  renderPartsWindow();
+  var st=document.getElementById('ist');
+  if(st){st.style.color='#2f54eb';st.textContent=t('dxfAssignDone',{n:touched});}
+}
+
+// Drop the outline and go back to a plain rectangle (keeps L/W as they are).
+function pwRemoveShape(){
+  var sel=parts.filter(function(p){return pwSel.has(String(p.id));});
+  if(!sel.length){alert(t('removeShapeNone'));return;}
+  var shaped=sel.filter(function(p){return p.shape&&p.shape.length;});
+  if(!shaped.length){alert(t('removeShapeNoneShaped'));return;}
+  var f=shaped[0];
+  if(!confirm(t('removeShapeConfirm',{n:shaped.length,l:f.l,w:f.w})))return;
+  snapshotParts();
+  shaped.forEach(function(p){ p.shape=null;p.holes=null;p.outlineEnts=null;p.holeEnts=null; });
+  renderParts();
+  renderPartsWindow();
+  var st=document.getElementById('ist');
+  if(st){st.style.color='#2f54eb';st.textContent=t('removeShapeDone',{n:shaped.length});}
 }
 
 // Bulk rotation: apply a rotation setting to every selected part.
@@ -4745,7 +5186,7 @@ function findMergeCandidates(){
   var eligible = parts.filter(function(p){
     return !p.__merged && !p.groupId && Math.max(p.l, p.w) > 0;
   });
-  var kerf = parseInt((document.getElementById('kerf')||{}).value) || 3;
+  var kerf = mergeKerfValue();  // same blade allowance as a manual merge
   var used = {};            // part id → consumed by a proposal already
   var proposals = [];
 
@@ -4961,6 +5402,7 @@ function _buildMergedPart(constituents, mode, kerf, idSuffix){
     ? Math.max.apply(null, constituents.map(function(p){ return Math.min(p.l,p.w); }))  // widest strip width
     : Math.max.apply(null, constituents.map(function(p){ return Math.max(p.l,p.w); })); // longest shared length
   var combined = dims.reduce(function(a,d){ return a+d; }, 0) + kerf*(constituents.length-1);
+  combined = Math.round(combined*100)/100; // a 3.3 mm kerf must not leave float dust
   var mergedL = isLen ? combined : shared;
   var mergedW = isLen ? shared   : combined;
   return {
@@ -5013,6 +5455,21 @@ function applyMerges(){
 // The selected parts must share material + thickness, and share ONE dimension
 // (all same width → join lengthwise; all same length → join widthwise) so the
 // result is a clean strip. Otherwise we explain what's needed.
+// Kerf used *inside* a merged strip: the blade width eaten between the pieces when
+// the strip is cut back apart. Separate from the sheet-nesting kerf, and it takes
+// decimals — a nominal 3 mm blade with set really removes ~3.3 mm.
+function mergeKerfValue(){
+  var el=document.getElementById('pw-merge-kerf');
+  var v=el?parseFloat(el.value):NaN;
+  if(!isFinite(v)&&ND.mergeKerf!=null) v=parseFloat(ND.mergeKerf);
+  if(!isFinite(v)||v<0) v=parseFloat((document.getElementById('kerf')||{}).value)||3;
+  return v;
+}
+function pwSetMergeKerf(val){
+  var v=parseFloat(val);
+  ND.mergeKerf=(isFinite(v)&&v>=0)?v:null;
+  saveND();
+}
 function pwMergeSelected(){
   var sel = parts.filter(function(p){ return pwSel.has(String(p.id)) && !p.__merged; });
   if (sel.length < 2){ alert('Select at least 2 parts to merge (merged strips and grouped parts are excluded).'); return; }
@@ -5020,7 +5477,7 @@ function pwMergeSelected(){
   var mat0 = normalizeMat(sel[0].mat), th0 = sel[0].thick||0;
   var sameMat = sel.every(function(p){ return normalizeMat(p.mat)===mat0 && (p.thick||0)===th0; });
   if (!sameMat){ alert('All selected parts must share the same material and thickness to merge.'); return; }
-  var kerf = parseInt((document.getElementById('kerf')||{}).value) || 3;
+  var kerf = mergeKerfValue();
   var TOL = 5; // mm tolerance for "same" dimension
   function maxd(p){ return Math.max(p.l,p.w); }
   function mind(p){ return Math.min(p.l,p.w); }
@@ -5033,7 +5490,12 @@ function pwMergeSelected(){
   // direction is genuinely ambiguous — both are valid. Don't guess; let the
   // operator pick, showing the resulting strip size for each choice.
   if (sameWidth && sameLength){
-    _chooseMergeDir(sel, kerf, function(mode){ if (mode) _doPwMerge(sel, mode, kerf); });
+    _chooseMergeDir(sel, kerf, function(mode, chosenKerf){
+      if (!mode) return;
+      var k=(typeof chosenKerf==='number')?chosenKerf:kerf;
+      if (k!==kerf) pwSetMergeKerf(k);   // remember what the operator actually used
+      _doPwMerge(sel, mode, k);
+    });
     return;
   }
   var mode = sameWidth ? 'length' : (sameLength ? 'width' : null);
@@ -5065,8 +5527,11 @@ function _chooseMergeDir(sel, kerf, cb){
   function maxd(p){ return Math.max(p.l,p.w); }
   function mind(p){ return Math.min(p.l,p.w); }
   var n = sel.length;
-  var sumW = sel.reduce(function(a,p){return a+mind(p);},0) + kerf*(n-1); // side-by-side combined width
-  var sumL = sel.reduce(function(a,p){return a+maxd(p);},0) + kerf*(n-1); // end-to-end combined length
+  var baseW = sel.reduce(function(a,p){return a+mind(p);},0);
+  var baseL = sel.reduce(function(a,p){return a+maxd(p);},0);
+  function r2(v){ return Math.round(v*100)/100; }
+  var sumW = r2(baseW + kerf*(n-1)); // side-by-side combined width
+  var sumL = r2(baseL + kerf*(n-1)); // end-to-end combined length
   var sharedL = Math.round(maxd(sel[0]));  // shared length (width-merge keeps this)
   var sharedW = Math.round(mind(sel[0]));  // shared width  (length-merge keeps this)
   var ov = document.getElementById('merge-dir-ov');
@@ -5082,20 +5547,34 @@ function _chooseMergeDir(sel, kerf, cb){
     +   '<button id="md-width" style="flex:1;text-align:left;padding:14px;border:2px solid #647488;background:#FBF1E4;border-radius:10px;cursor:pointer">'
     +     '<div style="font-size:14px;font-weight:700;color:#647488">↔ Side-by-side</div>'
     +     '<div style="font-size:11px;color:#667085;margin-top:5px">Combine widths · share the '+sharedL+'mm length</div>'
-    +     '<div style="font-size:12px;color:#1b1e26;margin-top:6px;font-weight:600">Strip: '+sharedL+' × '+Math.round(sumW)+' mm</div>'
+    +     '<div id="md-w-size" style="font-size:12px;color:#1b1e26;margin-top:6px;font-weight:600">Strip: '+sharedL+' × '+sumW+' mm</div>'
     +     '<div style="font-size:10px;color:#7A2E12;margin-top:4px">✂ rip cuts along the length</div>'
     +   '</button>'
     +   '<button id="md-length" style="flex:1;text-align:left;padding:14px;border:2px solid #647488;background:#FBF1E4;border-radius:10px;cursor:pointer">'
     +     '<div style="font-size:14px;font-weight:700;color:#647488">↕ End-to-end</div>'
     +     '<div style="font-size:11px;color:#667085;margin-top:5px">Combine lengths · share the '+sharedW+'mm width</div>'
-    +     '<div style="font-size:12px;color:#1b1e26;margin-top:6px;font-weight:600">Strip: '+Math.round(sumL)+' × '+sharedW+' mm</div>'
+    +     '<div id="md-l-size" style="font-size:12px;color:#1b1e26;margin-top:6px;font-weight:600">Strip: '+sumL+' × '+sharedW+' mm</div>'
     +     '<div style="font-size:10px;color:#7A2E12;margin-top:4px">✂ crosscuts across the width</div>'
     +   '</button>'
+    + '</div>'
+    + '<div style="display:flex;align-items:center;gap:8px;margin-top:14px;font-size:12px;color:#667085">'
+    +   '<span>✂ Kerf between the pieces</span>'
+    +   '<input id="md-kerf" type="number" step="0.1" min="0" max="20" value="'+kerf+'" style="width:70px;padding:4px 6px;border:1px solid #B0A99A;border-radius:6px;font-size:12px;text-align:center">'
+    +   '<span>mm</span>'
+    +   '<span style="color:#98a2b3;font-size:11px">— decimals allowed</span>'
     + '</div>'
     + '<div style="display:flex;justify-content:flex-end;margin-top:16px"><button id="md-cancel" style="padding:7px 16px;border:1px solid #B0A99A;color:#667085;background:#fff;border-radius:8px;font-size:13px;cursor:pointer">Cancel</button></div>'
     + '</div>';
   document.body.appendChild(ov);
-  function done(mode){ ov.remove(); cb(mode); }
+  // Editing the kerf here re-prices both options live and becomes the merge kerf.
+  var kIn=ov.querySelector('#md-kerf');
+  function curKerf(){ var v=parseFloat(kIn.value); return (isFinite(v)&&v>=0)?v:kerf; }
+  kIn.addEventListener('input',function(){
+    var k=curKerf();
+    ov.querySelector('#md-w-size').textContent='Strip: '+sharedL+' × '+r2(baseW+k*(n-1))+' mm';
+    ov.querySelector('#md-l-size').textContent='Strip: '+r2(baseL+k*(n-1))+' × '+sharedW+' mm';
+  });
+  function done(mode){ var k=curKerf(); ov.remove(); cb(mode, k); }
   ov.querySelector('#md-width').onclick  = function(){ done('width'); };
   ov.querySelector('#md-length').onclick = function(){ done('length'); };
   ov.querySelector('#md-cancel').onclick = function(){ done(null); };
@@ -9368,6 +9847,15 @@ function emitEntity(L,layer,e,part,rot,offX,offY){
       return {x:p[0],y:p[1],bulge:v.bulge||0};
     });
     lwpolyBulge(L,layer,verts,!!e.closed);
+  } else if(e.type==='SPLINE'){
+    // Written out as a finely tessellated polyline — every CAM package reads that,
+    // and at ~0.5 mm segments it is well inside routing tolerance.
+    var sp=_tessSpline(e);
+    if(sp.length>=2){
+      // lwpolyBulge (not lwpoly) — lwpoly hardcodes closed=1, which would draw a
+      // false chord across an open spline segment of the outline.
+      lwpolyBulge(L,layer,sp.map(function(v){ var q=pt(v.x,v.y); return {x:q[0],y:q[1],bulge:0}; }),!!(e.flags&1));
+    }
   }
 }
 function pushLayoutEntities(L,lay,dx,dy){
