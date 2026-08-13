@@ -580,6 +580,8 @@ body.print-mode{background:#fff}
     <div class="stat"><div class="sv" id="sv3">–</div><div class="sl" data-i18n="statEfficiency">Efficiency</div><div class="efb"><div class="eff" id="ef" style="width:0%"></div></div></div>
     <div class="stat"><div class="sv" id="sv4">–</div><div class="sl" data-i18n="statWaste">Waste m²</div></div>
   </div>
+  <!-- Sheets used vs sheets you actually have (per material) -->
+  <div id="stockwarn" style="display:none;margin:4px 0 2px"></div>
   <div style="display:flex;justify-content:flex-end;margin:-2px 0 2px"><button class="btn bp" onclick="reserveForCutting()" title="Rezervuoti panaudotus lakštus pjovimui — patvirtinama GVS sandėlyje" style="background:#1b1e26;border-color:#1b1e26;color:#fff">📤 Naudoti iš sandėlio (pjovimui)</button></div>
   <!-- ─── Quotation panel ──────────────────────────────────────────
        Shows itemized pricing: material area + cutting length + per-part + edgeband,
@@ -1581,6 +1583,12 @@ var I18N={
     confirmDeleteProject:'Delete project "{name}"? This cannot be undone.',
     enterValidNumber:'Enter a valid number',
     lwLocked:'Length/width come from the DXF outline for shaped parts. Use "▭ Remove shape" in the Parts Manager to go back to a plain rectangle, or assign a different DXF.',
+    sheetsHave:'Sheets I have',
+    sheetsUnlimited:'0 = unlimited',
+    stockShortTitle:'Not enough sheets for this cut',
+    stockOkTitle:'Sheets used',
+    stockShortBy:'short {n}',
+    stockOverTab:'Sheet {n} — beyond the {have} you have',
     tplLink:'⤓ Parts list template (CSV)',
     tplTip:'Download a small CSV you can fill in — just name, size and quantity. Far simpler than a full SWOOD report.',
     tplDone:'✓ Template downloaded — fill it in and drop it back here',
@@ -1751,6 +1759,12 @@ var I18N={
     confirmDeleteProject:'Ištrinti projektą „{name}"? Veiksmas negrįžtamas.',
     enterValidNumber:'Įveskite teisingą skaičių',
     lwLocked:'Detalėms su forma ilgis ir plotis imami iš DXF kontūro. Norėdami grąžinti paprastą stačiakampį, spauskite „▭ Pašalinti formą" detalių valdyme, arba priskirkite kitą DXF.',
+    sheetsHave:'Turiu lakštų',
+    sheetsUnlimited:'0 = neribota',
+    stockShortTitle:'Nepakanka lakštų šiam pjovimui',
+    stockOkTitle:'Panaudota lakštų',
+    stockShortBy:'trūksta {n}',
+    stockOverTab:'{n} lakštas — daugiau nei turimi {have}',
     tplLink:'⤓ Detalių sąrašo šablonas (CSV)',
     tplTip:'Atsisiųskite paprastą CSV — tereikia pavadinimo, matmenų ir kiekio. Daug paprasčiau nei pilna SWOOD ataskaita.',
     tplDone:'✓ Šablonas atsisiųstas — užpildykite ir įkelkite atgal čia',
@@ -3210,6 +3224,11 @@ function renderBoards(){
       +'<div><label class="fl">Storis (mm)</label><input type="number" value="'+(b.thickness!=null?b.thickness:18)+'" onchange="updateBoard('+b.id+',\'thickness\',this.value)"></div>'
       +'<div><label class="fl">Color</label><input type="color" value="'+b.color+'" onchange="updateBoard('+b.id+',\'color\',this.value)"></div>'
       +'</div>'
+      +'<label style="display:flex;align-items:center;gap:6px;font-size:11px;color:#667085;margin-top:6px;padding-top:5px;border-top:1px solid #e6e8ed" title="How many sheets of this material you actually have. Nesting still lays out every part, but you get told when it needs more sheets than you own. 0 = unlimited.">'
+      +'<span>📦 '+t('sheetsHave')+'</span>'
+      +'<input type="number" min="0" step="1" value="'+(b.qty!=null?b.qty:0)+'" onchange="updateBoard('+b.id+',\'qty\',this.value);renderStockWarning();buildTabs&&layouts.length&&buildTabs()" style="width:52px;padding:2px 4px;font-size:11px;text-align:center">'
+      +'<span style="font-size:10px;color:#98a2b3">'+t('sheetsUnlimited')+'</span>'
+      +'</label>'
       +'<label style="display:flex;align-items:center;gap:6px;font-size:11px;color:#667085;cursor:pointer;margin-top:6px;padding-top:5px;border-top:1px solid #e6e8ed">'
       +'<input type="checkbox" '+(b.grain?'checked':'')+' onchange="updateBoard('+b.id+',\'grain\',this.checked)" style="accent-color:#2f54eb;width:auto;cursor:pointer">'
       +'<span>🌾 Lock grain direction <span style="color:#667085;font-size:10px">(no rotation)</span></span>'
@@ -6687,6 +6706,7 @@ function _finishShapeNest(newLayouts, unplaced){
   var wlc=document.getElementById('wlc'); if(wlc)wlc.style.display='none';
   var cvc=document.getElementById('cvc'); if(cvc)cvc.style.display='block';
   if(typeof buildTabs==='function') buildTabs();
+  renderStockWarning();
   if(typeof activateTab==='function') activateTab(0); else if(typeof renderCanvas==='function') renderCanvas(0);
   var ep=document.getElementById('ep'); if(ep)ep.style.display='block';
   if(typeof buildExport==='function') buildExport();
@@ -6976,7 +6996,14 @@ function optimize(){
   document.getElementById('wlc').style.display='none';
   document.getElementById('cvc').style.display='block';
   buildExport();buildTabs();curSheet=0;activateTab(0);
+  renderStockWarning();
   renderQuote();
+  // Short of sheets? Say so alongside the other warnings.
+  var _shortRep=sheetStockReport().filter(function(r){return r.short>0;});
+  if(_shortRep.length){
+    warnings.unshift('⚠ '+t('stockShortTitle')+'\n\n'
+      +_shortRep.map(function(r){return '  "'+r.mat+'": needs '+r.used+', you have '+r.have+' — short '+r.short;}).join('\n'));
+  }
   // ── Build unplaced-parts warning (parts that couldn't fit on ANY sheet) ──
   var totUnplaced=0;
   for(var m in unplacedByMat) totUnplaced += unplacedByMat[m].count;
@@ -7830,8 +7857,51 @@ function computeLayoutDupGroups(){
   return { sigs:sigs, countBy:countBy, firstIdx:firstIdx, occurrence:occurrence };
 }
 
+// ── Sheet stock: how many sheets a nest needs vs how many you have ─────────
+// b.qty is "sheets available for this material"; 0 means unlimited. Nesting is
+// never silently capped — every part is still laid out — but a shortfall is
+// reported so it is caught before the saw rather than at it.
+function sheetStockReport(){
+  var used={};
+  layouts.forEach(function(l){ var m=normalizeMat(l.matName); used[m]=(used[m]||0)+1; });
+  var out=[];
+  Object.keys(used).forEach(function(m){
+    var bd=matchBoard(m)||boards.filter(function(b){return normalizeMat(b.mat)===m;})[0];
+    var have=(bd&&bd.qty>0)?bd.qty:0;   // 0 / missing → unlimited, nothing to report
+    out.push({mat:m, used:used[m], have:have, short:have>0?Math.max(0,used[m]-have):0});
+  });
+  out.sort(function(a,b){ return b.short-a.short || a.mat.localeCompare(b.mat); });
+  return out;
+}
+// Sheet index within its own material, 1-based — used to mark the tabs that
+// go beyond the sheets you own.
+function _sheetOrdinals(){
+  var seen={},ord=[];
+  layouts.forEach(function(l){ var m=normalizeMat(l.matName); seen[m]=(seen[m]||0)+1; ord.push(seen[m]); });
+  return ord;
+}
+function renderStockWarning(){
+  var el=document.getElementById('stockwarn');
+  if(!el) return;
+  var rep=layouts.length?sheetStockReport().filter(function(r){return r.have>0;}):[];
+  if(!rep.length){ el.style.display='none'; el.innerHTML=''; return; }
+  var short=rep.filter(function(r){return r.short>0;});
+  var bg=short.length?'#FDECEC':'#EDF7EE', bd=short.length?'#B84040':'#1a7f4b', fg=short.length?'#7A2E12':'#1a7f4b';
+  el.style.display='block';
+  el.innerHTML='<div style="background:'+bg+';border:1px solid '+bd+';border-radius:8px;padding:7px 10px;font-size:11px;color:'+fg+'">'
+    +'<span style="font-weight:700">'+(short.length?'⚠ '+t('stockShortTitle'):'📦 '+t('stockOkTitle'))+'</span> '
+    +rep.map(function(r){
+       return '<span style="margin-left:8px;white-space:nowrap">'+esc(r.mat)+': <b>'+r.used+'</b> / '+r.have
+         +(r.short?' <span style="font-weight:700">('+t('stockShortBy',{n:r.short})+')</span>':' ✓')+'</span>';
+     }).join(' ·')
+    +'</div>';
+}
+
 function buildTabs(){
   var dups = computeLayoutDupGroups();
+  var ords = _sheetOrdinals();
+  var stock = {};
+  sheetStockReport().forEach(function(r){ stock[r.mat]=r.have; });
   document.getElementById('tabs').innerHTML=layouts.map(function(l,i){
     var warn=l.trimWarning?'<span style="color:#B84040;margin-left:2px" title="No trim">⚠</span>':'';
     var grain=l.grainLocked?'<span style="color:#2f54eb;margin-left:2px" title="Grain locked">🌾</span>':'';
@@ -7847,10 +7917,15 @@ function buildTabs(){
     if(dupCount > 1){
       dupBadge = '<span style="margin-left:4px;padding:0 4px;background:#2f54eb;color:#fff;border-radius:3px;font-size:9px;font-weight:600" title="'+dups.occurrence[i]+' of '+dupCount+' identical sheets">×'+dupCount+'</span>';
     }
+    // Sheet beyond the number of sheets you own for this material
+    var have=stock[normalizeMat(l.matName)]||0;
+    var over=(have>0 && ords[i]>have)
+      ? '<span style="color:#B84040;margin-left:3px;font-weight:700" title="'+esc(t('stockOverTab',{n:ords[i],have:have}))+'">📦!</span>'
+      : '';
     return'<div class="tab" id="tab-'+i+'" onclick="activateTab('+i+')">'
       +mach
       +'<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:'+l.matColor+'"></span>'
-      +esc(l.matName.split(' ').slice(0,2).join(' '))+' #'+(i+1)+warn+grain+dupBadge+'</div>';
+      +esc(l.matName.split(' ').slice(0,2).join(' '))+' #'+(i+1)+warn+grain+dupBadge+over+'</div>';
   }).join('');
 }
 function activateTab(i){curSheet=i;selP=null;hovP=null;document.querySelectorAll('.tab').forEach(function(t,ti){t.className='tab'+(ti===i?' active':'');});renderCanvas(i);}
