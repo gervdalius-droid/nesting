@@ -510,6 +510,11 @@ body.print-mode{background:#fff}
       <span data-i18n="dropSub" style="font-size:10px;opacity:.6">SWOOD: full project · CSV: part list · DXF: shaped parts</span>
       <input type="file" id="fin" accept=".xlsm,.xlsx,.xls,.csv,.dxf,.DXF" multiple style="display:none" onchange="loadFile(this)">
     </div>
+    <div style="margin-top:5px;text-align:center">
+      <a href="#" onclick="event.preventDefault();downloadPartsTemplate()" data-i18n="tplLink"
+         data-i18n-title="tplTip" title="Download a small CSV you can fill in — just name, size and quantity. Far simpler than a full SWOOD report."
+         style="font-size:11px;color:#2f54eb;text-decoration:none;border-bottom:1px dotted #2f54eb;cursor:pointer">⤓ Parts list template (CSV)</a>
+    </div>
     <div id="ist" style="font-size:11px;margin-top:4px;min-height:14px"></div>
   </div>
   <div class="add-card">
@@ -1576,6 +1581,9 @@ var I18N={
     confirmDeleteProject:'Delete project "{name}"? This cannot be undone.',
     enterValidNumber:'Enter a valid number',
     lwLocked:'Length/width come from the DXF outline for shaped parts. Use "▭ Remove shape" in the Parts Manager to go back to a plain rectangle, or assign a different DXF.',
+    tplLink:'⤓ Parts list template (CSV)',
+    tplTip:'Download a small CSV you can fill in — just name, size and quantity. Far simpler than a full SWOOD report.',
+    tplDone:'✓ Template downloaded — fill it in and drop it back here',
     dxfAssignTitle:'Assign DXF shapes to parts',
     dxfAssignSetLW:'Take L/W from the DXF outline',
     dxfAssignAutoRot:'Auto-rotate 90° when that matches the part better',
@@ -1743,6 +1751,9 @@ var I18N={
     confirmDeleteProject:'Ištrinti projektą „{name}"? Veiksmas negrįžtamas.',
     enterValidNumber:'Įveskite teisingą skaičių',
     lwLocked:'Detalėms su forma ilgis ir plotis imami iš DXF kontūro. Norėdami grąžinti paprastą stačiakampį, spauskite „▭ Pašalinti formą" detalių valdyme, arba priskirkite kitą DXF.',
+    tplLink:'⤓ Detalių sąrašo šablonas (CSV)',
+    tplTip:'Atsisiųskite paprastą CSV — tereikia pavadinimo, matmenų ir kiekio. Daug paprasčiau nei pilna SWOOD ataskaita.',
+    tplDone:'✓ Šablonas atsisiųstas — užpildykite ir įkelkite atgal čia',
     dxfAssignTitle:'Priskirti DXF formas detalėms',
     dxfAssignSetLW:'Imti ilgį/plotį iš DXF kontūro',
     dxfAssignAutoRot:'Automatiškai pasukti 90°, jei taip labiau atitinka detalę',
@@ -4002,6 +4013,31 @@ function parseCSV(text){
   }
   return {rows:rows,headers:headers,sep:sep};
 }
+// ── Parts list template ────────────────────────────────────────────────────
+// A minimal CSV for people who do not have a SWOOD report: name, size, quantity
+// and material get you nesting; everything else is optional. Headers are written
+// in the current UI language, using exactly the spellings _csvFindCol matches
+// (ASCII, no diacritics — normalisation strips punctuation but not accents).
+// Semicolon-separated with a UTF-8 BOM so Excel opens it correctly in one click.
+function downloadPartsTemplate(){
+  var lt = (_lang==='lt');
+  var cols = lt
+    ? ['Pavadinimas','Ilgis','Plotis','Kiekis','Medziaga','Storis','Briauna L1','Briauna L2','Briauna W1','Briauna W2','Note 1']
+    : ['Name','Length','Width','Quantity','Material','Thickness','Edging Length 1','Edging Length 2','Edging Width 1','Edging Width 2','Note 1'];
+  // Rows are prefixed EXAMPLE_ so an accidental import of the untouched file is obvious.
+  var rows = [
+    ['EXAMPLE_FRONT','1307','409','2','MDF 18mm','18','ABS 2mm','ABS 2mm','ABS 2mm','ABS 2mm',''],
+    ['EXAMPLE_SIDE', '1292','350','4','MDF 18mm','18','ABS 1mm','ABS 1mm','','',''],
+    ['EXAMPLE_SHELF','464', '339','6','MDF 18mm','18','ABS 1mm','','','','CNC']
+  ];
+  var esc=function(v){ v=String(v==null?'':v); return /[";\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v; };
+  var csv=[cols.map(esc).join(';')].concat(rows.map(function(r){return r.map(esc).join(';');})).join('\r\n')+'\r\n';
+  downloadBlob(lt?'detaliu-sarasas-sablonas.csv':'parts-list-template.csv',
+               new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'}));
+  var st=document.getElementById('ist');
+  if(st){ st.style.color='#2f54eb'; st.textContent=t('tplDone'); }
+}
+
 function _csvFindCol(headers,keywords){
   var norm=headers.map(function(h){return h.toLowerCase().replace(/[^a-z0-9]/g,'');});
   for(var k=0;k<keywords.length;k++){
