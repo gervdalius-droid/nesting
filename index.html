@@ -291,7 +291,21 @@ input[type=color]{padding:2px 3px;height:27px;cursor:pointer}
 .pw-filters{display:flex;gap:6px;padding:8px 12px;border-bottom:1px solid #e6e8ed;flex-wrap:wrap;flex-shrink:0;background:#F7F5F0}
 .pw-filters input,.pw-filters select{width:auto;font-size:11px;padding:4px 8px}
 .pw-body{flex:1;overflow-y:auto;padding:0}
-.pw-tbl{width:100%;border-collapse:collapse;font-size:11px}
+/* table-layout:fixed makes the <colgroup> widths authoritative, which is what
+   lets the header dividers resize columns. min-width keeps it filling the modal
+   when the columns are narrow; it may exceed it and scroll when they are wide. */
+.pw-tbl{min-width:100%;border-collapse:collapse;font-size:11px;table-layout:fixed}
+.pw-tbl th{position:relative}
+.pw-tbl td{overflow:hidden;text-overflow:ellipsis}
+/* Drag handle sitting on the right edge of every header cell */
+/* Kept fully inside the th: each sticky header is its own stacking context, so a
+   handle overhanging the edge is painted over by the next header and never
+   receives the mousedown. */
+.pw-rsz{position:absolute;top:0;right:0;width:8px;height:100%;cursor:col-resize;z-index:3;user-select:none}
+.pw-rsz::after{content:'';position:absolute;top:20%;bottom:20%;right:0;width:1px;background:#c9ccd3}
+.pw-rsz:hover::after,.pw-rsz.drag::after{background:#2f54eb;top:0;bottom:0;width:2px}
+body.pw-resizing{cursor:col-resize!important;user-select:none}
+body.pw-resizing .pw-tbl th:hover{background:#F0EDE5}
 .pw-tbl th{position:sticky;top:0;background:#F0EDE5;padding:6px 10px;text-align:left;font-size:10px;font-weight:600;color:#667085;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid #e6e8ed;cursor:pointer;user-select:none;white-space:nowrap}
 .pw-tbl th:hover{background:#e6e8ed}
 .pw-tbl td{padding:5px 10px;border-bottom:1px solid #e9edf3;vertical-align:middle}
@@ -308,10 +322,10 @@ input[type=color]{padding:2px 3px;height:27px;cursor:pointer}
 .pw-swap-btn{border:1px solid #d2d7df;background:#ffffff;color:#2f54eb;font-size:13px;font-weight:600;padding:1px 5px;border-radius:3px;cursor:pointer;line-height:1}
 .pw-swap-btn:hover{background:#2f54eb;color:#fff;border-color:#2f54eb}
 .pw-edit-qty{font-weight:600;text-align:center}
-.pw-edit-num{font-family:monospace;color:#2f54eb;font-weight:600;max-width:72px;text-align:right}
-.pw-edit-t{max-width:56px;color:#667085;font-weight:400}
+.pw-edit-num{font-family:monospace;color:#2f54eb;font-weight:600;max-width:100%;text-align:right}
+.pw-edit-t{max-width:100%;color:#667085;font-weight:400}
 .pw-edit-name{font-weight:500}
-.pw-edit-mat{width:auto;min-width:110px;max-width:160px;padding:2px 4px;cursor:pointer}
+.pw-edit-mat{width:100%;min-width:0;max-width:100%;padding:2px 4px;cursor:pointer}
 .pw-tbl tr.sel .pw-edit:hover{background:#F5F2EC}
 /* hide number input spinners for cleaner look */
 .pw-edit-num::-webkit-inner-spin-button,.pw-edit-num::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
@@ -696,24 +710,26 @@ body.print-mode{background:#fff}
     </label>
     <button class="btn bs" onclick="pwSelectAll()" style="margin-left:auto">Select all</button>
     <button class="btn bs" onclick="pwClearSel()">Clear</button>
+    <button class="btn bs" onclick="pwResetColWidths()" title="Restore the default column widths. Drag the divider on a header's right edge to resize a column; double-click it to fit the contents.">⇔ Reset widths</button>
   </div>
   <div class="pw-body">
     <table class="pw-tbl">
+      <colgroup id="pw-colgroup"></colgroup>
       <thead><tr>
-        <th style="width:24px"><input type="checkbox" id="pw-chk-all" style="width:auto" onchange="pwToggleAll(this.checked)"></th>
-        <th onclick="pwSortBy('name')">Part name ↕</th>
-        <th onclick="pwSortBy('l')">L mm ↕</th>
-        <th onclick="pwSortBy('w')">W mm ↕</th>
-        <th style="width:30px" title="Swap L and W for this row"></th>
-        <th style="width:40px" title="Rotation — Auto / Allow / Lock. Click to cycle.">Rot</th>
-        <th style="width:54px">Qty</th>
-        <th onclick="pwSortBy('area')">Area m² ↕</th>
-        <th>Thickness</th>
-        <th onclick="pwSortBy('mat')">Material ↕</th>
-        <th>Edgebands</th>
-        <th>QR/CNC</th>
-        <th>Group</th>
-        <th style="width:28px"></th>
+        <th data-col="chk"><input type="checkbox" id="pw-chk-all" style="width:auto" onchange="pwToggleAll(this.checked)"></th>
+        <th data-col="name" onclick="pwSortBy('name')">Part name ↕</th>
+        <th data-col="l" onclick="pwSortBy('l')">L mm ↕</th>
+        <th data-col="w" onclick="pwSortBy('w')">W mm ↕</th>
+        <th data-col="swap" title="Swap L and W for this row"></th>
+        <th data-col="rot" title="Rotation — Auto / Allow / Lock. Click to cycle.">Rot</th>
+        <th data-col="qty">Qty</th>
+        <th data-col="area" onclick="pwSortBy('area')">Area m² ↕</th>
+        <th data-col="thick">Thickness</th>
+        <th data-col="mat" onclick="pwSortBy('mat')">Material ↕</th>
+        <th data-col="eb">Edgebands</th>
+        <th data-col="qr">QR/CNC</th>
+        <th data-col="grp">Group</th>
+        <th data-col="del"></th>
       </tr></thead>
       <tbody id="pw-tbody"></tbody>
     </table>
@@ -4472,8 +4488,124 @@ function renderParts(){
 var pwSel=new Set();
 var _pwSort='name';
 
+// ═══════════════════════════════════════════════════════════════════════════
+// PARTS MANAGER — resizable columns
+// Long part names ("HUVB-00…") were clipped by a hardcoded cell width. Column
+// widths now live in a <colgroup>, are dragged by the divider on the right edge
+// of each header cell, and are remembered per browser. Double-click a divider
+// to size that column to its widest cell; ⇔ Reset restores the defaults.
+// ═══════════════════════════════════════════════════════════════════════════
+var PW_COLS=[
+  {k:'chk',   w:26,  min:26},
+  {k:'name',  w:210, min:70},
+  {k:'l',     w:64,  min:44},
+  {k:'w',     w:64,  min:44},
+  {k:'swap',  w:32,  min:28},
+  {k:'rot',   w:42,  min:32},
+  {k:'qty',   w:54,  min:40},
+  {k:'area',  w:70,  min:48},
+  {k:'thick', w:70,  min:44},
+  {k:'mat',   w:132, min:60},
+  {k:'eb',    w:96,  min:48},
+  {k:'qr',    w:58,  min:40},
+  {k:'grp',   w:84,  min:44},
+  {k:'del',   w:30,  min:26}
+];
+var PW_COLW_KEY='pwColWidths';
+var _pwColW=(function(){
+  var out={}; PW_COLS.forEach(function(c){ out[c.k]=c.w; });
+  try{
+    var saved=JSON.parse(localStorage.getItem(PW_COLW_KEY)||'{}');
+    PW_COLS.forEach(function(c){
+      var v=parseInt(saved[c.k],10);
+      if(isFinite(v)&&v>=c.min) out[c.k]=v;
+    });
+  }catch(e){}
+  return out;
+})();
+function _pwSaveColW(){ try{ localStorage.setItem(PW_COLW_KEY,JSON.stringify(_pwColW)); }catch(e){} }
+function _pwColMin(k){ for(var i=0;i<PW_COLS.length;i++) if(PW_COLS[i].k===k) return PW_COLS[i].min; return 30; }
+
+// Rebuild <colgroup> and make sure each header carries a drag handle.
+function pwApplyColWidths(){
+  var cg=document.getElementById('pw-colgroup');
+  if(!cg) return;
+  cg.innerHTML=PW_COLS.map(function(c){
+    return '<col data-col="'+c.k+'" style="width:'+_pwColW[c.k]+'px">';
+  }).join('');
+  // With table-layout:fixed the browser squeezes the columns to fit the table's
+  // own width, so the table has to be as wide as the columns ask for — that is
+  // what makes a widened column actually widen instead of the others shrinking.
+  var tbl=cg.parentElement, total=0;
+  PW_COLS.forEach(function(c){ total+=_pwColW[c.k]; });
+  if(tbl) tbl.style.width=total+'px';
+  document.querySelectorAll('.pw-tbl thead th[data-col]').forEach(function(th){
+    var k=th.getAttribute('data-col');
+    if(k==='del') return;                       // nothing to drag against on the last column
+    if(th.querySelector('.pw-rsz')) return;
+    var h=document.createElement('div');
+    h.className='pw-rsz';
+    h.title='Drag to resize · double-click to fit contents';
+    h.addEventListener('mousedown',function(e){ pwStartColResize(e,k,h); });
+    h.addEventListener('dblclick',function(e){ e.preventDefault();e.stopPropagation(); pwAutoFitCol(k); });
+    h.addEventListener('click',function(e){ e.stopPropagation(); });   // never trigger the sort
+    th.appendChild(h);
+  });
+}
+function pwStartColResize(e,k,handle){
+  e.preventDefault(); e.stopPropagation();
+  var startX=e.clientX, startW=_pwColW[k], min=_pwColMin(k);
+  document.body.classList.add('pw-resizing');
+  handle.classList.add('drag');
+  function move(ev){
+    var w=Math.max(min, Math.round(startW+(ev.clientX-startX)));
+    if(w===_pwColW[k]) return;
+    _pwColW[k]=w;
+    pwApplyColWidths();   // also re-widens the table so the column really grows
+  }
+  function up(){
+    document.removeEventListener('mousemove',move);
+    document.removeEventListener('mouseup',up);
+    document.body.classList.remove('pw-resizing');
+    handle.classList.remove('drag');
+    _pwSaveColW();
+  }
+  document.addEventListener('mousemove',move);
+  document.addEventListener('mouseup',up);
+}
+// Widen (or narrow) a column to its widest rendered content.
+function pwAutoFitCol(k){
+  var idx=-1;
+  for(var i=0;i<PW_COLS.length;i++) if(PW_COLS[i].k===k){ idx=i; break; }
+  if(idx<0) return;
+  var probe=document.createElement('span');
+  probe.style.cssText='position:absolute;visibility:hidden;white-space:nowrap;font:11px '+getComputedStyle(document.body).fontFamily;
+  document.body.appendChild(probe);
+  var widest=0;
+  var th=document.querySelector('.pw-tbl thead th[data-col="'+k+'"]');
+  if(th){ probe.style.font='600 10px '+getComputedStyle(document.body).fontFamily; probe.textContent=th.textContent.trim(); widest=probe.offsetWidth; }
+  probe.style.font='11px '+getComputedStyle(document.body).fontFamily;
+  document.querySelectorAll('.pw-tbl tbody tr').forEach(function(tr){
+    var td=tr.children[idx]; if(!td) return;
+    var inp=td.querySelector('input[type=text],input:not([type]),select');
+    var txt=inp?(inp.value||''):td.textContent.trim();
+    probe.textContent=txt;
+    if(probe.offsetWidth>widest) widest=probe.offsetWidth;
+  });
+  document.body.removeChild(probe);
+  _pwColW[k]=Math.max(_pwColMin(k), Math.min(520, widest+34));  // padding + icons
+  _pwSaveColW();
+  pwApplyColWidths();
+}
+function pwResetColWidths(){
+  PW_COLS.forEach(function(c){ _pwColW[c.k]=c.w; });
+  _pwSaveColW();
+  pwApplyColWidths();
+}
+
 function openPartsWindow(){
   var ov=document.getElementById('pw-overlay');ov.classList.add('open');
+  pwApplyColWidths();
   // Show the saved merge kerf; placeholder falls back to the saw kerf when blank
   var mk=document.getElementById('pw-merge-kerf');
   if(mk){
@@ -4548,6 +4680,7 @@ function filteredPwParts(){
   return filtered;
 }
 function renderPartsWindow(){
+  pwApplyColWidths();
   refreshPwMatDropdown();
   var filteredAll=filteredPwParts();
   // Deduplicate by group key so identical parts show as ONE row
@@ -4590,7 +4723,7 @@ function renderPartsWindow(){
       +'</select>';
     return'<tr class="'+(isSel?'sel':'')+(isMerged?' pw-merged':'')+'" data-id="'+sid+'">'
       +'<td><input type="checkbox" class="pw-row-chk" '+(isSel?'checked':'')+' data-id="'+sid+'" style="width:auto;cursor:pointer"></td>'
-      +'<td style="max-width:220px"><div style="display:flex;align-items:center;gap:4px">'+mergeIcon+(p.shape?'<span title="DXF shape — L/W locked" style="font-size:10px;color:#2f54eb;flex-shrink:0">📐</span>':'')+'<input class="pw-edit pw-edit-name'+(isMerged?' pw-name-merged':'')+'" data-id="'+sid+'" value="'+esc(p.origName)+'" title="'+esc(p.origName)+'" onchange="pwEditField(\''+sid+'\',\'name\',this.value)"></div></td>'
+      +'<td class="pw-cell-name"><div style="display:flex;align-items:center;gap:4px;min-width:0">'+mergeIcon+(p.shape?'<span title="DXF shape — L/W locked" style="font-size:10px;color:#2f54eb;flex-shrink:0">📐</span>':'')+'<input class="pw-edit pw-edit-name'+(isMerged?' pw-name-merged':'')+'" data-id="'+sid+'" value="'+esc(p.origName)+'" title="'+esc(p.origName)+'" onchange="pwEditField(\''+sid+'\',\'name\',this.value)"></div></td>'
       +'<td><input class="pw-edit pw-edit-num pw-edit-l" data-id="'+sid+'" type="number" min="1" value="'+p.l+'" onchange="pwEditField(\''+sid+'\',\'l\',this.value)"></td>'
       +'<td><input class="pw-edit pw-edit-num pw-edit-w" data-id="'+sid+'" type="number" min="1" value="'+p.w+'" onchange="pwEditField(\''+sid+'\',\'w\',this.value)"></td>'
       +'<td style="text-align:center;padding:0"><button class="pw-swap-btn" title="Swap L and W for this part (also rotates DXF shape 90°)" onclick="pwSwapRow(\''+sid+'\')">⇆</button></td>'
