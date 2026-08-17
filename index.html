@@ -9335,6 +9335,8 @@ function openQuotePrint(){
     + 'td{padding:9px 10px;border-bottom:1px solid #e9edf3}'
     + 'tr.sub td{border-top:1px solid #1b1e26;border-bottom:none;font-weight:500;padding-top:12px;color:#667085}'
     + 'tr.gt td{background:#1b1e26;color:#eceef2;font-size:17px;font-weight:700;padding:14px 10px}'
+    + 'tr.aftergt td{padding-top:10px;border-bottom:none}'
+    + 'tr.incl td{color:#667085;font-weight:600;border-bottom:none;padding-top:2px}'
     + '.secttl{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:#667085;font-weight:600;margin:26px 0 8px}'
     + 'table.parts{font-size:11.5px;margin-bottom:18px}'
     + 'table.parts th{padding:7px 8px;border-bottom:1px solid #1b1e26}'
@@ -9373,9 +9375,11 @@ function openQuotePrint(){
     + rowsHtml
     // Always spell out both figures. Showing a lone "Total" left the customer
     // guessing whether VAT was in it; with a 0% rate the two simply match.
-    + '<tr class="sub"><td colspan="3" style="text-align:right">Total excl. VAT</td><td class="n">'+fm(q.afterMargin)+'</td></tr>'
-    + '<tr><td colspan="3" style="text-align:right;color:#667085">VAT '+(q.vat||0)+'%</td><td class="n">+'+fm(q.vatAmt)+'</td></tr>'
-    + '<tr class="gt"><td colspan="3" style="text-align:right">Total incl. VAT</td><td class="n">'+fm(q.grand)+'</td></tr>'
+    // Business customers reclaim VAT, so the net figure is the one they compare
+    // and approve — it gets the emphasis. Gross follows underneath for completeness.
+    + '<tr class="gt"><td colspan="3" style="text-align:right">Total excl. VAT</td><td class="n">'+fm(q.afterMargin)+'</td></tr>'
+    + '<tr class="aftergt"><td colspan="3" style="text-align:right;color:#667085">VAT '+(q.vat||0)+'%</td><td class="n">+'+fm(q.vatAmt)+'</td></tr>'
+    + '<tr class="incl"><td colspan="3" style="text-align:right">Total incl. VAT</td><td class="n">'+fm(q.grand)+'</td></tr>'
     + '</tbody></table>'
     + partsTableHtml
     + '<div class="notes">'
