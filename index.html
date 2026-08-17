@@ -638,6 +638,7 @@ body.print-mode{background:#fff}
         <input id="qp-vat" type="number" step="0.1" min="0" value="0" oninput="renderQuote()">
       </div>
       <label class="qp-cb" title="Include edgeband cost (uses SWOOD edgeband lengths if present)"><input type="checkbox" id="qp-edge" checked onchange="renderQuote()"> Edgeband</label>
+      <button class="btn bs" id="qp-eb-all" onclick="quoteApplyEdgebandAll()" data-i18n="ebApplyAll" title="Set an edgeband on every part, on all four sides — the quickest way to price a fully banded job. Per-part control lives in the Parts Manager.">🪵 Edgeband all parts</button>
     </div>
     <div id="qp-body"></div>
     <div class="qp-actions">
@@ -746,6 +747,16 @@ body.print-mode{background:#fff}
     <!-- Replace rectangles from a report list with real DXF outlines -->
     <button class="btn bs" onclick="pwAssignDXFPick()" title="Give the selected parts their true shape from DXF files. Files are matched to parts by name; nesting then uses the real outline instead of the bounding rectangle." style="color:#2f54eb;border-color:#2f54eb">📐 Assign DXF shape</button>
     <button class="btn bs" onclick="pwRemoveShape()" title="Drop the DXF outline from the selected parts and go back to a plain rectangle">▭ Remove shape</button>
+    <label style="display:flex;align-items:center;gap:4px;font-size:11px;color:#667085;white-space:nowrap" title="Apply an edgeband to the ticked parts — or to every part when nothing is ticked. Length edges are the two long sides, width edges the two short ones.">
+      🪵 <input id="pw-eb-name" placeholder="ABS 1mm" style="width:76px;padding:2px 4px;font-size:11px">
+      <select id="pw-eb-sides" style="width:auto;font-size:11px;padding:2px 4px">
+        <option value="all">All 4 sides</option>
+        <option value="length">Length edges</option>
+        <option value="width">Width edges</option>
+        <option value="clear">Clear</option>
+      </select>
+      <button class="btn bs" onclick="pwApplyEdgeband()">Apply</button>
+    </label>
     <input type="file" id="pw-dxf-in" accept=".dxf,.DXF" multiple style="display:none" onchange="pwAssignDXFFiles(this)">
     <div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap">
       <span style="font-size:11px;color:#667085">Rotation:</span>
@@ -1599,6 +1610,12 @@ var I18N={
     confirmDeleteProject:'Delete project "{name}"? This cannot be undone.',
     enterValidNumber:'Enter a valid number',
     lwLocked:'Length/width come from the DXF outline for shaped parts. Use "▭ Remove shape" in the Parts Manager to go back to a plain rectangle, or assign a different DXF.',
+    ebNoParts:'Add some parts first.',
+    ebPrompt:'Edgeband to apply to every part, on all four sides:',
+    ebApplied:'✓ Edgebanded {n} part(s) — {m} m total',
+    ebClearConfirm:'Remove the edgebanding from {n} part(s)?',
+    ebNone:'No edgebanding on any part yet',
+    ebApplyAll:'🪵 Edgeband all parts',
     sheetsHave:'Sheets I have',
     sheetsUnlimited:'0 = unlimited',
     stockShortTitle:'Not enough sheets for this cut',
@@ -1775,6 +1792,12 @@ var I18N={
     confirmDeleteProject:'Ištrinti projektą „{name}"? Veiksmas negrįžtamas.',
     enterValidNumber:'Įveskite teisingą skaičių',
     lwLocked:'Detalėms su forma ilgis ir plotis imami iš DXF kontūro. Norėdami grąžinti paprastą stačiakampį, spauskite „▭ Pašalinti formą" detalių valdyme, arba priskirkite kitą DXF.',
+    ebNoParts:'Pirma pridėkite detalių.',
+    ebPrompt:'Kokią briauną klijuoti visoms detalėms iš visų keturių pusių:',
+    ebApplied:'✓ Užklijuota briauna {n} detalei(-ėms) — iš viso {m} m',
+    ebClearConfirm:'Pašalinti briaunas nuo {n} detalės(-ių)?',
+    ebNone:'Nė viena detalė kol kas neturi briaunų',
+    ebApplyAll:'🪵 Briauna visoms detalėms',
     sheetsHave:'Turiu lakštų',
     sheetsUnlimited:'0 = neribota',
     stockShortTitle:'Nepakanka lakštų šiam pjovimui',
@@ -3538,8 +3561,8 @@ async function processFile(f){
           var lamLen = _hdr.lamL>=0 ? (parseInt(row[_hdr.lamL],10)||0) : 0;
           var lamWid = _hdr.lamW>=0 ? (parseInt(row[_hdr.lamW],10)||0) : 0;
           var eb={eb1:'',eb2:'',eb3:'',eb4:''};
-          if(lamLen>=1) eb.eb1='PVC'; if(lamLen>=2) eb.eb3='PVC';   // long edges
-          if(lamWid>=1) eb.eb2='PVC'; if(lamWid>=2) eb.eb4='PVC';   // short edges
+          if(lamLen>=1) eb.eb1='PVC'; if(lamLen>=2) eb.eb2='PVC';   // long edges  → eb1/eb2
+          if(lamWid>=1) eb.eb3='PVC'; if(lamWid>=2) eb.eb4='PVC';   // short edges → eb3/eb4
           var nm='Plokštė '+Math.round(L)+'×'+Math.round(W);
           for(var j=0;j<qty;j++){
             parts.push({id:Date.now()+added, name:nm, origName:nm,
@@ -5028,6 +5051,58 @@ function _dxfAssignFitRotation(row){
   var asIs=Math.abs(c.part.l-row.pr.l)+Math.abs(c.part.w-row.pr.w);
   var turned=Math.abs(c.part.l-row.pr.w)+Math.abs(c.part.w-row.pr.l);
   if(turned<asIs-0.5){ rotateShape90(row.pr); row.rotated=!row.rotated; }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// EDGEBANDING — apply in bulk
+// Until now an edgeband could only arrive with an import, so a manually built
+// or CSV-imported list had no banding at all and the quote showed 0.0 m / €0.
+// sides: 'all' | 'length' (the two long edges) | 'width' (the two short) | 'clear'
+// ═══════════════════════════════════════════════════════════════════════════
+var EB_DEFAULT_NAME='ABS 1mm';
+function applyEdgeband(targets,name,sides){
+  name=(name||'').trim();
+  if(sides!=='clear'&&!name) name=EB_DEFAULT_NAME;
+  var n=0;
+  targets.forEach(function(p){
+    if(!p.eb) p.eb={eb1:'',eb2:'',eb3:'',eb4:''};
+    // Exclusive, not additive: Apply defines the banding for these parts, so the
+    // result never depends on what happened to be set before.
+    if(sides==='clear'){ p.eb.eb1=p.eb.eb2=p.eb.eb3=p.eb.eb4=''; }
+    else if(sides==='length'){ p.eb.eb1=p.eb.eb2=name; p.eb.eb3=p.eb.eb4=''; }
+    else if(sides==='width'){ p.eb.eb3=p.eb.eb4=name; p.eb.eb1=p.eb.eb2=''; }
+    else { p.eb.eb1=p.eb.eb2=p.eb.eb3=p.eb.eb4=name; }
+    n++;
+  });
+  if(n){ renderParts(); scheduleSave&&scheduleSave(); renderQuote(); }
+  return n;
+}
+// Total banding metres over the whole job — used for the "no edgeband" hint.
+function totalEdgebandM(){
+  var mm=0; parts.forEach(function(p){ mm+=partEdgebandMm(p); });
+  return mm/1000;
+}
+// Parts Manager: acts on the ticked rows, or on everything when nothing is ticked.
+function pwApplyEdgeband(){
+  var sel=parts.filter(function(p){ return pwSel.has(String(p.id)); });
+  var targets=sel.length?sel:parts.slice();
+  if(!targets.length){ alert(t('ebNoParts')); return; }
+  var name=(document.getElementById('pw-eb-name')||{}).value||'';
+  var sides=(document.getElementById('pw-eb-sides')||{}).value||'all';
+  if(sides==='clear'&&!confirm(t('ebClearConfirm',{n:targets.length}))) return;
+  var n=applyEdgeband(targets,name,sides);
+  renderPartsWindow();
+  var st=document.getElementById('ist');
+  if(st){ st.style.color='#2f54eb'; st.textContent=t('ebApplied',{n:n,m:totalEdgebandM().toFixed(1)}); }
+}
+// Quotation panel: one click, every part, all four sides.
+function quoteApplyEdgebandAll(){
+  if(!parts.length){ alert(t('ebNoParts')); return; }
+  var name=prompt(t('ebPrompt'),EB_DEFAULT_NAME);
+  if(name===null) return;
+  var n=applyEdgeband(parts.slice(),name,'all');
+  if(document.getElementById('pw-overlay').classList.contains('open')) renderPartsWindow();
+  alert(t('ebApplied',{n:n,m:totalEdgebandM().toFixed(1)}));
 }
 
 function pwAssignDXFPick(){
@@ -8926,7 +9001,7 @@ function _refreshStats(){
 //   - sheet area (uw*uh) or used part area (pw*ph)        -> €/m²
 //   - cutting length: perimeter of each part placement     -> €/m
 //   - flat per-part fee                                    -> €/part
-//   - edgeband length from p.eb (eb1/eb3 = L, eb2/eb4 = W) -> €/m
+//   - edgeband length from p.eb (eb1/eb2 = L, eb3/eb4 = W) -> €/m
 //   - setup fee per sheet
 // then applies margin% and VAT% on the subtotal.
 // ═══════════════════════════════════════════════════════════════
@@ -8948,14 +9023,24 @@ function _placementPerimeter(p){
 }
 // Total edgeband length in mm for one placement (uses original part L/W,
 // since edges 1&3 are along L and 2&4 along W, regardless of rotation).
+// Canonical edge slots, matching the import column names and the parts template:
+//   eb1, eb2 = the two LENGTH edges (each part.l long)
+//   eb3, eb4 = the two WIDTH  edges (each part.w long)
+// Every producer (SWOOD, CSV, manual, bulk apply) and every consumer (cost,
+// label, CSV export) uses this one mapping — they used to disagree, which is
+// why banded parts came out with the wrong metres.
 function _placementEdgebandMm(p){
   var part = p.part; if(!part) return 0;
+  return partEdgebandMm(part);
+}
+function partEdgebandMm(part){
+  if(!part) return 0;
   var eb = part.eb || {};
   var L = part.l||0, W = part.w||0;
   var mm = 0;
   if (eb.eb1) mm += L;
-  if (eb.eb3) mm += L;
-  if (eb.eb2) mm += W;
+  if (eb.eb2) mm += L;
+  if (eb.eb3) mm += W;
   if (eb.eb4) mm += W;
   return mm;
 }
@@ -10504,13 +10589,13 @@ function buildLabel(p,lay){
   if (qr1SVG) h+=qr1SVG;
   else h+='<div style="font-size:9px;color:#bbb;text-align:center;line-height:1.4">NO<br>CNC</div>';
   h+='</div>';
-  // EBL (rowspan=6)
-  h+='<div class="lc leb" style="grid-row:span 6">'+esc(eb1||'')+'</div>';
-  // Center col: row2=eb-top, rows3-6=panel, row7=eb-bot
-  h+='<div class="lc leb-top">'+esc(eb2||'')+'</div>';
+  // EBL (rowspan=6) — left edge runs along the WIDTH
+  h+='<div class="lc leb" style="grid-row:span 6">'+esc(eb3||'')+'</div>';
+  // Center col: row2=eb-top, rows3-6=panel, row7=eb-bot — both run along the LENGTH
+  h+='<div class="lc leb-top">'+esc(eb1||'')+'</div>';
   h+='<div class="lc lpanel" style="grid-row:span 4">'+panelSVG+'</div>';
-  h+='<div class="lc leb-bot">'+esc(eb3||'')+'</div>';
-  // EBR (rowspan=6)
+  h+='<div class="lc leb-bot">'+esc(eb2||'')+'</div>';
+  // EBR (rowspan=6) — right edge runs along the WIDTH
   h+='<div class="lc leb" style="grid-row:span 6">'+esc(eb4||'')+'</div>';
   // QR2 (rowspan=6)
   h+='<div class="lc lqr" style="grid-row:span 6">';
