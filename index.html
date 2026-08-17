@@ -7042,8 +7042,9 @@ function optimize(){
     var finalLayouts = _consolidateLayout(bestLayouts || [], kerf, grainLocked);
     return { layouts: finalLayouts, placedIds: bestPlacedIds || {} };
   }
-  boards.forEach(function(bd){
+  boards.forEach(function(bd,bIdx){
     var bp=byBoard[bd.id];if(!bp||!bp.length)return;
+    var startIdx=layouts.length;   // where this board's sheets begin
     // Per-machine usable area calculation. If a part is bigger than what
     // the trim allows, we reduce trim to 0 only for the machine that's
     // actually using that big part — the other machine keeps its trim.
@@ -7111,11 +7112,42 @@ function optimize(){
       });
       Object.keys(res.placedIds).forEach(function(id){ allPlacedIds[id]=true; });
     }
+    // ── Limited stock spills onto the next board of the same material ──
+    // Two boards may share a name on purpose: a full 2800×2070 sheet and a
+    // stack of 2800×1035 offcuts, say. Parts all start on the first board, so
+    // once its "Sheets I have" is used up, the sheets beyond that stock are
+    // unwound and their parts handed to the next board of the same material.
+    var laterSame=null;
+    for(var bi=bIdx+1; bi<boards.length; bi++){
+      if(normalizeMat(boards[bi].mat)===normalizeMat(bd.mat)){ laterSame=boards[bi]; break; }
+    }
+    if(bd.qty>0 && laterSame && (layouts.length-startIdx)>bd.qty){
+      var spilled=layouts.splice(startIdx+bd.qty);
+      var moved=[];
+      spilled.forEach(function(l){
+        l.placements.forEach(function(pl){
+          if(pl.part){ moved.push(pl.part); delete allPlacedIds[pl.part.id]; }
+        });
+      });
+      if(moved.length) byBoard[laterSame.id]=(byBoard[laterSame.id]||[]).concat(moved);
+    }
     var unplacedHere=bp.filter(function(p){ return !allPlacedIds[p.id]; });
+    // Parts handed to a later board of the same material are not unplaced —
+    // they get their chance when that board is packed.
+    if(laterSame){
+      var handed={};
+      (byBoard[laterSame.id]||[]).forEach(function(p){ handed[p.id]=true; });
+      unplacedHere=unplacedHere.filter(function(p){ return !handed[p.id]; });
+    }
     if(unplacedHere.length){
-      unplacedByMat[bd.mat]={count:unplacedHere.length, boardQty:bd.qty, parts:unplacedHere};
+      // Keyed per BOARD: two boards can share a name, and keying by name alone
+      // let the second overwrite the first's tally instead of adding to it.
+      var _uk=bd.mat+(boards.filter(function(o){return normalizeMat(o.mat)===normalizeMat(bd.mat);}).length>1?' '+bd.w+'×'+bd.h:'');
+      unplacedByMat[_uk]={count:unplacedHere.length, boardQty:bd.qty, parts:unplacedHere};
     }
   });
+  // Sheet numbering must be contiguous after any spill-over removed sheets.
+  layouts.forEach(function(l,i){ l.idx=i; });
   var totA=layouts.reduce(function(a,l){return a+l.uw*l.uh;},0);
   var usedA=layouts.reduce(function(a,l){return a+l.placements.reduce(function(b,p){return b+p.pw*p.ph;},0);},0);
   var eff=totA?Math.round(usedA/totA*100):0;
@@ -7135,7 +7167,7 @@ function optimize(){
   var _shortRep=sheetStockReport().filter(function(r){return r.short>0;});
   if(_shortRep.length){
     warnings.unshift('⚠ '+t('stockShortTitle')+'\n\n'
-      +_shortRep.map(function(r){return '  "'+r.mat+'": needs '+r.used+', you have '+r.have+' — short '+r.short;}).join('\n'));
+      +_shortRep.map(function(r){return '  "'+(r.label||r.mat)+'": needs '+r.used+', you have '+r.have+' — short '+r.short;}).join('\n'));
   }
   // ── Build unplaced-parts warning (parts that couldn't fit on ANY sheet) ──
   var totUnplaced=0;
@@ -7995,22 +8027,50 @@ function computeLayoutDupGroups(){
 // never silently capped — every part is still laid out — but a shortfall is
 // reported so it is caught before the saw rather than at it.
 function sheetStockReport(){
-  var used={};
-  layouts.forEach(function(l){ var m=normalizeMat(l.matName); used[m]=(used[m]||0)+1; });
-  var out=[];
-  Object.keys(used).forEach(function(m){
-    var bd=matchBoard(m)||boards.filter(function(b){return normalizeMat(b.mat)===m;})[0];
-    var have=(bd&&bd.qty>0)?bd.qty:0;   // 0 / missing → unlimited, nothing to report
-    out.push({mat:m, used:used[m], have:have, short:have>0?Math.max(0,used[m]-have):0});
+  // Reported per BOARD, not per material name: the same name may legitimately
+  // cover several stock sizes (a full sheet plus a stack of offcuts), and each
+  // of those is its own pile with its own count. Layouts are matched back to
+  // their board by name AND sheet size.
+  var nameCount={};
+  boards.forEach(function(b){ var m=normalizeMat(b.mat); nameCount[m]=(nameCount[m]||0)+1; });
+  var out=[], claimed=0;
+  boards.forEach(function(b){
+    var m=normalizeMat(b.mat);
+    var used=layouts.filter(function(l){
+      return normalizeMat(l.matName)===m && l.sw===b.w && l.sh===b.h;
+    }).length;
+    claimed+=used;
+    var have=(b.qty>0)?b.qty:0;   // 0 → unlimited, nothing to report
+    if(!used && !have) return;
+    out.push({
+      mat:b.mat,
+      label:b.mat+(nameCount[m]>1?' '+b.w+'×'+b.h:''),   // disambiguate same-named stock lines
+      used:used, have:have, short:have>0?Math.max(0,used-have):0
+    });
   });
-  out.sort(function(a,b){ return b.short-a.short || a.mat.localeCompare(b.mat); });
+  // Sheets whose size matches no current board (project loaded after a board edit)
+  if(claimed<layouts.length){
+    var rest={};
+    layouts.forEach(function(l){
+      var m=normalizeMat(l.matName);
+      var hit=boards.some(function(b){ return normalizeMat(b.mat)===m && l.sw===b.w && l.sh===b.h; });
+      if(!hit){ var k=l.matName+' '+l.sw+'×'+l.sh; rest[k]=(rest[k]||0)+1; }
+    });
+    Object.keys(rest).forEach(function(k){ out.push({mat:k,label:k,used:rest[k],have:0,short:0}); });
+  }
+  out.sort(function(a,b){ return b.short-a.short || a.label.localeCompare(b.label); });
   return out;
 }
 // Sheet index within its own material, 1-based — used to mark the tabs that
 // go beyond the sheets you own.
 function _sheetOrdinals(){
+  // Counted per stock line (name + sheet size), so the first offcut sheet is
+  // "#1 of the offcuts" rather than "#3 of that material".
   var seen={},ord=[];
-  layouts.forEach(function(l){ var m=normalizeMat(l.matName); seen[m]=(seen[m]||0)+1; ord.push(seen[m]); });
+  layouts.forEach(function(l){
+    var k=normalizeMat(l.matName)+'|'+l.sw+'x'+l.sh;
+    seen[k]=(seen[k]||0)+1; ord.push(seen[k]);
+  });
   return ord;
 }
 function renderStockWarning(){
@@ -8024,7 +8084,7 @@ function renderStockWarning(){
   el.innerHTML='<div style="background:'+bg+';border:1px solid '+bd+';border-radius:8px;padding:7px 10px;font-size:11px;color:'+fg+'">'
     +'<span style="font-weight:700">'+(short.length?'⚠ '+t('stockShortTitle'):'📦 '+t('stockOkTitle'))+'</span> '
     +rep.map(function(r){
-       return '<span style="margin-left:8px;white-space:nowrap">'+esc(r.mat)+': <b>'+r.used+'</b> / '+r.have
+       return '<span style="margin-left:8px;white-space:nowrap">'+esc(r.label||r.mat)+': <b>'+r.used+'</b> / '+r.have
          +(r.short?' <span style="font-weight:700">('+t('stockShortBy',{n:r.short})+')</span>':' ✓')+'</span>';
      }).join(' ·')
     +'</div>';
@@ -8033,8 +8093,6 @@ function renderStockWarning(){
 function buildTabs(){
   var dups = computeLayoutDupGroups();
   var ords = _sheetOrdinals();
-  var stock = {};
-  sheetStockReport().forEach(function(r){ stock[r.mat]=r.have; });
   document.getElementById('tabs').innerHTML=layouts.map(function(l,i){
     var warn=l.trimWarning?'<span style="color:#B84040;margin-left:2px" title="No trim">⚠</span>':'';
     var grain=l.grainLocked?'<span style="color:#2f54eb;margin-left:2px" title="Grain locked">🌾</span>':'';
@@ -8050,8 +8108,9 @@ function buildTabs(){
     if(dupCount > 1){
       dupBadge = '<span style="margin-left:4px;padding:0 4px;background:#2f54eb;color:#fff;border-radius:3px;font-size:9px;font-weight:600" title="'+dups.occurrence[i]+' of '+dupCount+' identical sheets">×'+dupCount+'</span>';
     }
-    // Sheet beyond the number of sheets you own for this material
-    var have=stock[normalizeMat(l.matName)]||0;
+    // Sheet beyond the number of sheets you own of THIS stock size
+    var bdFor=boards.filter(function(b){return normalizeMat(b.mat)===normalizeMat(l.matName)&&b.w===l.sw&&b.h===l.sh;})[0];
+    var have=(bdFor&&bdFor.qty>0)?bdFor.qty:0;
     var over=(have>0 && ords[i]>have)
       ? '<span style="color:#B84040;margin-left:3px;font-weight:700" title="'+esc(t('stockOverTab',{n:ords[i],have:have}))+'">📦!</span>'
       : '';
