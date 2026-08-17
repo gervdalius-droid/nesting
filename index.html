@@ -9258,6 +9258,54 @@ function openQuotePrint(){
   // across the materials, so each line still has a price but the breakdown
   // doesn't reveal the cost structure. Each row's customer-share = rowTotal/subtotal * (afterMargin).
   // VAT shown separately at the bottom. This way the customer sees a clean line-item quote.
+  // ── Parts specification table ──────────────────────────────────────────
+  // What the customer is actually buying, so the quote is checkable against
+  // the order. Built from the placed parts (matching the "Parts" figure), with
+  // identical pieces collapsed to one row plus a quantity. Merged strips are
+  // expanded back into the pieces they will be cut into — the customer ordered
+  // those, not the strip.
+  var pGroups={}, pOrder=[];
+  layouts.forEach(function(l){
+    (l.placements||[]).forEach(function(pl){
+      var pieces=(pl.part&&pl.part.__merged&&pl.part.__mergedFrom&&pl.part.__mergedFrom.length)
+        ? pl.part.__mergedFrom : [pl.part];
+      pieces.forEach(function(pt){
+        if(!pt) return;
+        var key=(pt.origName||pt.name||'?')+'|'+pt.l+'x'+pt.w+'|'+(pt.thick||'')+'|'+(pt.mat||'');
+        if(!pGroups[key]){
+          pGroups[key]={name:pt.origName||pt.name||'?', l:pt.l, w:pt.w, thick:pt.thick,
+                        mat:pt.mat, edged:partEdgebandMm(pt)>0, qty:0};
+          pOrder.push(key);
+        }
+        pGroups[key].qty++;
+      });
+    });
+  });
+  pOrder.sort(function(a,b){
+    var A=pGroups[a],B=pGroups[b];
+    return (B.l*B.w)-(A.l*A.w) || A.name.localeCompare(B.name);
+  });
+  var anyEdged=pOrder.some(function(k){return pGroups[k].edged;});
+  var partsTableHtml='';
+  if(pOrder.length){
+    partsTableHtml = '<div class="secttl">Parts</div>'
+      + '<table class="parts"><thead><tr>'
+      + '<th>Part</th><th class="n">Size (mm)</th><th class="n">Thick</th><th>Material</th>'
+      + (anyEdged?'<th class="n">Edged</th>':'')
+      + '<th class="n">Qty</th>'
+      + '</tr></thead><tbody>'
+      + pOrder.map(function(k){
+          var g=pGroups[k];
+          return '<tr><td>'+esc(g.name)+'</td>'
+            + '<td class="n">'+g.l+' × '+g.w+'</td>'
+            + '<td class="n">'+(g.thick||'')+'</td>'
+            + '<td>'+esc(g.mat||'')+'</td>'
+            + (anyEdged?'<td class="n">'+(g.edged?'✓':'')+'</td>':'')
+            + '<td class="n"><b>'+g.qty+'</b></td></tr>';
+        }).join('')
+      + '</tbody></table>';
+  }
+
   var netTotal = q.afterMargin;  // price before VAT, after all markups
   var rowsHtml = '';
   q.rows.forEach(function(r){
@@ -9287,14 +9335,27 @@ function openQuotePrint(){
     + 'td{padding:9px 10px;border-bottom:1px solid #e9edf3}'
     + 'tr.sub td{border-top:1px solid #1b1e26;border-bottom:none;font-weight:500;padding-top:12px;color:#667085}'
     + 'tr.gt td{background:#1b1e26;color:#eceef2;font-size:17px;font-weight:700;padding:14px 10px}'
+    + '.secttl{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:#667085;font-weight:600;margin:26px 0 8px}'
+    + 'table.parts{font-size:11.5px;margin-bottom:18px}'
+    + 'table.parts th{padding:7px 8px;border-bottom:1px solid #1b1e26}'
+    + 'table.parts td{padding:6px 8px}'
+    + 'table.parts tr{break-inside:avoid;page-break-inside:avoid}'
+    + 'thead{display:table-header-group}'   // repeat the header when a long list breaks across pages
     + '.notes{font-size:11px;color:#667085;margin-top:24px;padding-top:14px;border-top:1px solid #e6e8ed;line-height:1.55}'
     + '.notes b{color:#1b1e26}'
     + '.foot{font-size:11px;color:#667085;margin-top:36px;padding-top:14px;border-top:1px solid #e6e8ed;text-align:center;line-height:1.6}'
     + '.foot b{color:#1b1e26;font-size:12px}'
-    + '@media print{body{padding:15mm}.no-print{display:none}}'
     + '.no-print{position:fixed;top:12px;right:12px;display:flex;gap:6px}'
     + '.no-print button{padding:8px 14px;border:1px solid #1b1e26;background:#ffffff;border-radius:6px;font-size:13px;cursor:pointer}'
     + '.no-print button.pri{background:#2f54eb;color:#fff;border-color:#2f54eb}'
+    // margin:0 leaves the browser no room to stamp its own date / title / URL /
+    // page-number into the page margin — the customer gets a clean sheet. The
+    // visual margin comes from the body padding instead.
+    + '@page{size:A4 portrait;margin:0}'
+    // Must come AFTER .no-print's base rule: a media query adds no specificity,
+    // so declaring display:none first let the later display:flex win and the
+    // on-screen buttons printed onto the quote.
+    + '@media print{body{padding:15mm}.no-print{display:none!important}}'
     + '</style></head><body>'
     + '<div class="no-print"><button class="pri" onclick="window.print()">🖨 Print / Save PDF</button><button onclick="window.close()">Close</button></div>'
     + '<h1>'+esc(headerTitle)+'</h1>'
@@ -9310,13 +9371,13 @@ function openQuotePrint(){
     + '<th>Material</th><th class="n">Sheets</th><th class="n">Parts</th><th class="n">Price</th>'
     + '</tr></thead><tbody>'
     + rowsHtml
-    + (q.vat
-        ? ('<tr class="sub"><td colspan="3" style="text-align:right">Subtotal (net)</td><td class="n">'+fm(q.afterMargin)+'</td></tr>'
-           + '<tr><td colspan="3" style="text-align:right;color:#667085">VAT '+q.vat+'%</td><td class="n">+'+fm(q.vatAmt)+'</td></tr>'
-           + '<tr class="gt"><td colspan="3" style="text-align:right">Total</td><td class="n">'+fm(q.grand)+'</td></tr>')
-        : ('<tr class="gt"><td colspan="3" style="text-align:right">Total</td><td class="n">'+fm(q.grand)+'</td></tr>')
-      )
+    // Always spell out both figures. Showing a lone "Total" left the customer
+    // guessing whether VAT was in it; with a 0% rate the two simply match.
+    + '<tr class="sub"><td colspan="3" style="text-align:right">Total excl. VAT</td><td class="n">'+fm(q.afterMargin)+'</td></tr>'
+    + '<tr><td colspan="3" style="text-align:right;color:#667085">VAT '+(q.vat||0)+'%</td><td class="n">+'+fm(q.vatAmt)+'</td></tr>'
+    + '<tr class="gt"><td colspan="3" style="text-align:right">Total incl. VAT</td><td class="n">'+fm(q.grand)+'</td></tr>'
     + '</tbody></table>'
+    + partsTableHtml
     + '<div class="notes">'
     + '<b>Includes:</b> Material, cutting, '
     + (q.useEdge?'edgebanding, ':'')
