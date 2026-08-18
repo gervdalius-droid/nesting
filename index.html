@@ -9009,17 +9009,22 @@ function _refreshStats(){
 // (DXF parts), otherwise falls back to rectangle perimeter 2*(L+W).
 function _placementPerimeter(p){
   var part = p.part;
+  var box = 2 * ((p.pw||0) + (p.ph||0));   // placement footprint (rotation already applied), mm
   if (part && part.shape && part.shape.length >= 3){
+    // Shape points are {x,y} objects everywhere in the app. This used to read
+    // them as [0]/[1] arrays, so every shaped part produced NaN metres, which
+    // then poisoned the row total, the subtotal and the grand total — and
+    // _fmtMoney renders a non-finite number as 0.00, so the whole quote quietly
+    // read €0.00 next to a perfectly good material cost.
     var s = part.shape, n = s.length, sum = 0;
     for (var i=0; i<n; i++){
       var a = s[i], b = s[(i+1)%n];
-      var dx = b[0]-a[0], dy = b[1]-a[1];
+      var dx = (b.x||0)-(a.x||0), dy = (b.y||0)-(a.y||0);
       sum += Math.sqrt(dx*dx + dy*dy);
     }
-    return sum;
+    return isFinite(sum) && sum > 0 ? sum : box;
   }
-  // Use placement footprint (already includes rotation, in mm)
-  return 2 * ((p.pw||0) + (p.ph||0));
+  return box;
 }
 // Total edgeband length in mm for one placement (uses original part L/W,
 // since edges 1&3 are along L and 2&4 along W, regardless of rotation).
@@ -9071,10 +9076,13 @@ function _quoteData(){
     var row = byMat[mat];
     row.sheets += 1;
     row.sheetArea_m2 += (l.uw * l.uh) / 1e6;
+    // num() keeps one bad placement from turning an entire quote into NaN, which
+    // then prints as €0.00 and looks like the pricing simply is not configured.
+    var num=function(v){ return isFinite(v) ? v : 0; };
     (l.placements||[]).forEach(function(p){
-      row.usedArea_m2 += (p.pw * p.ph) / 1e6;
-      row.cutM        += _placementPerimeter(p) / 1000;
-      row.edgeM       += _placementEdgebandMm(p) / 1000;
+      row.usedArea_m2 += num((p.pw * p.ph) / 1e6);
+      row.cutM        += num(_placementPerimeter(p) / 1000);
+      row.edgeM       += num(_placementEdgebandMm(p) / 1000);
       row.parts       += 1;
     });
   });
