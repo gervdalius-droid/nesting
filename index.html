@@ -3744,8 +3744,13 @@ function _tessBulge(p1,p2,b){
   var th=4*Math.atan(Math.abs(b)),r=ch/(2*Math.sin(th/2));
   var tol=DXF_TESS_TOL,n=Math.max(2,Math.ceil(th/(2*Math.acos(Math.max(0,1-tol/r)))));
   if(!isFinite(n)||n<2)n=2;n=Math.min(n,DXF_TESS_MAX_SEGS);
-  var mx=(p1.x+p2.x)/2,my=(p1.y+p2.y)/2,nx=-dy/ch,ny=dx/ch;
-  var d=r*Math.cos(th/2)*Math.sign(b),cx=mx-nx*d,cy=my-ny*d;
+  var mx=(p1.x+p2.x)/2,my=(p1.y+p2.y)/2,nx=-dy/ch,ny=dx/ch;   // (nx,ny) = LEFT normal of p1→p2
+  // A positive bulge is a counter-clockwise arc, so its centre lies to the LEFT
+  // of the chord. Subtracting put the centre on the wrong side, which made the
+  // sweep normalisation below take the long way round: every 90° corner fillet
+  // came out as a 270° lobe, so a rounded rectangle ballooned into a dog-bone
+  // and its bounding box — hence the part's size — was far too big.
+  var d=r*Math.cos(th/2)*Math.sign(b),cx=mx+nx*d,cy=my+ny*d;
   var a1=Math.atan2(p1.y-cy,p1.x-cx),a2=Math.atan2(p2.y-cy,p2.x-cx);
   var sw=a2-a1;
   if(b>0){while(sw<0)sw+=2*Math.PI;}else{while(sw>0)sw-=2*Math.PI;}
