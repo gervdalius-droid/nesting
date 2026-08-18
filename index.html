@@ -4078,7 +4078,9 @@ async function _dxfFileToShape(file){
 //   depth 0 and covers nearly everything  → the sheet border  (dropped)
 //   depth 0 (or 1 inside the sheet)       → a part outline
 //   one level deeper than a part          → a hole in that part
-//   deeper still                          → an island; ignored, it is not cut
+//   one level deeper again                → a part nested in that hole's waste
+// Depth alternates part → hole → part → hole all the way down, because a good
+// layout puts small parts inside the offcut of a big cut-out.
 // ═══════════════════════════════════════════════════════════════════════════
 function _extractPolysFromDXF(text){
   var ents=parseDXFText(text);
@@ -4128,15 +4130,25 @@ function extractLayoutParts(text, opts){
     sheet={w:Math.round(top.bb.w), h:Math.round(top.bb.h)};
     base=1; // parts sit one level in from the sheet
   }
-  var partPolys=polys.filter(function(p){ return p.depth===base; });
+  // Even offsets from the base level are material (parts); odd ones are voids.
+  var partPolys=polys.filter(function(p){ return p.depth>=base && ((p.depth-base)%2)===0; });
   var parts=partPolys.map(function(op){
     var oi=polys.indexOf(op);
-    var holes=polys.filter(function(h){ return h.depth===base+1 && h.parent===oi; });
+    var holes=polys.filter(function(h){ return h.parent===oi; });            // this part's own cut-outs
+    // Parts nested in this part's cut-outs are separate parts, not geometry of
+    // this one — their outlines must not be folded into this part's holes.
+    var nested=polys.filter(function(q){ return q.parent>=0 && polys[q.parent] && polys[q.parent].parent===oi; });
     var bb=op.bb;
     var norm=function(pts){ return pts.map(function(q){ return {x:q.x-bb.minX, y:q.y-bb.minY}; }); };
     // Keep the source entities for this part so curves survive a re-export.
     var cls=_classifyEntities(pr.ents, op.pts);
-    var holeGroups=_groupInnerEntsByHole(cls.innerEnts, holes.map(function(h){return h.pts;}));
+    var innerEnts=cls.innerEnts.filter(function(e){
+      var rp=_entityRepresentativePoint(e);
+      if(!rp) return true;
+      for(var k=0;k<nested.length;k++){ if(_pointInPoly(rp.x,rp.y,nested[k].pts)) return false; }
+      return true;
+    });
+    var holeGroups=_groupInnerEntsByHole(innerEnts, holes.map(function(h){return h.pts;}));
     return {
       shape:norm(op.pts),
       holes:holes.map(function(h){ return norm(h.pts); }),
