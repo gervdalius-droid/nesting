@@ -529,6 +529,11 @@ body.print-mode{background:#fff}
          title="Already have a cutting layout as a DXF? Pull the nested parts back out of it so they can be re-optimised."
          style="font-size:11px;color:#2f54eb;text-decoration:none;border-bottom:1px dotted #2f54eb;cursor:pointer">⤢ Extract parts from a layout DXF</a>
       <input type="file" id="exdxf-in" accept=".dxf,.DXF" style="display:none" onchange="extractLayoutPick(this)">
+      <span style="color:#c9ccd3"> · </span>
+      <a href="#" onclick="event.preventDefault();document.getElementById('dxfview-in').click()" data-i18n="dvLink"
+         title="Open a DXF and look at it: layers, entity counts, and what the extractor reads as a part, a cut-out or noise."
+         style="font-size:11px;color:#2f54eb;text-decoration:none;border-bottom:1px dotted #2f54eb;cursor:pointer">🔍 Inspect DXF</a>
+      <input type="file" id="dxfview-in" accept=".dxf,.DXF" style="display:none" onchange="dxfViewerPick(this)">
     </div>
     <div style="margin-top:5px;text-align:center">
       <a href="#" onclick="event.preventDefault();downloadPartsTemplate()" data-i18n="tplLink"
@@ -800,6 +805,31 @@ body.print-mode{background:#fff}
   <div class="dxf-foot">
     <button class="btn bs" onclick="closeDXFImportDialog()">Cancel</button>
     <button class="btn bp" onclick="confirmDXFImport()" style="flex:1">✓ Import parts</button>
+  </div>
+</div>
+</div>
+
+<!-- DXF VIEWER — layers and what the extractor makes of them -->
+<div class="dxf-overlay" id="dxfview-overlay" onclick="if(event.target===this)closeDXFViewer()">
+<div class="dxf-box" style="width:960px;max-width:97vw">
+  <div class="dxf-head">
+    <span style="font-size:16px">🔍</span>
+    <h3 style="flex:1;font-size:14px;font-weight:600" data-i18n="dvTitle">DXF inspector</h3>
+    <button class="btn bs br" onclick="closeDXFViewer()">✕</button>
+  </div>
+  <div id="dxfview-intro" style="padding:10px 16px 0;font-size:11px;color:#667085"></div>
+  <div style="padding:8px 16px;display:flex;gap:14px;align-items:center;flex-wrap:wrap;border-bottom:1px solid #e9edf3">
+    <label style="display:flex;align-items:center;gap:5px;font-size:11px;cursor:pointer">
+      <input type="checkbox" id="dxfview-detect" checked style="width:auto" onchange="renderDXFViewer()"> Show what the extractor detects
+    </label>
+    <button class="btn bs" onclick="dxfViewAllLayers(true)">All layers</button>
+    <button class="btn bs" onclick="dxfViewAllLayers(false)">None</button>
+    <span style="margin-left:auto;font-size:10px;color:#98a2b3">part · cut-out · sheet · ignored</span>
+  </div>
+  <div class="dxf-body" id="dxfview-body" style="padding:0;display:flex;gap:0"></div>
+  <div class="dxf-foot">
+    <button class="btn bs" onclick="closeDXFViewer()">Close</button>
+    <button class="btn bp" onclick="dxfViewExtract()" style="flex:1" data-i18n="dvExtract">⤢ Extract parts from this file</button>
   </div>
 </div>
 </div>
@@ -1657,6 +1687,10 @@ var I18N={
     stockOkTitle:'Sheets used',
     stockShortBy:'short {n}',
     stockOverTab:'Sheet {n} — beyond the {have} you have',
+    dvLink:'🔍 Inspect DXF',
+    dvTitle:'DXF inspector',
+    dvExtract:'⤢ Extract parts from this file',
+    dvEmpty:'No entities found in that DXF.',
     exLink:'⤢ Extract parts from a layout DXF',
     exTitle:'Extract parts from layout',
     exImport:'✓ Import parts',
@@ -1848,6 +1882,10 @@ var I18N={
     stockOkTitle:'Panaudota lakštų',
     stockShortBy:'trūksta {n}',
     stockOverTab:'{n} lakštas — daugiau nei turimi {have}',
+    dvLink:'🔍 Peržiūrėti DXF',
+    dvTitle:'DXF peržiūra',
+    dvExtract:'⤢ Išskirti detales iš šio failo',
+    dvEmpty:'Šiame DXF elementų nerasta.',
     exLink:'⤢ Išskirti detales iš išdėstymo DXF',
     exTitle:'Išskirti detales iš išdėstymo',
     exImport:'✓ Importuoti detales',
@@ -4185,6 +4223,168 @@ function groupExtractedParts(parts, tol){
     else groups.push({sample:p, qty:1});
   });
   return groups;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// DXF INSPECTOR
+// Open a supplier's DXF and actually look at it: which layers it has, how many
+// entities of each type, and — laid over the top — what the extractor reads as
+// a part, as a cut-out, as the sheet, or ignores. Enough to work out why a file
+// comes in wrong without guessing.
+// ═══════════════════════════════════════════════════════════════════════════
+var _dxfView=null;   // {fileName, text, ents, layers:{name:{n,on}}, detect}
+
+// Tessellate any entity into polylines so one renderer covers every type.
+function _entityPolylines(e){
+  if(e.type==='LINE') return [[{x:e.x1,y:e.y1},{x:e.x2,y:e.y2}]];
+  if(e.type==='CIRCLE'){
+    var out=[]; for(var i=0;i<=48;i++){ var a=i*2*Math.PI/48; out.push({x:e.cx+e.r*Math.cos(a), y:e.cy+e.r*Math.sin(a)}); }
+    return [out];
+  }
+  if(e.type==='ARC') return [_tessArc(e)];
+  if(e.type==='SPLINE'){ var sp=_tessSpline(e); return sp.length>1?[sp]:[]; }
+  if(e.type==='LWPOLYLINE'||e.type==='POLYLINE'){
+    var vs=e.vertices||[]; if(vs.length<2) return [];
+    var pts=[], n=vs.length, last=e.closed?n:n-1;
+    for(var k=0;k<last;k++){
+      var a2=vs[k], b2=vs[(k+1)%n];
+      if(a2.bulge){
+        var arc=_tessBulge({x:a2.x,y:a2.y},{x:b2.x,y:b2.y},a2.bulge);
+        for(var j=(pts.length?1:0); j<arc.length; j++) pts.push(arc[j]);
+      } else {
+        if(!pts.length) pts.push({x:a2.x,y:a2.y});
+        pts.push({x:b2.x,y:b2.y});
+      }
+    }
+    return pts.length>1?[pts]:[];
+  }
+  return [];
+}
+function _layerColour(name){
+  var h=0, s=String(name||'0');
+  for(var i=0;i<s.length;i++) h=(h*31+s.charCodeAt(i))>>>0;
+  return 'hsl('+(h%360)+',55%,42%)';
+}
+async function dxfViewerPick(inputEl){
+  var f=(inputEl.files||[])[0];
+  inputEl.value='';
+  if(!f) return;
+  try{
+    var text=await f.text();
+    var ents=parseDXFText(text);
+    if(!ents.length){ alert(t('dvEmpty')); return; }
+    var layers={};
+    ents.forEach(function(e){
+      var nm=e.layer||'0';
+      if(!layers[nm]) layers[nm]={n:0, on:true, types:{}};
+      layers[nm].n++;
+      layers[nm].types[e.type]=(layers[nm].types[e.type]||0)+1;
+    });
+    _dxfView={fileName:f.name, text:text, ents:ents, layers:layers};
+    document.getElementById('dxfview-overlay').classList.add('open');
+    renderDXFViewer();
+  }catch(err){ console.error(err); alert('Could not read that DXF: '+err.message); }
+}
+function closeDXFViewer(){
+  document.getElementById('dxfview-overlay').classList.remove('open');
+  _dxfView=null;
+}
+function dxfViewToggleLayer(name){
+  if(!_dxfView||!_dxfView.layers[name]) return;
+  _dxfView.layers[name].on=!_dxfView.layers[name].on;
+  renderDXFViewer();
+}
+function dxfViewAllLayers(on){
+  if(!_dxfView) return;
+  Object.keys(_dxfView.layers).forEach(function(k){ _dxfView.layers[k].on=!!on; });
+  renderDXFViewer();
+}
+// Hand the same file straight to the extractor.
+function dxfViewExtract(){
+  if(!_dxfView) return;
+  var text=_dxfView.text, name=_dxfView.fileName;
+  closeDXFViewer();
+  var res=extractLayoutParts(text,{minSide:20});
+  if(!res.parts.length){ alert(t('exNothing')); return; }
+  _exLayout={sheet:res.sheet, parts:res.parts, text:text, fileName:name, dropped:res.dropped};
+  var matSel=document.getElementById('exdxf-mat');
+  var mats=boards.map(function(b){return b.mat;}); if(!mats.length) mats=['MDF 18mm'];
+  matSel.innerHTML=mats.map(function(m){return '<option value="'+esc(m)+'">'+esc(m)+'</option>';}).join('')
+    +'<option value="__new__">+ New material…</option>';
+  document.getElementById('exdxf-sheet').checked=!!res.guessedSheet;
+  document.getElementById('exdxf-overlay').classList.add('open');
+  renderExtractDialog();
+}
+function renderDXFViewer(){
+  if(!_dxfView) return;
+  var showDetect=document.getElementById('dxfview-detect').checked;
+  var W=600,H=430;
+  // Fit every visible entity into the viewport.
+  var minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity, drawn=[];
+  _dxfView.ents.forEach(function(e){
+    var nm=e.layer||'0';
+    if(!_dxfView.layers[nm]||!_dxfView.layers[nm].on) return;
+    _entityPolylines(e).forEach(function(pl){
+      pl.forEach(function(q){ if(q.x<minX)minX=q.x; if(q.x>maxX)maxX=q.x; if(q.y<minY)minY=q.y; if(q.y>maxY)maxY=q.y; });
+      drawn.push({pts:pl, layer:nm});
+    });
+  });
+  var det=null;
+  if(showDetect){
+    try{ det=extractLayoutParts(_dxfView.text,{minSide:20}); }catch(e){ det=null; }
+    if(det){
+      det.parts.forEach(function(p){
+        p.shape.forEach(function(q){
+          var x=q.x+p.at.x, y=q.y+p.at.y;
+          if(x<minX)minX=x; if(x>maxX)maxX=x; if(y<minY)minY=y; if(y>maxY)maxY=y;
+        });
+      });
+    }
+  }
+  var svg='';
+  if(isFinite(minX)){
+    var bw=Math.max(1,maxX-minX), bh=Math.max(1,maxY-minY);
+    var sc=Math.min((W-16)/bw,(H-16)/bh), ox=8-minX*sc, oy=8-minY*sc;
+    var fy=function(y){ return H-(oy+y*sc); };
+    var X=function(x){ return ox+x*sc; };
+    svg='<svg width="'+W+'" height="'+H+'" style="display:block;background:#FCFAF4">';
+    if(det&&showDetect){
+      det.parts.forEach(function(p){
+        var pts=p.shape.map(function(q){ return X(q.x+p.at.x).toFixed(1)+','+fy(q.y+p.at.y).toFixed(1); }).join(' ');
+        svg+='<polygon points="'+pts+'" fill="#2f54eb1f" stroke="none"/>';
+        (p.holes||[]).forEach(function(h){
+          var hp=h.map(function(q){ return X(q.x+p.at.x).toFixed(1)+','+fy(q.y+p.at.y).toFixed(1); }).join(' ');
+          svg+='<polygon points="'+hp+'" fill="#8a6d1a26" stroke="none"/>';
+        });
+      });
+    }
+    drawn.forEach(function(d){
+      var pts=d.pts.map(function(q){ return X(q.x).toFixed(1)+','+fy(q.y).toFixed(1); }).join(' ');
+      svg+='<polyline points="'+pts+'" fill="none" stroke="'+_layerColour(d.layer)+'" stroke-width="0.8"/>';
+    });
+    svg+='</svg>';
+  } else {
+    svg='<div style="padding:40px;text-align:center;font-size:12px;color:#98a2b3">No visible geometry — turn a layer back on.</div>';
+  }
+  var typeTotals={};
+  _dxfView.ents.forEach(function(e){ typeTotals[e.type]=(typeTotals[e.type]||0)+1; });
+  document.getElementById('dxfview-intro').textContent=
+    _dxfView.fileName+' — '+_dxfView.ents.length+' entities · '
+    + Object.keys(typeTotals).map(function(k){ return typeTotals[k]+' '+k; }).join(' · ')
+    + (det?(' · detected '+det.parts.length+' part(s)'+(det.sheet?', sheet '+det.sheet.w+'×'+det.sheet.h:'')):'');
+  var layerRows=Object.keys(_dxfView.layers).sort().map(function(nm){
+    var L=_dxfView.layers[nm];
+    return '<label style="display:flex;align-items:center;gap:6px;padding:5px 8px;border-bottom:1px solid #f0eee9;cursor:pointer;font-size:11px">'
+      +'<input type="checkbox" '+(L.on?'checked':'')+' style="width:auto" onchange="dxfViewToggleLayer('+JSON.stringify(nm).replace(/"/g,'&quot;')+')">'
+      +'<span style="width:9px;height:9px;border-radius:2px;background:'+_layerColour(nm)+';flex-shrink:0"></span>'
+      +'<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(nm)+'">'+esc(nm)+'</span>'
+      +'<span style="font-family:monospace;color:#667085">'+L.n+'</span></label>';
+  }).join('');
+  document.getElementById('dxfview-body').innerHTML=
+    '<div style="flex:0 0 210px;border-right:1px solid #e9edf3;max-height:440px;overflow:auto">'
+      +'<div style="padding:7px 8px;font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:#667085;font-weight:600">Layers</div>'
+      +layerRows+'</div>'
+    +'<div style="flex:1;padding:6px">'+svg+'</div>';
 }
 
 // ── Extraction dialog ──────────────────────────────────────────────────────
