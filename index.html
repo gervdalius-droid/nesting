@@ -7025,9 +7025,126 @@ async function runShapeNestWasm(){
     _nestProgressMat(mi, matKeys.length, bd.mat, 1);
   }
 
+  // ── Second pass: nest leftovers into the cut-outs of parts already placed ──
+  // The engine will not do this itself — offered a part with a big pocket and a
+  // small part that only fits inside it, it puts the small one on a NEW sheet.
+  // So each pocket is re-offered to the solver as a bin of its own, in its real
+  // shape, and whatever fits is mapped back onto the same sheet.
+  try{
+    await fillCutoutsFromSheets(newLayouts, kerf);
+  }catch(e){ console.warn('cut-out fill skipped:', e && e.message); }
+
   _nestRunning=false; _nestHideProgress();
   if(_nestCancelled) return;
   _finishShapeNest(newLayouts, unplaced);
+}
+
+// Minimum useful pocket: anything smaller is a handle slot or a service hole,
+// not somewhere a part is going to be cut from.
+var CUTOUT_MIN_SIDE=60;   // mm
+
+async function fillCutoutsFromSheets(newLayouts, kerf){
+  if(!newLayouts.length) return 0;
+  // Every cut-out on every sheet, in that sheet's coordinates, biggest first.
+  var pockets=[];
+  newLayouts.forEach(function(lay,li){
+    (lay.placements||[]).forEach(function(pl){
+      (pl.nestHoles||[]).forEach(function(h){
+        if(!h||h.length<3) return;
+        var pts=h.map(function(q){ return {x:q.x+pl.x, y:q.y+pl.y}; });
+        var bb=_polyBBox(pts);
+        if(Math.min(bb.w,bb.h)<CUTOUT_MIN_SIDE) return;
+        pockets.push({li:li, owner:pl, pts:pts, bb:bb, area:_polyArea(pts), grainLocked:!!lay.grainLocked});
+      });
+    });
+  });
+  if(!pockets.length) return 0;
+  pockets.sort(function(a,b){ return b.area-a.area; });
+
+  var moved=0;
+  for(var pi=0; pi<pockets.length; pi++){
+    if(_nestCancelled) break;
+    var pk=pockets[pi];
+    // Candidates: parts on the emptiest sheets first — emptying a sheet is what
+    // actually removes it from the job. Never the part that owns this pocket.
+    var fill=newLayouts.map(function(l){
+      var a=(l.placements||[]).reduce(function(n,p){ return n+p.pw*p.ph; },0);
+      return a/((l.uw*l.uh)||1);
+    });
+    var cands=[];
+    newLayouts.forEach(function(l,li){
+      (l.placements||[]).forEach(function(p){
+        if(p===pk.owner) return;
+        if(!p.part) return;
+        if(p.pw>pk.bb.w||p.ph>pk.bb.h){ if(p.ph>pk.bb.w||p.pw>pk.bb.h) return; } // cannot fit either way round
+        cands.push({li:li, p:p, fill:fill[li]});
+      });
+    });
+    if(!cands.length) continue;
+    cands.sort(function(a,b){ return a.fill-b.fill; });
+    cands=cands.slice(0,40);   // keep the sub-solve quick
+
+    var binPts=pk.pts.map(function(q){ return [q.x-pk.bb.minX, pk.bb.h-(q.y-pk.bb.minY)]; });
+    var items=cands.map(function(cd,idx){
+      var g=_partNestGeom(cd.p.part);
+      var outer=g.outer.map(function(q){ return [q.x,q.y]; });
+      var shape=(g.holes&&g.holes.length)
+        ? {type:'polygon', data:{outer:outer, inner:g.holes.map(function(hh){ return hh.map(function(q){ return [q.x,q.y]; }); })}}
+        : {type:'simple_polygon', data:outer};
+      return {id:idx, demand:1,
+              allowed_orientations: pk.grainLocked?[0.0,180.0]:[0,45,90,135,180,225,270,315],
+              shape:shape, min_quality:null};
+    });
+    var sol=null;
+    try{ sol=JSON.parse(await nestSolve(JSON.stringify({name:'pocket', items:items,
+          bins:[{id:0, shape:{type:'simple_polygon', data:binPts}, stock:1, cost:1}]}), kerf)); }
+    catch(e){ continue; }
+
+    var lay=newLayouts[pk.li];
+    var takeOut=[];
+    (sol.layouts||[]).forEach(function(sl){
+      (sl.placed_items||[]).forEach(function(it){
+        var cd=cands[it.item_id];
+        if(!cd || takeOut.indexOf(cd)>=0) return;
+        var part=cd.p.part;
+        var g=_partNestGeom(part);
+        var ang=(it.transformation&&it.transformation.rotation)||0;
+        var tr=(it.transformation&&it.transformation.translation)||[0,0];
+        var cs=Math.cos(ang), sn=Math.sin(ang);
+        function R(pt){ return {x: pt.x*cs - pt.y*sn + tr[0], y: pt.x*sn + pt.y*cs + tr[1]}; }
+        // engine frame is y-up inside the pocket; sheets are y-down
+        var toSheet=function(pt){ var q=R(pt); return {x:pk.bb.minX+q.x, y:pk.bb.minY+(pk.bb.h-q.y)}; };
+        var sOuter=g.outer.map(toSheet);
+        var sHoles=(g.holes||[]).map(function(hh){ return hh.map(toSheet); });
+        var mnX=Infinity,mnY=Infinity,mxX=-Infinity,mxY=-Infinity;
+        sOuter.forEach(function(q){ if(q.x<mnX)mnX=q.x; if(q.y<mnY)mnY=q.y; if(q.x>mxX)mxX=q.x; if(q.y>mxY)mxY=q.y; });
+        var deg=ang*180/Math.PI;
+        lay.placements.push({
+          part:part, x:mnX, y:mnY, pw:Math.round(mxX-mnX), ph:Math.round(mxY-mnY),
+          rot:(Math.round(deg)%360!==0), color:lay.matColor||'#888',
+          nestPoly:sOuter.map(function(q){ return {x:q.x-mnX, y:q.y-mnY}; }),
+          nestHoles:sHoles.map(function(hh){ return hh.map(function(q){ return {x:q.x-mnX, y:q.y-mnY}; }); }),
+          nestAngle:deg, inCutout:true
+        });
+        takeOut.push(cd);
+        moved++;
+      });
+    });
+    // Remove the moved placements from wherever they came from.
+    takeOut.forEach(function(cd){
+      var src=newLayouts[cd.li];
+      var k=src.placements.indexOf(cd.p);
+      if(k>=0) src.placements.splice(k,1);
+    });
+  }
+  if(moved){
+    // A sheet that gave up all its parts is no longer needed.
+    for(var i=newLayouts.length-1;i>=0;i--){
+      if(!newLayouts[i].placements.length) newLayouts.splice(i,1);
+    }
+    newLayouts.forEach(function(l,i){ l.idx=i; });
+  }
+  return moved;
 }
 
 function runShapeNest(){
