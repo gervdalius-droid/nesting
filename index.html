@@ -607,6 +607,8 @@ body.print-mode{background:#fff}
   </div>
   <!-- Sheets used vs sheets you actually have (per material) -->
   <div id="stockwarn" style="display:none;margin:4px 0 2px"></div>
+  <!-- Parts that could not be placed, with the reason for each -->
+  <div id="unfit" style="display:none;margin:4px 0 2px"></div>
   <div style="display:flex;justify-content:flex-end;margin:-2px 0 2px"><button class="btn bp" onclick="reserveForCutting()" title="Rezervuoti panaudotus lakštus pjovimui — patvirtinama GVS sandėlyje" style="background:#1b1e26;border-color:#1b1e26;color:#fff">📤 Naudoti iš sandėlio (pjovimui)</button></div>
   <!-- ─── Quotation panel ──────────────────────────────────────────
        Shows itemized pricing: material area + cutting length + per-part + edgeband,
@@ -1687,6 +1689,13 @@ var I18N={
     stockOkTitle:'Sheets used',
     stockShortBy:'short {n}',
     stockOverTab:'Sheet {n} — beyond the {have} you have',
+    unfitTitle:'{n} part(s) could not be placed',
+    unfitPart:'Part', unfitSize:'Size (mm)', unfitQty:'Qty', unfitMaterial:'Material', unfitWhy:'Why not',
+    unfitTooBig:'Bigger than the sheet ({w}×{h}) even with no trim',
+    unfitGrain:'Only fits turned 90°, but grain is locked for this material',
+    unfitOutOfStock:'Ran out of sheets — only {n} available',
+    unfitNoRoom:'No room left on the sheets',
+    unfitNoBoard:'No material board for this part',
     dvLink:'🔍 Inspect DXF',
     dvTitle:'DXF inspector',
     dvExtract:'⤢ Extract parts from this file',
@@ -1882,6 +1891,13 @@ var I18N={
     stockOkTitle:'Panaudota lakštų',
     stockShortBy:'trūksta {n}',
     stockOverTab:'{n} lakštas — daugiau nei turimi {have}',
+    unfitTitle:'{n} detalė(-ių) nepavyko sudėti',
+    unfitPart:'Detalė', unfitSize:'Matmenys (mm)', unfitQty:'Kiekis', unfitMaterial:'Medžiaga', unfitWhy:'Kodėl ne',
+    unfitTooBig:'Didesnė už lakštą ({w}×{h}) net ir be apipjovimo',
+    unfitGrain:'Telpa tik pasukta 90°, bet šiai medžiagai užrakinta rievių kryptis',
+    unfitOutOfStock:'Nebeliko lakštų — turima tik {n}',
+    unfitNoRoom:'Lakštuose nebeliko vietos',
+    unfitNoBoard:'Šiai detalei nėra medžiagos lakšto',
     dvLink:'🔍 Peržiūrėti DXF',
     dvTitle:'DXF peržiūra',
     dvExtract:'⤢ Išskirti detales iš šio failo',
@@ -7549,6 +7565,19 @@ function _finishShapeNest(newLayouts, unplaced){
   var cvc=document.getElementById('cvc'); if(cvc)cvc.style.display='block';
   if(typeof buildTabs==='function') buildTabs();
   renderStockWarning();
+  // Same "did not fit" table as the rectangular optimizer, so shape nesting
+  // reports its leftovers instead of leaving a stale table on screen.
+  (function(){
+    var placedIds={};
+    layouts.forEach(function(l){ (l.placements||[]).forEach(function(p){ if(p.part) placedIds[p.part.id]=true; }); });
+    var rows=[];
+    parts.forEach(function(p){
+      if(placedIds[p.id]) return;
+      var bd=matchBoard(p.mat)||boards.filter(function(b){return normalizeMat(b.mat)===normalizeMat(p.mat);})[0]||null;
+      rows.push({part:p, board:bd, reason:_unfitReason(p,bd)});
+    });
+    renderUnfitTable(rows);
+  })();
   if(typeof activateTab==='function') activateTab(0); else if(typeof renderCanvas==='function') renderCanvas(0);
   var ep=document.getElementById('ep'); if(ep)ep.style.display='block';
   if(typeof buildExport==='function') buildExport();
@@ -7586,6 +7615,7 @@ function optimize(){
   layouts=[];selP=null;hovP=null;
   var warnings=[];
   var unplacedByMat={}; // mat -> count of parts that didn't fit
+  var unfitRows=[];     // {part, board, reason} — drives the "did not fit" table
   var byBoard={};
   parts.forEach(function(p){var bd=matchBoard(p.mat);if(!bd)bd=ensureBoard(p.mat);if(!byBoard[bd.id])byBoard[bd.id]=[];byBoard[bd.id].push(p);});
   // Pack-ordering strategies. The algorithm tries each and keeps the best.
@@ -7757,15 +7787,30 @@ function optimize(){
     // Per-machine usable area calculation. If a part is bigger than what
     // the trim allows, we reduce trim to 0 only for the machine that's
     // actually using that big part — the other machine keeps its trim.
+    // Trim is dropped only as far as the parts actually require. The old test
+    // compared a part's LONGEST side against the longest usable side, so a part
+    // like 900×586 on a 1000×600 sheet passed the check (900 < 970) and then
+    // failed to place, because its 586 short side did not fit the 570 usable
+    // height. Now every part is tested for a real fit, in either orientation
+    // unless the board's grain is locked.
     function computeUsable(trimVal, partsForMachine){
       var u={uw:bd.w-trimVal*2, uh:bd.h-trimVal*2, usedTrim:trimVal, warned:false};
-      if(partsForMachine && partsForMachine.length){
-        var maxL=Math.max.apply(null, partsForMachine.map(function(p){return Math.max(p.l,p.w);}));
-        if(maxL>Math.max(u.uw,u.uh)){
-          var ms=Math.max(0, Math.floor((Math.max(bd.w,bd.h)-maxL)/2));
-          warnings.push('⚠ "'+bd.mat+'" — trim reduced to 0 (parts up to '+maxL+'mm, max safe trim: '+ms+'mm)\n   Operator: cut edge-to-edge, factory edge is straight.');
-          u.uw=bd.w; u.uh=bd.h; u.usedTrim=0; u.warned=true;
-        }
+      if(!partsForMachine || !partsForMachine.length) return u;
+      var lockGrain=!!bd.grain;
+      var allow=trimVal, tightest=null;
+      partsForMachine.forEach(function(p){
+        var t1=Math.min((bd.w-p.l)/2, (bd.h-p.w)/2);                       // as drawn
+        var t2=lockGrain ? -Infinity : Math.min((bd.w-p.w)/2, (bd.h-p.l)/2); // turned 90°
+        var best=Math.max(t1,t2);
+        if(best<allow){ allow=best; tightest=p; }
+      });
+      allow=Math.floor(Math.max(0, allow));
+      if(allow<u.usedTrim){
+        u.uw=bd.w-allow*2; u.uh=bd.h-allow*2; u.usedTrim=allow; u.warned=(allow===0);
+        var who=tightest?(tightest.origName||tightest.name||'?')+' '+tightest.l+'×'+tightest.w:'a part';
+        warnings.push('⚠ "'+bd.mat+'" — trim reduced to '+allow+'mm for '+who
+          +(allow===0?'\n   Operator: cut edge-to-edge, the factory edge is the part edge.'
+                     :'\n   Operator: reduced trim on this sheet.'));
       }
       return u;
     }
@@ -7853,6 +7898,7 @@ function optimize(){
       // let the second overwrite the first's tally instead of adding to it.
       var _uk=bd.mat+(boards.filter(function(o){return normalizeMat(o.mat)===normalizeMat(bd.mat);}).length>1?' '+bd.w+'×'+bd.h:'');
       unplacedByMat[_uk]={count:unplacedHere.length, boardQty:bd.qty, parts:unplacedHere};
+      unplacedHere.forEach(function(up){ unfitRows.push({part:up, board:bd, reason:_unfitReason(up,bd)}); });
     }
   });
   // Sheet numbering must be contiguous after any spill-over removed sheets.
@@ -7871,6 +7917,7 @@ function optimize(){
   document.getElementById('cvc').style.display='block';
   buildExport();buildTabs();curSheet=0;activateTab(0);
   renderStockWarning();
+  renderUnfitTable(unfitRows);
   renderQuote();
   // Short of sheets? Say so alongside the other warnings.
   var _shortRep=sheetStockReport().filter(function(r){return r.short>0;});
@@ -7882,16 +7929,8 @@ function optimize(){
   var totUnplaced=0;
   for(var m in unplacedByMat) totUnplaced += unplacedByMat[m].count;
   if(totUnplaced>0){
-    var lines=['⚠ ' + totUnplaced + ' of ' + parts.length + ' parts could not be placed.'];
-    lines.push('');
-    for(var mat in unplacedByMat){
-      var info=unplacedByMat[mat];
-      lines.push('  "'+mat+'": '+info.count+' parts');
-    }
-    lines.push('');
-    lines.push('These parts are larger than the board, or larger than the usable area after trim.');
-    lines.push('Check part dimensions and material board size.');
-    warnings.unshift(lines.join('\n'));
+    warnings.unshift('⚠ '+totUnplaced+' of '+parts.length+' parts could not be placed.\n'
+      +'The table above the sheets lists each one and why.');
   }
   // ── Create an auto version snapshot right after optimize.
   // If the previous auto version exists, rename it to preserve history
@@ -8782,6 +8821,59 @@ function _sheetOrdinals(){
   });
   return ord;
 }
+// ── Why a part could not be placed ─────────────────────────────────────────
+// "You are short" tells the operator nothing actionable. Each part gets the
+// specific reason, checked against the board it was assigned to with trim
+// already reduced as far as the parts allow.
+function _unfitReason(p, bd){
+  if(!bd) return t('unfitNoBoard');
+  var W=bd.w, H=bd.h;                     // full sheet: trim is dropped when parts need it
+  var asIs   = (p.l<=W && p.w<=H);
+  var turned = (p.w<=W && p.l<=H);
+  if(!asIs && !turned) return t('unfitTooBig',{w:W,h:H});
+  var locked = bd.grain || p.allowRotate===false;
+  if(!asIs && turned && locked) return t('unfitGrain');
+  if(bd.qty>0) return t('unfitOutOfStock',{n:bd.qty});
+  return t('unfitNoRoom');
+}
+function renderUnfitTable(rows){
+  var el=document.getElementById('unfit');
+  if(!el) return;
+  if(!rows||!rows.length){ el.style.display='none'; el.innerHTML=''; return; }
+  // Collapse identical part+reason into one line with a count.
+  var groups={}, order=[];
+  rows.forEach(function(r){
+    var p=r.part;
+    var key=(p.origName||p.name||'?')+'|'+p.l+'x'+p.w+'|'+(p.mat||'')+'|'+r.reason;
+    if(!groups[key]){ groups[key]={name:p.origName||p.name||'?', l:p.l, w:p.w, mat:p.mat, thick:p.thick, reason:r.reason, qty:0}; order.push(key); }
+    groups[key].qty++;
+  });
+  order.sort(function(a,b){ return groups[b].qty-groups[a].qty || groups[a].name.localeCompare(groups[b].name); });
+  var total=rows.length;
+  el.style.display='block';
+  el.innerHTML='<div style="background:#FDECEC;border:1px solid #B84040;border-radius:8px;padding:8px 10px">'
+    +'<div style="font-size:11px;font-weight:700;color:#7A2E12;margin-bottom:6px">⚠ '+t('unfitTitle',{n:total})+'</div>'
+    +'<table style="width:100%;border-collapse:collapse;font-size:11px">'
+    +'<thead><tr style="color:#7A2E12;text-align:left">'
+      +'<th style="padding:3px 6px;font-weight:600">'+t('unfitPart')+'</th>'
+      +'<th style="padding:3px 6px;font-weight:600;text-align:right">'+t('unfitSize')+'</th>'
+      +'<th style="padding:3px 6px;font-weight:600;text-align:right">'+t('unfitQty')+'</th>'
+      +'<th style="padding:3px 6px;font-weight:600">'+t('unfitMaterial')+'</th>'
+      +'<th style="padding:3px 6px;font-weight:600">'+t('unfitWhy')+'</th>'
+    +'</tr></thead><tbody>'
+    +order.map(function(k){
+      var g=groups[k];
+      return '<tr style="border-top:1px solid #f3cfcf">'
+        +'<td style="padding:3px 6px">'+esc(g.name)+'</td>'
+        +'<td style="padding:3px 6px;text-align:right;font-family:monospace">'+g.l+' × '+g.w+'</td>'
+        +'<td style="padding:3px 6px;text-align:right;font-family:monospace"><b>'+g.qty+'</b></td>'
+        +'<td style="padding:3px 6px">'+esc(g.mat||'')+'</td>'
+        +'<td style="padding:3px 6px;color:#7A2E12">'+esc(g.reason)+'</td>'
+      +'</tr>';
+    }).join('')
+    +'</tbody></table></div>';
+}
+
 function renderStockWarning(){
   var el=document.getElementById('stockwarn');
   if(!el) return;
