@@ -1689,6 +1689,8 @@ var I18N={
     stockOkTitle:'Sheets used',
     stockShortBy:'short {n}',
     stockOverTab:'Sheet {n} — beyond the {have} you have',
+    startupBrowse:'Browse all projects',
+    startupBrowseSub:'search the full history · {n} saved',
     altHave:'{n} part(s) spilled past your stock of {mat} — you also have:',
     altSpare:'{n} spare',
     altUnlimited:'unlimited',
@@ -1896,6 +1898,8 @@ var I18N={
     stockOkTitle:'Panaudota lakštų',
     stockShortBy:'trūksta {n}',
     stockOverTab:'{n} lakštas — daugiau nei turimi {have}',
+    startupBrowse:'Peržiūrėti visus projektus',
+    startupBrowseSub:'ieškoti visoje istorijoje · išsaugota {n}',
     altHave:'{n} detalė(-ių) netilpo į turimą {mat} atsargą — taip pat turite:',
     altSpare:'liko {n}',
     altUnlimited:'neribota',
@@ -2980,7 +2984,12 @@ function openHistory(){
   document.getElementById('hist-overlay').classList.add('open');
   renderHistory();
 }
-function closeHistory(){document.getElementById('hist-overlay').classList.remove('open');}
+function closeHistory(){
+  document.getElementById('hist-overlay').classList.remove('open');
+  // Came here from the startup picker and closed without opening anything —
+  // put the picker back so the app never lands on a blank screen.
+  if(_startupPending){ _startupPending=false; showStartupModal(); }
+}
 async function refreshHistory(){renderHistory();}
 async function renderHistory(){
   var body=document.getElementById('hist-body');
@@ -3022,6 +3031,7 @@ function histRowClick(e,name){
 }
 async function histAction(action,name){
   if(action==='open'){
+    _startupPending=false;      // a project was chosen; don't reopen the picker
     await loadProjectByName(name);
     closeHistory();
   } else if(action==='dup'){
@@ -3238,8 +3248,9 @@ function showStartupModal(){
   var lastName='';
   try{lastName=localStorage.getItem(LS_LAST_PROJECT)||'';}catch(e){}
   // Build immediately from local info so the picker appears with no network wait.
-  function render(continueName, continueSub, others){
+  function render(continueName, continueSub, others, total){
     var html='';
+    total=total||0;
     if(continueName){
       html+='<button class="startup-card primary" onclick="startupContinue('+JSON.stringify(continueName).replace(/"/g,'&quot;')+')">'
         +'<div class="startup-ic" style="background:#2f54eb;color:#fff">↩</div>'
@@ -3260,17 +3271,25 @@ function showStartupModal(){
       });
       html+='</div>';
     }
+    // The list above is capped, so always offer the full, searchable history.
+    if(total>0){
+      html+='<button class="startup-card" onclick="startupBrowseAll()" style="margin-top:6px">'
+        +'<div class="startup-ic" style="background:#eceef2;color:#667085">🗂</div>'
+        +'<div class="startup-ct"><div class="ct-t">'+esc(t('startupBrowse'))+'</div>'
+        +'<div class="ct-s">'+esc(t('startupBrowseSub',{n:total}))+'</div></div>'
+        +'<div class="startup-arrow">→</div></button>';
+    }
     box.innerHTML=html;
   }
   // First paint (synchronous, from localStorage last-project name)
-  render(lastName, lastName?'pick up where you left off':'', null);
+  render(lastName, lastName?'pick up where you left off':'', null, 0);
   document.getElementById('startup-overlay').classList.add('open');
   // Enrich asynchronously with the full project list (cloud + local).
   try{
     listProjects().then(function(list){
       if(!list||!list.length){
         // No saved projects at all → keep just "New Project"
-        if(!lastName) render('', '', null);
+        if(!lastName) render('', '', null, 0);
         return;
       }
       // Latest = the last-opened name if it still exists, else the most-recent.
@@ -3278,15 +3297,24 @@ function showStartupModal(){
       if(lastName) latest=list.find(function(p){return p.name===lastName;});
       if(!latest) latest=list[0];
       var others=list.filter(function(p){return p.name!==latest.name;}).slice(0,5);
-      render(latest.name, 'last opened · '+(_relTime(latest.updated_at)||'recently'), others);
+      render(latest.name, 'last opened · '+(_relTime(latest.updated_at)||'recently'), others, list.length);
     }).catch(function(){ /* keep the synchronous fallback */ });
   }catch(e){}
+}
+// Opened from the startup picker: if the browser is closed without choosing a
+// project, come back to the picker rather than dropping into a blank app.
+var _startupPending=false;
+function startupBrowseAll(){
+  _startupPending=true;
+  hideStartupModal();
+  openHistory();
 }
 function hideStartupModal(){
   var o=document.getElementById('startup-overlay');
   if(o) o.classList.remove('open');
 }
 function startupContinue(name){
+  _startupPending=false;
   hideStartupModal();
   loadProjectByName(name).then(function(ok){
     if(!ok){ startupNew(true); }
@@ -3295,6 +3323,7 @@ function startupContinue(name){
 }
 // Start a fresh, blank project. `silent` skips the modal-close (used on deep-link failure).
 function startupNew(silent){
+  _startupPending=false;
   if(!silent) hideStartupModal();
   // Fresh blank state — mirror the "Fresh start" branch of the old boot.
   _suppressSave=true;
