@@ -1689,6 +1689,7 @@ var I18N={
     stockOkTitle:'Sheets used',
     stockShortBy:'short {n}',
     stockOverTab:'Sheet {n} — beyond the {have} you have',
+    boardUse:'Use in this cut',
     startupBrowse:'Browse all projects',
     startupBrowseSub:'search the full history · {n} saved',
     altHave:'{n} part(s) spilled past your stock of {mat} — you also have:',
@@ -1898,6 +1899,7 @@ var I18N={
     stockOkTitle:'Panaudota lakštų',
     stockShortBy:'trūksta {n}',
     stockOverTab:'{n} lakštas — daugiau nei turimi {have}',
+    boardUse:'Naudoti šiame pjovime',
     startupBrowse:'Peržiūrėti visus projektus',
     startupBrowseSub:'ieškoti visoje istorijoje · išsaugota {n}',
     altHave:'{n} detalė(-ių) netilpo į turimą {mat} atsargą — taip pat turite:',
@@ -3382,6 +3384,7 @@ function updateBoard(id,f,v){
   var b=boards.find(function(b){return b.id===id;});if(!b)return;
   if(f==='w'||f==='h')v=u2mm(v);
   else if(f==='qty'||f==='thickness')v=parseInt(v)||0;
+  else if(f==='useInJob')v=!!v;
   else if(f==='priceM2'||f==='priceMatMarkup'||f==='priceCutM'||f==='pricePart'||f==='priceEdge')v=parseFloat(v)||0;
   b[f]=v;if(f==='color')renderBoards();refreshSel();
   // Pricing changes -> live-update the quote
@@ -3409,6 +3412,10 @@ function renderBoards(){
       +'<div><label class="fl">Storis (mm)</label><input type="number" value="'+(b.thickness!=null?b.thickness:18)+'" onchange="updateBoard('+b.id+',\'thickness\',this.value)"></div>'
       +'<div><label class="fl">Color</label><input type="color" value="'+b.color+'" onchange="updateBoard('+b.id+',\'color\',this.value)"></div>'
       +'</div>'
+      +'<label style="display:flex;align-items:center;gap:6px;font-size:11px;color:#667085;cursor:pointer;margin-top:6px;padding-top:5px;border-top:1px solid #e6e8ed" title="Untick to leave this board out of the cut. When a material is stocked in several sizes, the optimizer picks the best mix of the ticked ones.">'
+      +'<input type="checkbox" '+(b.useInJob===false?'':'checked')+' onchange="updateBoard('+b.id+',\'useInJob\',this.checked)" style="accent-color:#2f54eb;width:auto;cursor:pointer">'
+      +'<span>✅ '+t('boardUse')+'</span>'
+      +'</label>'
       +'<label style="display:flex;align-items:center;gap:6px;font-size:11px;color:#667085;margin-top:6px;padding-top:5px;border-top:1px solid #e6e8ed" title="How many sheets of this material you actually have. Nesting still lays out every part, but you get told when it needs more sheets than you own. 0 = unlimited.">'
       +'<span>📦 '+t('sheetsHave')+'</span>'
       +'<input type="number" min="0" step="1" value="'+(b.qty!=null?b.qty:0)+'" onchange="updateBoard('+b.id+',\'qty\',this.value);renderStockWarning();buildTabs&&layouts.length&&buildTabs()" style="width:52px;padding:2px 4px;font-size:11px;text-align:center">'
@@ -7630,6 +7637,90 @@ function _finishShapeNest(newLayouts, unplaced){
   }
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// BEST MIX OF SHEET SIZES
+// A material may be stocked in several sizes — a full 2800×2070, half sheets,
+// an odd offcut. Parts used to be poured onto the first board and only spilled
+// onto the next once its stock ran out, which is list order, not a choice.
+// Now the sizes form one pool and each sheet goes to whichever size gives the
+// most parts per euro. Boards can be excluded from the pool with the "use in
+// optimisation" tick on the board card.
+// ═══════════════════════════════════════════════════════════════════════════
+function boardInPool(b){ return b && b.useInJob!==false; }
+// One sheet's cost. Priced boards use €/m² plus their material markup, so a
+// cheap offcut beats a fresh full sheet. With no prices anywhere the area
+// stands in for cost, which makes the same comparison come out as least waste.
+function _boardSheetCost(b, priced){
+  var m2=(b.w*b.h)/1e6;
+  if(!priced) return m2;
+  var price=parseFloat(b.priceM2)||0, mk=parseFloat(b.priceMatMarkup)||0;
+  return m2*price*(1+mk/100);
+}
+// Prices are only meaningful if the whole pool has them; otherwise one priced
+// board would be compared against another board's bare square metres.
+function _poolIsPriced(pool){
+  return pool.length>0 && pool.every(function(b){ return (parseFloat(b.priceM2)||0)>0; });
+}
+// Greedy, one sheet at a time: for each size still in stock, pack what is left
+// onto a single sheet of it and keep whichever gives the lowest cost per m² of
+// parts actually obtained. Standard heuristic for multi-stock-size cutting, and
+// far better than consuming the list in order.
+function chooseSheetMix(mparts, pool, kerf, trimVal, machine){
+  var assign={};                       // partId → board id
+  if(!pool.length || !mparts.length) return assign;
+  var priced=_poolIsPriced(pool);
+  var stock={};
+  pool.forEach(function(b){ stock[b.id]=(b.qty>0)?b.qty:Infinity; });
+  var remaining=mparts.slice();
+  var guard=0;
+  while(remaining.length && guard++<400){
+    var best=null;
+    for(var i=0;i<pool.length;i++){
+      var b=pool[i];
+      if(stock[b.id]<=0) continue;
+      var u=_usableFor(b, remaining, trimVal);
+      if(u.uw<=0||u.uh<=0) continue;
+      var sheets;
+      try{ sheets=pack(u.uw, u.uh, remaining, kerf, b.color, 0, u.usedTrim, !!b.grain, 'bssf'); }
+      catch(e){ continue; }
+      if(!sheets || !sheets.length || !sheets[0].placements.length) continue;
+      var first=sheets[0];
+      var placedArea=first.placements.reduce(function(a,p){ return a+p.pw*p.ph; },0)/1e6;
+      if(placedArea<=0) continue;
+      var score=_boardSheetCost(b,priced)/placedArea;   // cost per m² of parts won
+      // Tie-break toward the sheet that carries more, which keeps sheet count down.
+      if(!best || score<best.score-1e-9 || (Math.abs(score-best.score)<=1e-9 && placedArea>best.placedArea)){
+        best={board:b, sheet:first, score:score, placedArea:placedArea};
+      }
+    }
+    if(!best) break;                                   // nothing left that fits anywhere
+    var taken={};
+    best.sheet.placements.forEach(function(p){ if(p.part){ assign[p.part.id]=best.board.id; taken[p.part.id]=true; } });
+    if(!Object.keys(taken).length) break;
+    remaining=remaining.filter(function(p){ return !taken[p.id]; });
+    stock[best.board.id]--;
+  }
+  // Anything the pool could not take stays with its original board so it is
+  // reported as unplaced rather than vanishing.
+  return assign;
+}
+// Usable area of a board for a given set of parts, trim reduced only as far as
+// those parts require (same rule the per-board pass uses).
+function _usableFor(bd, partsForBoard, trimVal){
+  var u={uw:bd.w-trimVal*2, uh:bd.h-trimVal*2, usedTrim:trimVal};
+  if(!partsForBoard||!partsForBoard.length) return u;
+  var lockGrain=!!bd.grain, allow=trimVal;
+  partsForBoard.forEach(function(p){
+    var t1=Math.min((bd.w-p.l)/2,(bd.h-p.w)/2);
+    var t2=lockGrain?-Infinity:Math.min((bd.w-p.w)/2,(bd.h-p.l)/2);
+    var best=Math.max(t1,t2);
+    if(best<allow) allow=best;
+  });
+  allow=Math.floor(Math.max(0,allow));
+  u.uw=bd.w-allow*2; u.uh=bd.h-allow*2; u.usedTrim=allow;
+  return u;
+}
+
 function optimize(){
   if(!boards.length||!parts.length){alert(t('alertAddBoardsParts'));return;}
   // ── Guard: warn if operator would lose manual changes by re-optimizing.
@@ -7657,6 +7748,31 @@ function optimize(){
   var unfitRows=[];     // {part, board, reason} — drives the "did not fit" table
   var byBoard={};
   parts.forEach(function(p){var bd=matchBoard(p.mat);if(!bd)bd=ensureBoard(p.mat);if(!byBoard[bd.id])byBoard[bd.id]=[];byBoard[bd.id].push(p);});
+  // ── Spread each material across the sheet sizes it is stocked in ──────────
+  // Only materials held in more than one usable size need deciding; everything
+  // else keeps the assignment above untouched, so single-board jobs are
+  // unaffected in both behaviour and speed.
+  (function chooseMixes(){
+    var byMatName={};
+    parts.forEach(function(p){ var m=normalizeMat(p.mat); (byMatName[m]=byMatName[m]||[]).push(p); });
+    Object.keys(byMatName).forEach(function(m){
+      var pool=boards.filter(function(b){ return normalizeMat(b.mat)===m && boardInPool(b); });
+      if(pool.length<2) return;                       // nothing to choose between
+      var mp=byMatName[m];
+      var kerfForMix=(mode==='saw')?sawKerf:cncKerf;
+      var trimForMix=(mode==='saw')?sawTrim:cncTrim;
+      var assign=chooseSheetMix(mp, pool, kerfForMix, trimForMix, mode);
+      if(!Object.keys(assign).length) return;
+      // Re-file the parts this material owns according to the chosen mix.
+      pool.forEach(function(b){ if(byBoard[b.id]) byBoard[b.id]=byBoard[b.id].filter(function(p){ return normalizeMat(p.mat)!==m; }); });
+      mp.forEach(function(p){
+        var bid=assign[p.id];
+        var target=bid!=null?bid:(matchBoard(p.mat)||pool[0]).id;
+        if(!byBoard[target]) byBoard[target]=[];
+        byBoard[target].push(p);
+      });
+    });
+  })();
   // Pack-ordering strategies. The algorithm tries each and keeps the best.
   // More strategies = better chance of hitting an efficient packing at the
   // cost of more CPU time (linear in number of strategies).
@@ -7905,33 +8021,9 @@ function optimize(){
       });
       Object.keys(res.placedIds).forEach(function(id){ allPlacedIds[id]=true; });
     }
-    // ── Limited stock spills onto the next board of the same material ──
-    // Two boards may share a name on purpose: a full 2800×2070 sheet and a
-    // stack of 2800×1035 offcuts, say. Parts all start on the first board, so
-    // once its "Sheets I have" is used up, the sheets beyond that stock are
-    // unwound and their parts handed to the next board of the same material.
-    var laterSame=null;
-    for(var bi=bIdx+1; bi<boards.length; bi++){
-      if(normalizeMat(boards[bi].mat)===normalizeMat(bd.mat)){ laterSame=boards[bi]; break; }
-    }
-    if(bd.qty>0 && laterSame && (layouts.length-startIdx)>bd.qty){
-      var spilled=layouts.splice(startIdx+bd.qty);
-      var moved=[];
-      spilled.forEach(function(l){
-        l.placements.forEach(function(pl){
-          if(pl.part){ moved.push(pl.part); delete allPlacedIds[pl.part.id]; }
-        });
-      });
-      if(moved.length) byBoard[laterSame.id]=(byBoard[laterSame.id]||[]).concat(moved);
-    }
+    // Which sheet size a part lands on is settled up front by chooseSheetMix,
+    // so there is no spill-over step here any more.
     var unplacedHere=bp.filter(function(p){ return !allPlacedIds[p.id]; });
-    // Parts handed to a later board of the same material are not unplaced —
-    // they get their chance when that board is packed.
-    if(laterSame){
-      var handed={};
-      (byBoard[laterSame.id]||[]).forEach(function(p){ handed[p.id]=true; });
-      unplacedHere=unplacedHere.filter(function(p){ return !handed[p.id]; });
-    }
     if(unplacedHere.length){
       // Keyed per BOARD: two boards can share a name, and keying by name alone
       // let the second overwrite the first's tally instead of adding to it.
@@ -9913,15 +10005,25 @@ function _quoteData(){
   var useEdge = !!((document.getElementById('qp-edge')||{}).checked);
 
   // Aggregate by material name (= boards[].mat)
-  var byMat = {}; // matName -> { sheets, sheetArea_m2, usedArea_m2, cutM, parts, edgeM, board }
+  // Grouped per BOARD, not per material name. A material stocked in several
+  // sizes can carry a different €/m² per size — an offcut is cheaper than a
+  // fresh sheet — and matchBoard(name) always returned the first size, so every
+  // sheet was billed at that one's rate. Each layout is matched to the board it
+  // was actually cut from, by name AND sheet size.
+  var byMat = {}; // key -> { sheets, sheetArea_m2, usedArea_m2, cutM, parts, edgeM, board }
+  var _multiSize = {};
+  boards.forEach(function(b){ var m=normalizeMat(b.mat); _multiSize[m]=(_multiSize[m]||0)+1; });
   layouts.forEach(function(l){
     var mat = l.matName || 'Unknown';
-    var bd = matchBoard(mat);
-    if(!byMat[mat]) byMat[mat] = {
+    var m = normalizeMat(mat);
+    var bd = boards.filter(function(b){ return normalizeMat(b.mat)===m && b.w===l.sw && b.h===l.sh; })[0]
+             || matchBoard(mat);
+    var key = mat + ((_multiSize[m]>1) ? (' '+l.sw+'×'+l.sh) : '');
+    if(!byMat[key]) byMat[key] = {
       sheets:0, sheetArea_m2:0, usedArea_m2:0, cutM:0, parts:0, edgeM:0,
       board: bd, color: (bd&&bd.color) || l.matColor || '#667085'
     };
-    var row = byMat[mat];
+    var row = byMat[key];
     row.sheets += 1;
     row.sheetArea_m2 += (l.uw * l.uh) / 1e6;
     // num() keeps one bad placement from turning an entire quote into NaN, which
