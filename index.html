@@ -7193,7 +7193,16 @@ function nestSolve(instJson, kerf){
 }
 
 // Build a jagua-rs bin-packing instance (ExtBPInstance) for one material.
-function _bpInstanceForMaterial(name, mparts, uw, uh, grain){
+// kerfPad: the solver insets every item by one kerf from the bin edge as well
+// as from its neighbours (measured: at kerf 4 items land at x=4, spaced 404).
+// A sheet edge is not a cut, so that inset silently shrinks the usable area —
+// on a 1000×606 sheet at kerf 4 it removed 2×4 mm of height and a 600 mm part
+// stopped fitting rotated, halving what each sheet could hold. The bin is
+// grown by one kerf per side to cancel it; the placements are shifted back by
+// the same amount. Pocket bins deliberately keep the inset, because there the
+// wall really is cut.
+function _bpInstanceForMaterial(name, mparts, uw, uh, grain, kerfPad, maxSheets){
+  kerfPad=kerfPad||0;
   // Rotation step from the selector. Grain-locked boards may only flip 0°/180°
   // (preserves grain direction); otherwise snap at the chosen angle increment.
   var step = parseInt((document.getElementById('nestRot')||{}).value) || 45;
@@ -7211,8 +7220,8 @@ function _bpInstanceForMaterial(name, mparts, uw, uh, grain){
     }
     return { id: idx, demand: 1, allowed_orientations: orient, shape: shape, min_quality: null };
   });
-  var bin = { id:0, shape:{ type:'rectangle', data:{ x_min:0, y_min:0, width:uw, height:uh } },
-              stock: Math.max(1, mparts.length), cost: 1 };
+  var bin = { id:0, shape:{ type:'rectangle', data:{ x_min:0, y_min:0, width:uw+2*kerfPad, height:uh+2*kerfPad } },
+              stock: Math.max(1, Math.min(maxSheets||mparts.length, mparts.length)), cost: 1 };
   return { name: name||'job', items: items, bins: [bin] };
 }
 
@@ -7236,14 +7245,39 @@ async function runShapeNestWasm(){
     return;
   }
 
-  for(var mi=0; mi<matKeys.length; mi++){
+  // Walk each material's sheet sizes, cheapest first, capping every size at the
+  // sheets you actually own and carrying whatever will not fit on to the next
+  // size. Shape nesting used to resolve ONE board per material, so a job could
+  // report short of the small size while the large one sat untouched and raising
+  // the large board's quantity changed nothing. Capping by stock also means the
+  // estimate that chose the split can no longer be wrong in a way that strands
+  // parts: what does not fit simply moves on.
+  var jobs=[];
+  matKeys.forEach(function(mat){
+    var pool=boards.filter(function(b){ return normalizeMat(b.mat)===mat && boardInPool(b); });
+    if(!pool.length){ jobs.push({mat:mat, bd:(matchBoard(mat)||boards[0]), parts:byMat[mat], cap:0}); return; }
+    var priced=_poolIsPriced(pool);
+    pool=pool.slice().sort(function(a,b){
+      return (_boardSheetCost(a,priced)/((a.w*a.h)/1e6)) - (_boardSheetCost(b,priced)/((b.w*b.h)/1e6));
+    });
+    pool.forEach(function(b){ jobs.push({mat:mat, bd:b, parts:null, cap:(b.qty>0?b.qty:0)}); });
+    jobs.push({mat:mat, __seed:byMat[mat]});
+  });
+  // Seeds carry each material's parts to the first of its boards.
+  var pending={};
+  jobs=jobs.filter(function(j){ if(j.__seed){ pending[j.mat]=j.__seed.slice(); return false; } return true; });
+
+  for(var mi=0; mi<jobs.length; mi++){
     if(_nestCancelled) break;
-    var mat=matKeys[mi], mparts=byMat[mat];
-    var bd=matchBoard(mat)||boards[0];
+    var mat=jobs[mi].mat;
+    var mparts=jobs[mi].parts || pending[mat] || [];
+    if(!mparts.length) continue;                       // nothing left for this size
+    var bd=jobs[mi].bd||boards[0];
+    var capSheets=jobs[mi].cap||0;
     var uw=Math.max(10, bd.w-2*trim), uh=Math.max(10, bd.h-2*trim);
     var grain=!!bd.grain;
-    _nestProgressMat(mi, matKeys.length, bd.mat, 0.15);
-    var inst=_bpInstanceForMaterial(mat, mparts, uw, uh, grain);
+    _nestProgressMat(mi, jobs.length, bd.mat, 0.15);
+    var inst=_bpInstanceForMaterial(mat, mparts, uw, uh, grain, kerf, capSheets||undefined);
     var sol=null;
     try{
       var resStr=await nestSolve(JSON.stringify(inst), kerf);
@@ -7265,8 +7299,10 @@ async function runShapeNestWasm(){
         // Place in the engine's (y-up) frame, then flip the whole layout to the app's
         // y-down sheet frame. A single global flip preserves the engine's no-overlap
         // guarantee, and leaves nestPoly in the y-down local coords the renderer expects.
-        var sOuter=g.outer.map(function(pt){ var q=R(pt); return {x:q.x, y:uh-q.y}; });
-        var sHoles=(g.holes||[]).map(function(h){ return h.map(function(pt){ var q=R(pt); return {x:q.x, y:uh-q.y}; }); });
+        // Padded bin → real sheet: x-kerf, and the y-flip uses the padded height,
+        // which reduces to (uh + kerf - q.y).
+        var sOuter=g.outer.map(function(pt){ var q=R(pt); return {x:q.x-kerf, y:uh+kerf-q.y}; });
+        var sHoles=(g.holes||[]).map(function(h){ return h.map(function(pt){ var q=R(pt); return {x:q.x-kerf, y:uh+kerf-q.y}; }); });
         var minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
         sOuter.forEach(function(pt){ if(pt.x<minX)minX=pt.x; if(pt.y<minY)minY=pt.y; if(pt.x>maxX)maxX=pt.x; if(pt.y>maxY)maxY=pt.y; });
         var pw=maxX-minX, ph=maxY-minY;
@@ -7284,8 +7320,22 @@ async function runShapeNestWasm(){
           placements:pls, kerf:kerf, machine:'cnc', shapeNest:true });
       }
     });
-    _nestProgressMat(mi, matKeys.length, bd.mat, 1);
+    // Whatever this size could not take (its stock ran out, or the parts do not
+    // fit it) moves on to the next size of the same material.
+    (function(){
+      var placedHere={};
+      newLayouts.forEach(function(l){
+        if(normalizeMat(l.matName)!==normalizeMat(bd.mat) || l.sw!==bd.w || l.sh!==bd.h) return;
+        (l.placements||[]).forEach(function(pl){ if(pl.part) placedHere[pl.part.id]=true; });
+      });
+      pending[mat]=mparts.filter(function(p){ return !placedHere[p.id]; });
+    })();
+    _nestProgressMat(mi, jobs.length, bd.mat, 1);
   }
+  // Anything still pending after every size of a material has been tried.
+  Object.keys(pending).forEach(function(m){
+    (pending[m]||[]).forEach(function(p){ unplaced.push(p.origName||p.name||'?'); });
+  });
 
   // ── Second pass: nest leftovers into the cut-outs of parts already placed ──
   // The engine will not do this itself — offered a part with a big pocket and a
