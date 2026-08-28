@@ -9214,6 +9214,16 @@ function renderStockWarning(){
 function buildTabs(){
   var dups = computeLayoutDupGroups();
   var ords = _sheetOrdinals();
+  // How many distinct sheet sizes each material is actually cut on in this job.
+  var _matSizeCount={};
+  (function(){
+    var seen={};
+    layouts.forEach(function(l){
+      var m=normalizeMat(l.matName), k=m+'|'+l.sw+'x'+l.sh;
+      if(seen[k]) return; seen[k]=1;
+      _matSizeCount[m]=(_matSizeCount[m]||0)+1;
+    });
+  })();
   document.getElementById('tabs').innerHTML=layouts.map(function(l,i){
     var warn=l.trimWarning?'<span style="color:#B84040;margin-left:2px" title="No trim">⚠</span>':'';
     var grain=l.grainLocked?'<span style="color:#2f54eb;margin-left:2px" title="Grain locked">🌾</span>':'';
@@ -9235,10 +9245,16 @@ function buildTabs(){
     var over=(have>0 && ords[i]>have)
       ? '<span style="color:#B84040;margin-left:3px;font-weight:700" title="'+esc(t('stockOverTab',{n:ords[i],have:have}))+'">📦!</span>'
       : '';
-    return'<div class="tab" id="tab-'+i+'" onclick="activateTab('+i+')">'
+    // Sheet size on the tab, so two stock sizes of one material are told apart
+    // at a glance. Only when the material really is held in more than one size —
+    // otherwise it is noise on every tab.
+    var sizeTag = (_matSizeCount[normalizeMat(l.matName)]>1)
+      ? '<span style="margin-left:5px;font-family:monospace;font-size:9px;opacity:.75">'+l.sw+'×'+l.sh+'</span>'
+      : '';
+    return'<div class="tab" id="tab-'+i+'" onclick="activateTab('+i+')" title="'+esc(l.matName+' · '+l.sw+'×'+l.sh+' mm')+'">'
       +mach
       +'<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:'+l.matColor+'"></span>'
-      +esc(l.matName.split(' ').slice(0,2).join(' '))+' #'+(i+1)+warn+grain+dupBadge+over+'</div>';
+      +esc(l.matName.split(' ').slice(0,2).join(' '))+' #'+(i+1)+sizeTag+warn+grain+dupBadge+over+'</div>';
   }).join('');
 }
 function activateTab(i){curSheet=i;selP=null;hovP=null;document.querySelectorAll('.tab').forEach(function(t,ti){t.className='tab'+(ti===i?' active':'');});renderCanvas(i);}
@@ -9256,6 +9272,20 @@ function draw(lay){
   ctx.fillStyle='#EDE9DF';ctx.fillRect(tx,ty,uw,uh);
   if(lay.trim>0){ctx.strokeStyle='#B0A898';ctx.lineWidth=1;ctx.setLineDash([4,4]);ctx.strokeRect(tx+.5,ty+.5,uw-1,uh-1);ctx.setLineDash([]);ctx.fillStyle='rgba(0,0,0,.25)';ctx.font='9px monospace';ctx.textAlign='left';ctx.textBaseline='top';ctx.fillText('trim '+lay.trim+'mm',3,2);}
   ctx.strokeStyle='#888';ctx.lineWidth=1.5;ctx.strokeRect(.75,.75,W-1.5,H-1.5);
+  // ── SHEET SIZE, top-right ────────────────────────────────────────────────
+  // With one material stocked in several sizes every sheet looked alike, so
+  // there was no way to tell from the drawing which board a sheet was cut from.
+  (function(){
+    var label=lay.sw+' × '+lay.sh+' mm';
+    ctx.font='bold 11px monospace'; ctx.textAlign='right'; ctx.textBaseline='top';
+    var tw=ctx.measureText(label).width;
+    ctx.fillStyle='rgba(255,255,255,.82)';
+    ctx.fillRect(W-tw-11, 3, tw+8, 15);
+    ctx.strokeStyle='rgba(0,0,0,.18)'; ctx.lineWidth=1;
+    ctx.strokeRect(W-tw-10.5, 3.5, tw+7, 14);
+    ctx.fillStyle='#1b1e26';
+    ctx.fillText(label, W-7, 5);
+  })();
   // ── REGISTER POINT (0,0) — bottom-left corner of usable area ──────
   // Matches the typical CNC / beam-saw convention where the work-coordinate
   // origin sits at the bottom-left of the sheet (Y axis points up from there).
