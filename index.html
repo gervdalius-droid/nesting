@@ -8082,7 +8082,63 @@ function optimize(){
       unplacedHere.forEach(function(up){ unfitRows.push({part:up, board:bd, reason:_unfitReason(up,bd)}); });
     }
   });
-  // Sheet numbering must be contiguous after any spill-over removed sheets.
+  // ── Enforce stock against the real result, not the estimate ──────────────
+  // chooseSheetMix decides the split from a single trial pack. That estimate can
+  // come out short of what the real run needs — the two-machine mode packs saw
+  // and CNC parts on separate sheets, and the full strategy search can land on a
+  // different sheet count — which left a size over its stock while a sibling
+  // sheet size still had spare. Whatever the cause, the fix is the same: move
+  // the genuine overflow onto a sibling that has room and re-pack it there.
+  (function enforceStock(){
+    for(var pass=0; pass<3; pass++){
+      var moved=false;
+      boards.forEach(function(bd){
+        if(!(bd.qty>0) || !boardInPool(bd)) return;
+        var mine=layouts.filter(function(l){
+          return normalizeMat(l.matName)===normalizeMat(bd.mat) && l.sw===bd.w && l.sh===bd.h;
+        });
+        if(mine.length<=bd.qty) return;                       // within stock
+        var surplus=mine.slice(bd.qty);
+        var spill=[];
+        surplus.forEach(function(l){ (l.placements||[]).forEach(function(p){ if(p.part) spill.push(p.part); }); });
+        if(!spill.length) return;
+        var maxL=0,maxW=0;
+        spill.forEach(function(p){ maxL=Math.max(maxL,Math.max(p.l,p.w)); maxW=Math.max(maxW,Math.min(p.l,p.w)); });
+        // Cheapest sibling with spare stock that the biggest overflow part fits on.
+        var pool=boards.filter(function(b){ return b!==bd && normalizeMat(b.mat)===normalizeMat(bd.mat) && boardInPool(b); });
+        var priced=_poolIsPriced(pool.concat([bd]));
+        var sib=pool.filter(function(b){
+          var used=layouts.filter(function(l){ return normalizeMat(l.matName)===normalizeMat(b.mat) && l.sw===b.w && l.sh===b.h; }).length;
+          if(b.qty>0 && used>=b.qty) return false;
+          return maxL<=Math.max(b.w,b.h) && maxW<=Math.min(b.w,b.h);
+        }).sort(function(a,b){
+          return (_boardSheetCost(a,priced)/((a.w*a.h)/1e6)) - (_boardSheetCost(b,priced)/((b.w*b.h)/1e6));
+        })[0];
+        if(!sib) return;                                      // nowhere to put it — reported as short
+        layouts=layouts.filter(function(l){ return surplus.indexOf(l)<0; });
+        // Saw and CNC parts cannot share a sheet, so pack them separately.
+        var groups = (mode==='both')
+          ? [{m:'saw', ps:spill.filter(function(p){return partMachine(p)==='saw';})},
+             {m:'cnc', ps:spill.filter(function(p){return partMachine(p)==='cnc';})}]
+          : [{m:mode, ps:spill}];
+        groups.forEach(function(g){
+          if(!g.ps.length) return;
+          var k=(g.m==='saw')?sawKerf:cncKerf;
+          var tr=(g.m==='saw')?sawTrim:cncTrim;
+          var u=_usableFor(sib, g.ps, tr);
+          var res=tryAllStrategies(g.ps, u.uw, u.uh, k, sib.color, u.usedTrim, !!sib.grain);
+          res.layouts.forEach(function(l){
+            l.matName=sib.mat; l.matColor=sib.color; l.sw=sib.w; l.sh=sib.h;
+            l.machine=g.m; l.kerf=k; l.trim=u.usedTrim; l.grainLocked=!!sib.grain;
+            layouts.push(l);
+          });
+        });
+        moved=true;
+      });
+      if(!moved) break;
+    }
+  })();
+  // Sheet numbering must be contiguous after any sheets were moved.
   layouts.forEach(function(l,i){ l.idx=i; });
   var totA=layouts.reduce(function(a,l){return a+l.uw*l.uh;},0);
   var usedA=layouts.reduce(function(a,l){return a+l.placements.reduce(function(b,p){return b+p.pw*p.ph;},0);},0);
