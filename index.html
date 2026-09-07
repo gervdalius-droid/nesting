@@ -747,7 +747,7 @@ body.print-mode{background:#fff}
         <th data-col="swap" title="Swap L and W for this row"></th>
         <th data-col="rot" title="Rotation — Auto / Allow / Lock. Click to cycle.">Rot</th>
         <th data-col="mach" title="Which machine cuts this part. Auto reads the shape — a plain rectangle goes to the saw, a shaped or drilled part to the CNC. Click a cell to mark the part 🤖 CNC or 🪚 Saw yourself; the mark is the only way to send a plain rectangle to the CNC.">Mach</th>
-        <th data-col="qty">Qty</th>
+        <th data-col="qty" title="Quantity of identical parts. ⤢ answers how many fit on one sheet and sets the quantity to fill it.">Qty ⤢</th>
         <th data-col="area" onclick="pwSortBy('area')">Area m² ↕</th>
         <th data-col="thick">Thickness</th>
         <th data-col="mat" onclick="pwSortBy('mat')">Material ↕</th>
@@ -5148,7 +5148,7 @@ var PW_COLS=[
   {k:'swap',  w:32,  min:28},
   {k:'rot',   w:42,  min:32},
   {k:'mach',  w:52,  min:44},
-  {k:'qty',   w:54,  min:40},
+  {k:'qty',   w:82,  min:40},
   {k:'area',  w:70,  min:48},
   {k:'thick', w:70,  min:44},
   {k:'mat',   w:132, min:60},
@@ -5384,7 +5384,10 @@ function renderPartsWindow(){
           return '<button class="pw-swap-btn" style="color:'+cl+'" title="'+ti+'" onclick="pwCycleRowRotation(\''+sid+'\')">'+gl+'</button>';
         })()+'</td>'
       +'<td style="text-align:center;padding:0">'+machBtn(p,false,'pwCycleRowMachine(\''+sid+'\')')+'</td>'
-      +'<td style="padding:0 2px"><input class="pw-edit pw-edit-num pw-edit-qty" data-id="'+sid+'" type="number" min="1" value="'+countGroupOf(p)+'" title="Total quantity of identical parts (same name + material + L×W + thickness). Editing clones or removes copies." onchange="pwSetQty(\''+sid+'\',this.value)"></td>'
+      +'<td style="padding:0 2px"><div style="display:flex;gap:2px;align-items:center">'
+        +'<input class="pw-edit pw-edit-num pw-edit-qty" data-id="'+sid+'" type="number" min="1" value="'+countGroupOf(p)+'" title="Total quantity of identical parts (same name + material + L×W + thickness). Editing clones or removes copies." onchange="pwSetQty(\''+sid+'\',this.value)">'
+        +'<button class="pw-swap-btn" style="flex-shrink:0" title="How many of this part fit on one sheet? Counts with the real packer — board size, kerf, trim and grain included — and can set the quantity to fill whole sheets." onclick="openMaxQty(\''+sid+'\')">⤢</button>'
+      +'</div></td>'
       +'<td style="font-family:monospace;font-size:10px;color:#667085" data-id="'+sid+'-area">'+((p.l*p.w)/1e6).toFixed(4)+'</td>'
       +'<td><input class="pw-edit pw-edit-num pw-edit-t" data-id="'+sid+'" type="number" min="1" value="'+p.thick+'" onchange="pwEditField(\''+sid+'\',\'thick\',this.value)"></td>'
       +'<td style="max-width:140px">'+dot+matSel+'</td>'
@@ -7916,6 +7919,256 @@ function _usableFor(bd, partsForBoard, trimVal){
   allow=Math.floor(Math.max(0,allow));
   u.uw=bd.w-allow*2; u.uh=bd.h-allow*2; u.usedTrim=allow;
   return u;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// MAXIMISE QUANTITY — "how many of this part fit on one sheet?"
+// The answer nobody can do in their head: it depends on the board size, the
+// kerf, the trim the sheet actually allows, and whether grain lets the part
+// turn. So the packer answers it, with the very same code that nests the job.
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Which machine a part runs on decides its kerf and trim.
+function _partKerfTrim(p){
+  var mode=getMachineMode();
+  var m=(mode==='both') ? partMachine(p) : mode;
+  var sawKerf=parseInt((document.getElementById('kerf')||{}).value)||0;
+  var cncKerf=parseInt((document.getElementById('kerf-cnc')||{}).value);
+  if(isNaN(cncKerf)) cncKerf=sawKerf;
+  var sawTrim=parseInt((document.getElementById('trim')||{}).value)||0;
+  var cncTrim=parseInt((document.getElementById('trim-cnc')||{}).value);
+  if(isNaN(cncTrim)) cncTrim=sawTrim;
+  return {machine:m, kerf:(m==='saw')?sawKerf:cncKerf, trim:(m==='saw')?sawTrim:cncTrim};
+}
+
+// May this part turn 90° on this board?
+function _partMayRotate(p, grainLocked){
+  if(p.allowRotate===true) return true;
+  if(p.allowRotate===false) return false;
+  return !grainLocked;
+}
+
+// Above this many copies the real pack is slow and pointless — for a part that
+// small the plain grid is the answer to within a piece or two.
+var MQ_PROBE_CAP=400;
+
+// How many copies of `p` fit on ONE sheet of board `bd`.
+// Returns {n, uw, uh, trim, kerf, machine, grain, rotates, fits, estimated}.
+function partsPerSheet(p, bd){
+  var kt=_partKerfTrim(p);
+  var u=_usableFor(bd, [p], kt.trim);
+  var grain=!!bd.grain, rot=_partMayRotate(p, grain);
+  var out={n:0, uw:u.uw, uh:u.uh, trim:u.usedTrim, kerf:kt.kerf, machine:kt.machine,
+           grain:grain, rotates:rot, fits:false, estimated:false};
+  if(u.uw<=0 || u.uh<=0) return out;
+  var k=kt.kerf, L=p.l, W=p.w;
+  var asIs = (L<=u.uw && W<=u.uh);
+  var turned = rot && (W<=u.uw && L<=u.uh);
+  if(!asIs && !turned) return out;              // will not fit on this board at all
+  out.fits=true;
+  // A plain grid bounds the search: the packer can beat it, never by much.
+  var grid=function(a,b){ return Math.floor((u.uw+k)/(a+k)) * Math.floor((u.uh+k)/(b+k)); };
+  var g=Math.max(asIs?grid(L,W):0, turned?grid(W,L):0);
+  if(g+4 > MQ_PROBE_CAP){ out.n=g; out.estimated=true; return out; }
+  var probe=Math.max(1, g+4);
+  // Mixed orientations often beat a single one: five turned parts in a tall
+  // band plus a row of flat ones can outdo any pure grid. Bias the packer the
+  // way the optimizer's own strategy search does and keep the best result.
+  var tries=[];
+  MQ_RECIPES.forEach(function(rc){
+    if(rc!=='asis' && !rot) return;              // an orientation it may not use
+    MQ_MODES.forEach(function(mode){
+      var res=pack(u.uw, u.uh, _mqClones(p, probe, rc, rot), k, bd.color, 0, u.usedTrim, grain, mode);
+      var n=(res && res[0]) ? res[0].placements.length : 0;
+      if(n>0) tries.push({n:n, rc:rc, mode:mode});
+    });
+  });
+  // Only promise a count the packer reproduces when asked for exactly that many.
+  // A number lifted off a fuller probe list is a coincidence, not a promise —
+  // the operator would set the quantity and get two sheets. The plain grid is
+  // the floor: it is a row-and-column layout, so it always fits.
+  tries.sort(function(a,b){ return b.n-a.n; });
+  for(var i=0;i<tries.length;i++){
+    if(tries[i].n<=g) break;                     // nothing left that beats the grid
+    if(_fitsOnOneSheet(p, bd, tries[i].n, u, k, grain, tries[i].rc, tries[i].mode, rot)){
+      out.n=tries[i].n;
+      return out;
+    }
+  }
+  out.n=g;
+  return out;
+}
+
+var MQ_RECIPES=['asis','swap','half','alt'];
+var MQ_MODES=['bssf','bl'];
+
+// n throwaway copies of a part, safe to hand to the packer. `recipe` decides
+// how many go in turned — the packer may still turn them back, this only sets
+// where it starts from. Shapes are dropped: this is a bounding-box count.
+function _mqClones(p, n, recipe, mayRotate){
+  var out=[];
+  for(var i=0;i<n;i++){
+    var c=Object.assign({}, p);
+    c.eb=Object.assign({}, p.eb||{});
+    c.id='mq_'+i;
+    delete c.groupId;                            // group cohesion would skew the count
+    delete c.shape; delete c.holes;              // the rectangle packer counts bboxes
+    c.printed=false;
+    var turn = mayRotate && (recipe==='swap'
+                          || (recipe==='half' && i>=Math.floor(n/2))
+                          || (recipe==='alt'  && (i%2)===1));
+    if(turn){ var t=c.l; c.l=c.w; c.w=t; }
+    out.push(c);
+  }
+  return out;
+}
+
+// Does the packer put exactly n copies on a single sheet? Tries the recipe that
+// found the count first, then every other combination before giving up.
+function _fitsOnOneSheet(p, bd, n, u, k, grain, recipe, mode, mayRotate){
+  var combos=[];
+  if(recipe && mode) combos.push({rc:recipe, m:mode});
+  MQ_RECIPES.forEach(function(rc){
+    if(rc!=='asis' && !mayRotate) return;
+    MQ_MODES.forEach(function(m){
+      if(rc===recipe && m===mode) return;
+      combos.push({rc:rc, m:m});
+    });
+  });
+  for(var i=0;i<combos.length;i++){
+    var res=pack(u.uw, u.uh, _mqClones(p, n, combos[i].rc, mayRotate), k, bd.color, 0, u.usedTrim, grain, combos[i].m);
+    if(res && res.length===1 && res[0].placements.length===n) return true;
+  }
+  return false;
+}
+
+// How many MORE copies squeeze into the space left on the sheets this job
+// already uses. Measured by actually dropping them in and taking them out
+// again, so it reflects the layout on screen rather than a fresh nest.
+function fitMoreInCurrentLayouts(p){
+  if(!layouts || !layouts.length) return 0;
+  var mode=getMachineMode(), want=partMachine(p);
+  var mine=layouts.filter(function(l){
+    if(normalizeMat(l.matName)!==normalizeMat(p.mat)) return false;
+    if(mode==='both' && l.machine && l.machine!==want) return false;
+    return true;
+  });
+  var LIMIT=400, count=0, added=[];
+  for(var i=0;i<mine.length && count<LIMIT;i++){
+    var l=mine[i], rot=_partMayRotate(p, !!l.grainLocked);
+    while(count<LIMIT){
+      var cand={x:0, y:0, pw:p.l, ph:p.w, __probe:true};
+      var spot=findFreeSpot(l, cand, false);
+      if(!spot && rot){ cand={x:0, y:0, pw:p.w, ph:p.l, __probe:true}; spot=findFreeSpot(l, cand, false); }
+      if(!spot) break;
+      cand.x=spot.x; cand.y=spot.y;
+      l.placements.push(cand);                   // occupy it so the next probe sees it
+      added.push({lay:l, pl:cand});
+      count++;
+    }
+  }
+  added.forEach(function(a){                     // this was only a measurement
+    var idx=a.lay.placements.indexOf(a.pl);
+    if(idx>=0) a.lay.placements.splice(idx,1);
+  });
+  return count;
+}
+
+// ── The dialog ────────────────────────────────────────────────────────────
+function openMaxQty(id){
+  var p=parts.find(function(x){return String(x.id)===String(id);});
+  if(!p){ return; }
+  closeMaxQty();
+  var cur=countGroupOf(p);
+  var pool=boards.filter(function(b){ return normalizeMat(b.mat)===normalizeMat(p.mat); });
+  if(!pool.length){ var only=matchBoard(p.mat); if(only) pool=[only]; }
+  var kt=_partKerfTrim(p);
+  var L='font-size:10px;font-weight:700;color:#667085;text-transform:uppercase;letter-spacing:.05em';
+  var rows=pool.map(function(bd){
+    var r=partsPerSheet(p, bd);
+    var sheetsNow=r.n>0 ? Math.ceil(cur/r.n) : 0;
+    var out='<tr style="border-top:1px solid #f0f2f5">'
+      +'<td style="padding:7px 8px;font-family:monospace;font-size:12px">'
+        +'<span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:'+bd.color+';margin-right:6px"></span>'
+        +bd.w+'×'+bd.h
+        +(boardInPool(bd)?'':'<span title="Not ticked for this job" style="margin-left:6px;font-size:10px;color:#B84040">excluded</span>')
+      +'</td>';
+    if(!r.fits){
+      out+='<td colspan="3" style="padding:7px 8px;font-size:11px;color:#B84040">Does not fit — usable area is '
+        +Math.max(0,r.uw)+'×'+Math.max(0,r.uh)+' mm after '+r.trim+' mm trim'
+        +(r.grain&&!r.rotates?', and grain forbids turning it':'')+'</td></tr>';
+      return out;
+    }
+    out+='<td style="padding:7px 8px;text-align:right"><b style="font-size:17px;color:#2f54eb">'+r.n+'</b>'
+      +'<span style="font-size:10px;color:#667085"> / sheet'+(r.estimated?' ≈':'')+'</span></td>'
+      +'<td style="padding:7px 8px;font-size:10px;color:#667085;white-space:nowrap">'
+        +r.uw+'×'+r.uh+' usable · kerf '+r.kerf+' · trim '+r.trim
+        +'<br>'+(r.rotates?'may turn 90°':'orientation locked')
+        +' · now '+cur+' pcs = '+(sheetsNow||'—')+' sheet'+(sheetsNow===1?'':'s')
+      +'</td>'
+      +'<td style="padding:7px 8px;white-space:nowrap">'
+        +'<input id="mq-sh-'+bd.id+'" type="number" min="1" max="99" value="1" style="width:46px;padding:3px 4px;font-size:12px;text-align:center">'
+        +'<span style="font-size:10px;color:#667085;margin:0 6px">sheets</span>'
+        +'<button class="btn bs bp" onclick="mqApply(\'' + p.id + '\','+bd.id+','+r.n+')" style="font-size:11px;padding:4px 9px">Set qty</button>'
+      +'</td></tr>';
+    return out;
+  }).join('');
+
+  var extra=fitMoreInCurrentLayouts(p);
+  var leftover = !layouts.length
+    ? '<div style="font-size:11px;color:#667085;margin-top:12px">Nest the job first to see what still fits in the space you have left.</div>'
+    : (extra>0
+        ? '<div style="margin-top:12px;background:#f2f7ff;border:1px solid #d6e4ff;border-radius:8px;padding:9px 11px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">'
+          +'<span style="font-size:12px">Room left in the sheets this job already uses: <b>≈'+extra+' more</b></span>'
+          +'<button class="btn bs bp" onclick="mqFill(\'' + p.id + '\','+extra+')" style="font-size:11px;padding:4px 9px;margin-left:auto">Add '+extra+' → qty '+(cur+extra)+'</button>'
+          +'</div>'
+        : '<div style="font-size:11px;color:#667085;margin-top:12px">No room left for another one in the current layout.</div>');
+
+  var html=''
+   +'<div style="font-size:16px;font-weight:700;color:#1b1e26">⤢ How many fit on a sheet</div>'
+   +'<div style="font-size:12px;color:#667085;margin-top:3px">'
+     +esc(p.origName||p.name||'part')+' · <b>'+p.l+'×'+p.w+'</b> mm · '+esc(p.mat)
+     +' · '+(kt.machine==='saw'?'🪚 saw':'🤖 CNC')+' settings'
+   +'</div>'
+   +(p.shape?'<div style="font-size:11px;color:#8a6d1a;margin-top:6px">📐 Counted on the bounding rectangle — Shape nest can fit more of an irregular outline.</div>':'')
+   +'<table style="width:100%;border-collapse:collapse;margin-top:12px"><thead><tr>'
+     +'<th style="'+L+';text-align:left;padding:0 8px 5px">Board</th>'
+     +'<th style="'+L+';text-align:right;padding:0 8px 5px">Fits</th>'
+     +'<th style="'+L+';text-align:left;padding:0 8px 5px">How it was counted</th>'
+     +'<th style="'+L+';text-align:left;padding:0 8px 5px">Set quantity</th>'
+   +'</tr></thead><tbody>'+(rows||'<tr><td style="padding:8px;font-size:12px;color:#B84040">No board for this material yet.</td></tr>')+'</tbody></table>'
+   +leftover
+   +'<div style="display:flex;justify-content:flex-end;margin-top:16px">'
+     +'<button onclick="closeMaxQty()" style="padding:8px 16px;border:1px solid #e6e8ed;background:#fff;border-radius:7px;cursor:pointer">Close</button>'
+   +'</div>';
+  var bg=document.createElement('div'); bg.id='mq-bg';
+  bg.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:100001;display:flex;align-items:center;justify-content:center;padding:20px';
+  bg.onclick=function(e){ if(e.target===bg) closeMaxQty(); };
+  var card=document.createElement('div');
+  card.style.cssText='background:#fff;border-radius:14px;padding:20px 22px;width:680px;max-width:95vw;max-height:90vh;overflow-y:auto;box-shadow:0 12px 40px rgba(0,0,0,.25)';
+  card.innerHTML=html; bg.appendChild(card); document.body.appendChild(bg);
+}
+function closeMaxQty(){ var b=document.getElementById('mq-bg'); if(b) b.remove(); }
+// Fill n sheets with this part.
+function mqApply(id, boardId, perSheet){
+  var el=document.getElementById('mq-sh-'+boardId);
+  var sheets=Math.max(1, Math.min(99, parseInt(el&&el.value,10)||1));
+  var target=perSheet*sheets;
+  if(target<1){ return; }
+  closeMaxQty();
+  pwSetQty(id, target);
+  setStatus && setStatus('ok','⤢ Quantity → '+target+' ('+sheets+' full sheet'+(sheets>1?'s':'')+' × '+perSheet+')');
+  _reoptimizeSoon();
+}
+// Top the part up with whatever the current sheets still have room for.
+function mqFill(id, extra){
+  var p=parts.find(function(x){return String(x.id)===String(id);});
+  if(!p || extra<1) return;
+  var target=countGroupOf(p)+extra;
+  closeMaxQty();
+  pwSetQty(id, target);
+  setStatus && setStatus('ok','⤢ Filled the leftover space — quantity → '+target);
+  _reoptimizeSoon();
 }
 
 function optimize(){
