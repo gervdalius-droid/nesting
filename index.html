@@ -685,6 +685,8 @@ body.print-mode{background:#fff}
         <button class="rot-btn" id="rot-btn" onclick="rotateSel()" data-i18n-title="rotateTip" title="Rotate selected part by the chosen ↻ step (R = clockwise, Shift+R = counter-clockwise). True shapes rotate by their real outline." style="display:none"><span data-i18n="rotateBtn">↻ Rotate (R)</span></button>
         <button class="rot-btn" id="mv-btn" onclick="openMovePopover(event)" data-i18n-title="moveTip" title="Move selected part to a different sheet" style="display:none;color:#2f54eb;border-color:#2f54eb"><span data-i18n="moveBtn">📋 Move…</span></button>
         <button class="rot-btn" id="pr-btn" onclick="printSel()" data-i18n-title="printTip" title="Print label for selected part (P key)" style="display:none;color:#2f54eb;border-color:#2f54eb"><span data-i18n="printBtn">🏷 Print (P)</span></button>
+        <button class="rot-btn" id="cp-btn" onclick="copySel()" data-i18n-title="copyTip" title="Copy this part (Ctrl+C). Ctrl+V drops a copy on the sheet — use it when you can see a part would fit and the nester gave up. Ctrl+D does both at once." style="display:none;color:#2f54eb;border-color:#2f54eb"><span data-i18n="copyBtn">⧉ Copy (Ctrl+C)</span></button>
+        <button class="rot-btn" id="pa-btn" onclick="pasteClip()" data-i18n-title="pasteTip" title="Paste the copied part onto this sheet (Ctrl+V). It lands under the pointer, then drag it where you want it. A part the nester left over is used first, so nothing is added twice." style="display:none;color:#2f54eb;border-color:#2f54eb"><span data-i18n="pasteBtn">📄 Paste (Ctrl+V)</span></button>
         <button class="btn bs" onclick="openBatchPrint()" data-i18n-title="printAllTip" title="Print labels for every part on this sheet (or all sheets)" style="margin-left:auto;font-size:10px;padding:3px 8px;color:#2f54eb;border-color:#2f54eb"><span data-i18n="printAllBtn">🏷 Print all labels</span></button>
         <button class="btn bs" onclick="consolidateSheets()" data-i18n-title="consolidateTip" title="Repack current placements — merge nearly-empty sheets" style="font-size:10px;padding:3px 8px"><span data-i18n="consolidateBtn">✨ Consolidate sheets</span></button>
         <button class="btn bs" onclick="openScrapDialog()" title="Find the largest reusable offcut on each sheet — export its label and DXF for tracking/reuse" style="font-size:10px;padding:3px 8px;color:#647488;border-color:#647488">♻ Export scrap</button>
@@ -1655,9 +1657,24 @@ var I18N={
     moveTip:'Move selected part to a different sheet',
     printBtn:'🏷 Print (P)',
     printTip:'Print label for selected part (P key)',
+    copyBtn:'⧉ Copy (Ctrl+C)',
+    copyTip:'Copy this part (Ctrl+C). Ctrl+V drops a copy on the sheet — for when you can see a part fits and the nester gave up. Ctrl+D does both at once.',
+    pasteBtn:'📄 Paste (Ctrl+V)',
+    pasteTip:'Paste the copied part onto this sheet (Ctrl+V). It lands under the pointer — then drag it where you want it.',
+    copied:'⧉ Copied {name} — Ctrl+V drops a copy on the sheet, Ctrl+D beside this one',
+    copyNothingSelected:'Click a part on the sheet first, then copy it',
+    pasteNothingCopied:'Nothing copied yet — click a part and press Ctrl+C',
+    pasteNoSheet:'Open a sheet first',
+    pasteSourceGone:'The copied part is no longer in the job',
+    pasteWrongMaterial:'This sheet is {sheet}, the copied part is {part}.\n\nOpen a {part} sheet and paste there.',
+    pasteTooBig:'The copy is {pw}×{ph} mm and this sheet only has {uw}×{uh} mm of usable area.',
+    pastedUnplaced:'⧉ Placed {name} that did not fit — drag it where you want it',
+    pastedNew:'⧉ Pasted a copy of {name} — quantity is now {n} · drag it where you want it',
+    unfitPlaceByHand:'⤓ Place by hand',
+    unfitPlaceByHandTip:'Put one on the sheet you are looking at, and drag it into the gap yourself',
     consolidateBtn:'✨ Consolidate sheets',
     consolidateTip:'Repack current placements — merge nearly-empty sheets',
-    canvasHint:'Drag · R = rotate · P = print label',
+    canvasHint:'Drag · R = rotate · P = print label · Ctrl+C/V = copy a part onto the sheet',
     // save status
     saving:'Saving…',
     saved:'✓ Saved',
@@ -1868,9 +1885,24 @@ var I18N={
     moveTip:'Perkelti pasirinktą detalę į kitą plokštę',
     printBtn:'🏷 Spausdinti (P)',
     printTip:'Spausdinti pasirinktos detalės etiketę (P klavišas)',
+    copyBtn:'⧉ Kopijuoti (Ctrl+C)',
+    copyTip:'Kopijuoti šią detalę (Ctrl+C). Ctrl+V padeda kopiją ant plokštės — kai matote, kad detalė telpa, o programa pasidavė. Ctrl+D padaro abu iš karto.',
+    pasteBtn:'📄 Įklijuoti (Ctrl+V)',
+    pasteTip:'Įklijuoti nukopijuotą detalę į šią plokštę (Ctrl+V). Ji atsiranda po pelės žymekliu — tada nutempkite kur norite.',
+    copied:'⧉ Nukopijuota {name} — Ctrl+V padeda kopiją ant plokštės, Ctrl+D šalia šios',
+    copyNothingSelected:'Pirma spustelėkite detalę ant plokštės, tada kopijuokite',
+    pasteNothingCopied:'Dar nieko nenukopijuota — spustelėkite detalę ir spauskite Ctrl+C',
+    pasteNoSheet:'Pirma atidarykite plokštę',
+    pasteSourceGone:'Nukopijuotos detalės projekte nebėra',
+    pasteWrongMaterial:'Ši plokštė yra {sheet}, o nukopijuota detalė — {part}.\n\nAtidarykite {part} plokštę ir įklijuokite ten.',
+    pasteTooBig:'Kopija yra {pw}×{ph} mm, o šioje plokštėje telpa tik {uw}×{uh} mm.',
+    pastedUnplaced:'⧉ Padėta {name}, kuri netilpo — nutempkite kur norite',
+    pastedNew:'⧉ Įklijuota {name} kopija — kiekis dabar {n} · nutempkite kur norite',
+    unfitPlaceByHand:'⤓ Padėti ranka',
+    unfitPlaceByHandTip:'Padeda vieną ant matomos plokštės — patys nutempkite į tarpą',
     consolidateBtn:'✨ Sujungti plokštes',
     consolidateTip:'Perdėlioti esamas detales — sujungti beveik tuščias plokštes',
-    canvasHint:'Tempkite · R = pasukti · P = spausdinti etiketę',
+    canvasHint:'Tempkite · R = pasukti · P = etiketė · Ctrl+C/V = kopijuoti detalę ant plokštės',
     saving:'Saugoma…',
     saved:'✓ Išsaugota',
     savedLocal:'✓ Išsaugota (vietoje)',
@@ -2535,17 +2567,9 @@ function collectProjectState(){
     parts:parts,
     partGroups:partGroups,
     gId:gId,
-    layouts:layouts.map(function(l){
-      // Placements reference parts by object — store partId for round-trip re-link.
-      return {
-        idx:l.idx,uw:l.uw,uh:l.uh,sw:l.sw,sh:l.sh,trim:l.trim,
-        matName:l.matName,matColor:l.matColor,grainLocked:!!l.grainLocked,
-        trimWarning:!!l.trimWarning,
-        placements:(l.placements||[]).map(function(pl){
-          return {x:pl.x,y:pl.y,pw:pl.pw,ph:pl.ph,rot:!!pl.rot,color:pl.color,partId:pl.part&&pl.part.id};
-        })
-      };
-    }),
+    // Placements reference parts by object — plainLayout stores partId for the
+    // round-trip re-link, and carries the true-shape outline and sheet machine.
+    layouts:layouts.map(plainLayout),
     versions:versions,          // layout version history (already plain data)
     vId:vId,
     activeVersionId:activeVersionId,
@@ -2631,17 +2655,7 @@ function applyProjectState(d){
     _autoVersionFp=null; // will be set when user triggers re-Optimize
     // Rebuild layouts and re-link placements to parts by id
     var partById={};parts.forEach(function(p){partById[String(p.id)]=p;});
-    layouts=(d.layouts||[]).map(function(l){
-      return {
-        idx:l.idx,uw:l.uw,uh:l.uh,sw:l.sw,sh:l.sh,trim:l.trim,
-        matName:l.matName,matColor:l.matColor,grainLocked:!!l.grainLocked,trimWarning:!!l.trimWarning,
-        placements:(l.placements||[]).map(function(pl){
-          var pt=partById[String(pl.partId)];
-          if(!pt)return null;
-          return {x:pl.x,y:pl.y,pw:pl.pw,ph:pl.ph,rot:!!pl.rot,color:pl.color,part:pt};
-        }).filter(Boolean)
-      };
-    });
+    layouts=(d.layouts||[]).map(function(l){ return liveLayout(l, partById); });
     curSheet=Math.min(d.curSheet||0,Math.max(0,layouts.length-1));
     // Apply settings
     if(d.settings){
@@ -6931,21 +6945,55 @@ function snapshotFingerprint(snapLayouts){
 // Deep-clone the current layouts array into a standalone snapshot.
 // Placements store partId rather than part reference so the snapshot is
 // JSON-safe (same shape as what save/load uses).
+// ── Placements as plain data, and back ─────────────────────────────────────
+// Every snapshot in the app — project save, undo step, layout version — passed
+// through a hand-written field list that dropped the true-shape fields and the
+// sheet's machine/kerf. That is not cosmetic: nestPoly IS the outline the DXF
+// export cuts, so a shape nest that came back from a snapshot exported as an
+// un-rotated rectangle — the wrong part on the machine. One pair of helpers
+// now does the conversion for all four sites.
+function _ringPlain(ring){
+  // 0.01 mm keeps every dimension well inside the app's own arc tolerance.
+  return (ring||[]).map(function(q){ return {x:Math.round(q.x*100)/100, y:Math.round(q.y*100)/100}; });
+}
+function _placementCarry(src, dst){
+  if(src.nestPoly && src.nestPoly.length){
+    dst.nestPoly=_ringPlain(src.nestPoly);
+    if(src.nestHoles && src.nestHoles.length) dst.nestHoles=src.nestHoles.map(_ringPlain);
+    dst.nestAngle=src.nestAngle||0;
+    if(src.inCutout) dst.inCutout=true;
+  }
+  return dst;
+}
+function plainPlacement(pl){
+  return _placementCarry(pl, {x:pl.x, y:pl.y, pw:pl.pw, ph:pl.ph,
+    rot:!!pl.rot, color:pl.color, partId:pl.part && pl.part.id});
+}
+function livePlacement(pl, partById){
+  var pt=partById[String(pl.partId)];
+  if(!pt) return null;
+  return _placementCarry(pl, {x:pl.x, y:pl.y, pw:pl.pw, ph:pl.ph,
+    rot:!!pl.rot, color:pl.color, part:pt});
+}
+function _layoutCarry(l, placements){
+  var o={ idx:l.idx, uw:l.uw, uh:l.uh, sw:l.sw, sh:l.sh, trim:l.trim,
+          matName:l.matName, matColor:l.matColor,
+          grainLocked:!!l.grainLocked, trimWarning:!!l.trimWarning,
+          placements:placements };
+  if(l.machine) o.machine=l.machine;              // which machine cuts this sheet
+  if(typeof l.kerf==='number') o.kerf=l.kerf;     // and with what kerf
+  if(l.shapeNest) o.shapeNest=true;
+  return o;
+}
+function plainLayout(l){
+  return _layoutCarry(l, (l.placements||[]).map(plainPlacement));
+}
+function liveLayout(l, partById){
+  return _layoutCarry(l, (l.placements||[]).map(function(pl){ return livePlacement(pl, partById); }).filter(Boolean));
+}
+
 function snapshotLayouts(){
-  return layouts.map(function(l){
-    return {
-      idx:l.idx, uw:l.uw, uh:l.uh, sw:l.sw, sh:l.sh, trim:l.trim,
-      matName:l.matName, matColor:l.matColor,
-      grainLocked:!!l.grainLocked, trimWarning:!!l.trimWarning,
-      placements:(l.placements||[]).map(function(pl){
-        return {
-          x:pl.x, y:pl.y, pw:pl.pw, ph:pl.ph,
-          rot:!!pl.rot, color:pl.color,
-          partId:pl.part && pl.part.id
-        };
-      })
-    };
-  });
+  return layouts.map(plainLayout);
 }
 
 // Deep-clone the current parts array as part of a version snapshot.
@@ -6975,18 +7023,7 @@ function restoreSnapshot(snap, restoreCurSheet, snapParts){
   }
   var partById={};
   parts.forEach(function(p){ partById[String(p.id)]=p; });
-  layouts=(snap||[]).map(function(l){
-    return {
-      idx:l.idx, uw:l.uw, uh:l.uh, sw:l.sw, sh:l.sh, trim:l.trim,
-      matName:l.matName, matColor:l.matColor,
-      grainLocked:!!l.grainLocked, trimWarning:!!l.trimWarning,
-      placements:(l.placements||[]).map(function(pl){
-        var pt=partById[String(pl.partId)];
-        if(!pt) return null;
-        return {x:pl.x, y:pl.y, pw:pl.pw, ph:pl.ph, rot:!!pl.rot, color:pl.color, part:pt};
-      }).filter(Boolean)
-    };
-  });
+  layouts=(snap||[]).map(function(l){ return liveLayout(l, partById); });
   if(typeof restoreCurSheet==='number'){
     curSheet=Math.min(restoreCurSheet, Math.max(0, layouts.length-1));
   }
@@ -9553,13 +9590,14 @@ function _unfitReason(p, bd){
 function renderUnfitTable(rows){
   var el=document.getElementById('unfit');
   if(!el) return;
+  _unfitRowsCache=rows ? rows.slice() : null;   // "place by hand" works off this
   if(!rows||!rows.length){ el.style.display='none'; el.innerHTML=''; return; }
   // Collapse identical part+reason into one line with a count.
   var groups={}, order=[];
   rows.forEach(function(r){
     var p=r.part;
     var key=(p.origName||p.name||'?')+'|'+p.l+'x'+p.w+'|'+(p.mat||'')+'|'+r.reason;
-    if(!groups[key]){ groups[key]={name:p.origName||p.name||'?', l:p.l, w:p.w, mat:p.mat, thick:p.thick, reason:r.reason, qty:0}; order.push(key); }
+    if(!groups[key]){ groups[key]={name:p.origName||p.name||'?', l:p.l, w:p.w, mat:p.mat, thick:p.thick, reason:r.reason, qty:0, key:key}; order.push(key); }
     groups[key].qty++;
   });
   order.sort(function(a,b){ return groups[b].qty-groups[a].qty || groups[a].name.localeCompare(groups[b].name); });
@@ -9574,6 +9612,7 @@ function renderUnfitTable(rows){
       +'<th style="padding:3px 6px;font-weight:600;text-align:right">'+t('unfitQty')+'</th>'
       +'<th style="padding:3px 6px;font-weight:600">'+t('unfitMaterial')+'</th>'
       +'<th style="padding:3px 6px;font-weight:600">'+t('unfitWhy')+'</th>'
+      +'<th style="padding:3px 6px;font-weight:600"></th>'
     +'</tr></thead><tbody>'
     +order.map(function(k){
       var g=groups[k];
@@ -9583,6 +9622,7 @@ function renderUnfitTable(rows){
         +'<td style="padding:3px 6px;text-align:right;font-family:monospace"><b>'+g.qty+'</b></td>'
         +'<td style="padding:3px 6px">'+esc(g.mat||'')+'</td>'
         +'<td style="padding:3px 6px;color:#7A2E12">'+esc(g.reason)+'</td>'
+        +'<td style="padding:3px 6px;text-align:right"><button class="btn bs" title="'+esc(t('unfitPlaceByHandTip'))+'" style="font-size:10px;padding:2px 6px;white-space:nowrap" onclick="placeUnfitByHand('+esc(JSON.stringify(g.key))+')">'+t('unfitPlaceByHand')+'</button></td>'
       +'</tr>';
     }).join('')
     +'</tbody></table></div>';
@@ -9670,7 +9710,7 @@ function buildTabs(){
       +esc(l.matName.split(' ').slice(0,2).join(' '))+' #'+(i+1)+sizeTag+warn+grain+dupBadge+over+'</div>';
   }).join('');
 }
-function activateTab(i){curSheet=i;selP=null;hovP=null;document.querySelectorAll('.tab').forEach(function(t,ti){t.className='tab'+(ti===i?' active':'');});renderCanvas(i);}
+function activateTab(i){curSheet=i;selP=null;hovP=null;document.querySelectorAll('.tab').forEach(function(t,ti){t.className='tab'+(ti===i?' active':'');});updateCanvasToolbar();renderCanvas(i);}
 function renderCanvas(idx){
   var lay=layouts[idx];if(!lay)return;
   SC=Math.min((document.getElementById('cvc').clientWidth-4)/lay.sw,420/lay.sh);
@@ -10044,6 +10084,9 @@ function bindCanvas(lay){
   var _dragMoved=false;
   cv.onmousemove=function(e){
     var pos=gp(e);
+    // Paste needs to know where the operator is looking.
+    _lastCanvasMM={x:(pos.mx-lay.trim*SC)/SC, y:(pos.my-lay.trim*SC)/SC};
+    _mouseOnCanvas=true;
     if(_rotating&&selP){
       _dragMoved=true;
       var smx=(pos.mx-lay.trim*SC)/SC, smy=(pos.my-lay.trim*SC)/SC;
@@ -10104,16 +10147,12 @@ function bindCanvas(lay){
       dragOX=pos.mx-(lay.trim*SC+h.x*SC);
       dragOY=pos.my-(lay.trim*SC+h.y*SC);
       cv.style.cursor='grabbing';if(tip)tip.style.display='none';
-      document.getElementById('rot-btn').style.display='inline-block';
-      document.getElementById('mv-btn').style.display='inline-block';
-      document.getElementById('pr-btn').style.display='inline-block';
+      updateCanvasToolbar();
       closeMovePopover();
       draw(lay);
     }else{
       selP=null;
-      document.getElementById('rot-btn').style.display='none';
-      document.getElementById('mv-btn').style.display='none';
-      document.getElementById('pr-btn').style.display='none';
+      updateCanvasToolbar();
       closeMovePopover();
       draw(lay);
     }
@@ -10152,6 +10191,7 @@ function bindCanvas(lay){
     if(h){e.preventDefault();openModal(h,lay);return false;}
   };
   cv.onmouseleave=function(){
+    _mouseOnCanvas=false;
     if(_rotating){ _rotating=false; var rl=resolveCollision(lay,selP,selP.x,selP.y); selP.x=rl.x; selP.y=rl.y; draw(lay);scheduleExportRebuild();scheduleSave(); }
     if(dragging&&dragP){
       var r=resolveCollision(lay,dragP,dragP.x,dragP.y);
@@ -10239,6 +10279,13 @@ document.addEventListener('keydown',function(e){
     var inField=(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA'||e.target.isContentEditable);
     if(k==='z' && !e.shiftKey){ if(inField)return; e.preventDefault(); undo(); return; }
     if((k==='z' && e.shiftKey) || k==='y'){ if(inField)return; e.preventDefault(); redo(); return; }
+    // Copy / paste / duplicate a placed part. Only when there is something to
+    // act on, so plain text copying keeps working everywhere else.
+    if(k==='c' && !e.shiftKey && !inField && selP && !String(window.getSelection&&window.getSelection()||'').length){
+      e.preventDefault(); copySel(); return;
+    }
+    if(k==='v' && !e.shiftKey && !inField && _clip){ e.preventDefault(); pasteClip(); return; }
+    if(k==='d' && !e.shiftKey && !inField && selP){ e.preventDefault(); duplicateSel(); return; }
   }
   if(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA')return;
   if(e.key==='r'||e.key==='R'){e.preventDefault();rotateSel(e.shiftKey?-1:1);}
@@ -10258,13 +10305,181 @@ document.addEventListener('keydown',function(e){
     }
   }
   if(e.key==='p'||e.key==='P'){e.preventDefault();printSel();}
-  if(e.key==='Escape'){selP=null;var lay=layouts[curSheet];if(lay)draw(lay);}
+  if(e.key==='Escape'){selP=null;updateCanvasToolbar();var lay=layouts[curSheet];if(lay)draw(lay);}
   if((e.key==='Delete'||e.key==='Backspace')&&selP){
     var lay=layouts[curSheet];if(!lay)return;
     lay.placements=lay.placements.filter(function(p){return p!==selP;});
-    selP=null;hovP=null;draw(lay);scheduleExportRebuild();scheduleSave();
+    selP=null;hovP=null;updateCanvasToolbar();draw(lay);scheduleExportRebuild();scheduleSave();
   }
 });
+
+// ═══════════════════════════════════════════════════════════════
+// COPY / PASTE A PLACED PART — the operator's override
+// ═══════════════════════════════════════════════════════════════
+// The nester works on bounding boxes, so it gives up while an interlocking
+// shape still has an obvious home — the eye sees the gap the box test cannot.
+// Copy a placed part, paste a copy onto the sheet, drag it into that gap.
+// Paste spends a part the nester left unplaced before it invents a new one,
+// so the usual case (the last one "did not fit") costs nothing extra.
+var _clip=null;                     // snapshot of the copied placement
+var _lastCanvasMM=null;             // pointer position on the sheet, in mm
+var _mouseOnCanvas=false;
+
+function _snapshotPlacement(pl){
+  return {
+    partId: pl.part && pl.part.id,
+    x:pl.x, y:pl.y, pw:pl.pw, ph:pl.ph, rot:!!pl.rot, color:pl.color,
+    nestPoly: pl.nestPoly ? pl.nestPoly.map(function(q){ return {x:q.x, y:q.y}; }) : null,
+    nestHoles: pl.nestHoles ? pl.nestHoles.map(function(h){ return h.map(function(q){ return {x:q.x, y:q.y}; }); }) : null,
+    nestAngle: pl.nestAngle||0
+  };
+}
+
+function copySel(){
+  if(!selP){ setStatus('', t('copyNothingSelected')); return false; }
+  _clip=_snapshotPlacement(selP);
+  updateCanvasToolbar();
+  setStatus('ok', t('copied', {name:(selP.part&&selP.part.origName)||'part'}));
+  return true;
+}
+
+// A part of the same kind that the nester never placed — spend that first.
+function _takeUnplacedLike(src){
+  var placed={};
+  layouts.forEach(function(l){ (l.placements||[]).forEach(function(pl){ if(pl.part) placed[String(pl.part.id)]=true; }); });
+  var key=partGroupKey(src);
+  for(var i=0;i<parts.length;i++){
+    if(!placed[String(parts[i].id)] && partGroupKey(parts[i])===key) return parts[i];
+  }
+  return null;
+}
+
+// One more of the same part, added to the job.
+function _cloneNewPart(src){
+  var maxId=parts.reduce(function(m,x){ return Math.max(m, (typeof x.id==='number'?x.id:0)); },0);
+  var c=Object.assign({}, src);
+  c.eb=Object.assign({}, src.eb||{});
+  c.id=maxId+1;
+  c.printed=false;
+  parts.push(c);
+  return c;
+}
+
+// Where a pasted copy lands: under the pointer when it is over the sheet and
+// clear of the original, otherwise beside the part it was copied from.
+function _pastePosition(lay, pl, fromX, fromY){
+  var clampX=function(x){ return Math.max(0, Math.min(Math.max(0, lay.uw-pl.pw), Math.round(x))); };
+  var clampY=function(y){ return Math.max(0, Math.min(Math.max(0, lay.uh-pl.ph), Math.round(y))); };
+  var settle=function(x, y){
+    // A true shape may overlap another's box — that is the whole point of
+    // shape nesting, and resolveCollision leaves those alone too.
+    if(pl.nestPoly) return {x:x, y:y};
+    if(!checkCollision(lay, pl, x, y)) return {x:x, y:y};
+    var r=resolveCollision(lay, pl, x, y);
+    return {x:clampX(r.x), y:clampY(r.y)};
+  };
+  if(_mouseOnCanvas && _lastCanvasMM){
+    var px=clampX(_lastCanvasMM.x-pl.pw/2), py=clampY(_lastCanvasMM.y-pl.ph/2);
+    var onTop=(fromX!=null) && Math.abs(px-fromX)<4 && Math.abs(py-fromY)<4;
+    if(!onTop) return settle(px, py);
+  }
+  var k=getLayoutKerf(lay);
+  if(fromX!=null){
+    var right={x:clampX(fromX+pl.pw+k), y:clampY(fromY)};
+    if(right.x>fromX) return settle(right.x, right.y);
+    var below={x:clampX(fromX), y:clampY(fromY+pl.ph+k)};
+    if(below.y>fromY) return settle(below.x, below.y);
+  }
+  var free=pl.nestPoly ? null : findFreeSpot(lay, pl, false);
+  if(free) return free;
+  return {x:clampX((fromX||0)+20), y:clampY((fromY||0)+20)};
+}
+
+function pasteClip(){
+  if(!_clip){ setStatus('', t('pasteNothingCopied')); return false; }
+  var lay=layouts[curSheet];
+  if(!lay){ setStatus('', t('pasteNoSheet')); return false; }
+  var src=parts.find(function(x){ return String(x.id)===String(_clip.partId); });
+  if(!src){ _clip=null; updateCanvasToolbar(); setStatus('', t('pasteSourceGone')); return false; }
+  if(normalizeMat(lay.matName)!==normalizeMat(src.mat)){
+    alert(t('pasteWrongMaterial', {sheet:lay.matName, part:src.mat}));
+    return false;
+  }
+  if(_clip.pw>lay.uw || _clip.ph>lay.uh){
+    alert(t('pasteTooBig', {pw:_clip.pw, ph:_clip.ph, uw:lay.uw, uh:lay.uh}));
+    return false;
+  }
+  var target=_takeUnplacedLike(src), reused=!!target;
+  if(!target) target=_cloneNewPart(src);
+  var pl={ part:target, x:0, y:0, pw:_clip.pw, ph:_clip.ph, rot:!!_clip.rot,
+           color:_clip.color || lay.matColor || '#888' };
+  if(_clip.nestPoly){
+    pl.nestPoly=_clip.nestPoly.map(function(q){ return {x:q.x, y:q.y}; });
+    pl.nestHoles=(_clip.nestHoles||[]).map(function(h){ return h.map(function(q){ return {x:q.x, y:q.y}; }); });
+    pl.nestAngle=_clip.nestAngle||0;
+  }
+  var pos=_pastePosition(lay, pl, _clip.x, _clip.y);
+  pl.x=pos.x; pl.y=pos.y;
+  lay.placements.push(pl);
+  selP=pl; hovP=null; dragP=null; dragging=false;
+  updateCanvasToolbar();
+  draw(lay);
+  renderParts();
+  _refreshStats();
+  scheduleExportRebuild();
+  scheduleSave();
+  renderVersionBar();
+  var nm=src.origName||src.name||'part';
+  setStatus('ok', reused ? t('pastedUnplaced',{name:nm}) : t('pastedNew',{name:nm, n:countGroupOf(target)}));
+  return true;
+}
+
+// Copy + paste in one keystroke, always placed beside the original.
+function duplicateSel(){
+  if(!selP){ setStatus('', t('copyNothingSelected')); return; }
+  var wasOn=_mouseOnCanvas;
+  _mouseOnCanvas=false;                // "beside the original", never under the cursor
+  copySel();
+  pasteClip();
+  _mouseOnCanvas=wasOn;
+}
+
+// Buttons that only make sense with a selection (or a full clipboard).
+function updateCanvasToolbar(){
+  var show=function(id, on){ var el=document.getElementById(id); if(el) el.style.display=on?'inline-block':'none'; };
+  show('rot-btn', !!selP);
+  show('mv-btn', !!selP);
+  show('pr-btn', !!selP);
+  show('cp-btn', !!selP);
+  show('pa-btn', !!_clip && !!layouts[curSheet]);
+}
+
+// Place one part the nester could not fit onto the sheet on screen, by hand.
+var _unfitRowsCache=null;
+function placeUnfitByHand(key){
+  var lay=layouts[curSheet];
+  if(!lay){ alert(t('pasteNoSheet')); return; }
+  var row=(_unfitRowsCache||[]).find(function(r){ return _unfitKey(r)===key; });
+  var src=row && row.part;
+  if(!src){ return; }
+  if(normalizeMat(lay.matName)!==normalizeMat(src.mat)){
+    alert(t('pasteWrongMaterial', {sheet:lay.matName, part:src.mat}));
+    return;
+  }
+  // Reuse the paste path so the placement is built exactly the same way.
+  _clip={ partId:src.id, x:0, y:0, pw:src.l, ph:src.w, rot:false, color:lay.matColor||'#888',
+          nestPoly:null, nestHoles:null, nestAngle:0 };
+  var before=layouts[curSheet].placements.length;
+  var okDone=pasteClip();
+  if(okDone && layouts[curSheet].placements.length>before){
+    _unfitRowsCache=(_unfitRowsCache||[]).filter(function(r){ return r!==row; });
+    renderUnfitTable(_unfitRowsCache);
+  }
+}
+function _unfitKey(r){
+  var p=r.part;
+  return (p.origName||p.name||'?')+'|'+p.l+'x'+p.w+'|'+(p.mat||'')+'|'+r.reason;
+}
 
 // ═══════════════════════════════════════════════════════════════
 // MOVE PARTS BETWEEN SHEETS — manual rebalancing UI
