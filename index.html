@@ -1670,6 +1670,8 @@ var I18N={
     pasteTooBig:'The copy is {pw}×{ph} mm and this sheet only has {uw}×{uh} mm of usable area.',
     pastedUnplaced:'⧉ Placed {name} that did not fit — drag it where you want it',
     pastedNew:'⧉ Pasted a copy of {name} — quantity is now {n} · drag it where you want it',
+    pasteCarrying:'· it follows the mouse — click to drop it, Esc to cancel',
+    pasteCancelled:'Paste cancelled',
     unfitPlaceByHand:'⤓ Place by hand',
     unfitPlaceByHandTip:'Put one on the sheet you are looking at, and drag it into the gap yourself',
     consolidateBtn:'✨ Consolidate sheets',
@@ -1898,6 +1900,8 @@ var I18N={
     pasteTooBig:'Kopija yra {pw}×{ph} mm, o šioje plokštėje telpa tik {uw}×{uh} mm.',
     pastedUnplaced:'⧉ Padėta {name}, kuri netilpo — nutempkite kur norite',
     pastedNew:'⧉ Įklijuota {name} kopija — kiekis dabar {n} · nutempkite kur norite',
+    pasteCarrying:'· ji seka pelę — spustelėkite, kad padėtumėte, Esc — atšaukti',
+    pasteCancelled:'Įklijavimas atšauktas',
     unfitPlaceByHand:'⤓ Padėti ranka',
     unfitPlaceByHandTip:'Padeda vieną ant matomos plokštės — patys nutempkite į tarpą',
     consolidateBtn:'✨ Sujungti plokštes',
@@ -9986,6 +9990,19 @@ function draw(lay){
       ctx.strokeStyle='#c82828';ctx.lineWidth=2;ctx.strokeRect(x+.5,y+.5,w-1,h-1);
     }
     if(isSel&&!p.nestPoly)[[x,y],[x+w,y],[x+w,y+h],[x,y+h]].forEach(function(pt){ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(pt[0],pt[1],3.5,0,Math.PI*2);ctx.fill();ctx.strokeStyle='#333';ctx.lineWidth=1;ctx.stroke();});
+    // A just-pasted part wears a halo for a couple of seconds — on a sheet of
+    // identical shapes it is the only thing that says "here is your copy".
+    if(p.__pastedAt && (Date.now()-p.__pastedAt)<PASTE_HALO_MS){
+      ctx.save();
+      ctx.strokeStyle='#2f54eb'; ctx.lineWidth=3; ctx.setLineDash([7,4]);
+      if(p.nestPoly){ ctx.beginPath(); traceRawPoly(ctx,p.nestPoly,x,y,SC); ctx.stroke(); }
+      else ctx.strokeRect(x-2.5,y-2.5,w+5,h+5);
+      ctx.setLineDash([]);
+      ctx.fillStyle='rgba(47,84,235,.16)';
+      if(p.nestPoly){ ctx.beginPath(); traceRawPoly(ctx,p.nestPoly,x,y,SC); ctx.fill(); }
+      else ctx.fillRect(x,y,w,h);
+      ctx.restore();
+    }
     if(isSel && p.nestPoly){ var _rhx=x+w,_rhy=y,_rhr=9; ctx.beginPath(); ctx.arc(_rhx,_rhy,_rhr,0,Math.PI*2); ctx.fillStyle='#2f54eb'; ctx.fill(); ctx.lineWidth=2; ctx.strokeStyle='#fff'; ctx.stroke(); ctx.fillStyle='#fff'; ctx.font='bold 12px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('↻',_rhx,_rhy+0.5); _rotHandle={x:_rhx,y:_rhy,r:_rhr+7}; }
     // Group label badge in corner
     if(grp&&w>30&&h>16){ctx.fillStyle=grp.color;ctx.fillRect(x+1,y+1,Math.min(w-2,grp.name.length*6+6),11);ctx.fillStyle='#fff';ctx.font='bold 8px sans-serif';ctx.textAlign='left';ctx.textBaseline='top';ctx.fillText(grp.name,x+3,y+2);}
@@ -10167,15 +10184,15 @@ function bindCanvas(lay){
       cv.style.cursor='crosshair'; return;
     }
     if(dragging&&dragP){
-      if(_dragMoved){
+      if(_dragMoved || _pasteCarry){
         var resolved=resolveCollision(lay,dragP,dragP.x,dragP.y);
         dragP.x=resolved.x;dragP.y=resolved.y;
-        dragging=false;dragP=null;  // clear drag state BEFORE save so scheduleSave doesn't skip
+        dragging=false;dragP=null;_pasteCarry=false;  // clear drag state BEFORE save so scheduleSave doesn't skip
         draw(lay);scheduleExportRebuild();scheduleSave();renderVersionBar();
       } else {
         dragging=false;dragP=null;
       }
-    }else{dragging=false;dragP=null;}
+    }else{dragging=false;dragP=null;_pasteCarry=false;}
     cv.style.cursor='crosshair';
   };
   cv.onclick=function(e){console.log('[FF] click button='+e.button);};
@@ -10281,9 +10298,7 @@ document.addEventListener('keydown',function(e){
     if((k==='z' && e.shiftKey) || k==='y'){ if(inField)return; e.preventDefault(); redo(); return; }
     // Copy / paste / duplicate a placed part. Only when there is something to
     // act on, so plain text copying keeps working everywhere else.
-    if(k==='c' && !e.shiftKey && !inField && selP && !String(window.getSelection&&window.getSelection()||'').length){
-      e.preventDefault(); copySel(); return;
-    }
+    if(k==='c' && !e.shiftKey && !inField && selP){ e.preventDefault(); copySel(); return; }
     if(k==='v' && !e.shiftKey && !inField && _clip){ e.preventDefault(); pasteClip(); return; }
     if(k==='d' && !e.shiftKey && !inField && selP){ e.preventDefault(); duplicateSel(); return; }
   }
@@ -10305,7 +10320,14 @@ document.addEventListener('keydown',function(e){
     }
   }
   if(e.key==='p'||e.key==='P'){e.preventDefault();printSel();}
-  if(e.key==='Escape'){selP=null;updateCanvasToolbar();var lay=layouts[curSheet];if(lay)draw(lay);}
+  if(e.key==='Escape'){
+    var layE=layouts[curSheet];
+    if(_pasteCarry && dragP && layE){        // drop the copy that is still in mid-air
+      cancelPasteCarry(layE);
+    }
+    selP=null;updateCanvasToolbar();
+    if(layE)draw(layE);
+  }
   if((e.key==='Delete'||e.key==='Backspace')&&selP){
     var lay=layouts[curSheet];if(!lay)return;
     lay.placements=lay.placements.filter(function(p){return p!==selP;});
@@ -10420,8 +10442,21 @@ function pasteClip(){
   }
   var pos=_pastePosition(lay, pl, _clip.x, _clip.y);
   pl.x=pos.x; pl.y=pos.y;
+  pl.__pastedAt=Date.now();                 // draw() haloes it so it cannot be missed
+  pl.__pastedNew=!reused;                   // Escape takes an invented part back out
   lay.placements.push(pl);
-  selP=pl; hovP=null; dragP=null; dragging=false;
+  selP=pl; hovP=null;
+  // Hand it to the cursor: the copy follows the mouse and the next click drops
+  // it. That is how you put a part in a gap you can see — and it makes the
+  // paste impossible to overlook on a sheet full of identical shapes.
+  var carried=false;
+  if(_mouseOnCanvas && _lastCanvasMM){
+    dragP=pl; dragging=true; _pasteCarry=true;
+    dragOX=pl.pw*SC/2; dragOY=pl.ph*SC/2;
+    carried=true;
+  } else {
+    dragP=null; dragging=false; _pasteCarry=false;
+  }
   updateCanvasToolbar();
   draw(lay);
   renderParts();
@@ -10430,8 +10465,37 @@ function pasteClip(){
   scheduleSave();
   renderVersionBar();
   var nm=src.origName||src.name||'part';
-  setStatus('ok', reused ? t('pastedUnplaced',{name:nm}) : t('pastedNew',{name:nm, n:countGroupOf(target)}));
+  var base = reused ? t('pastedUnplaced',{name:nm}) : t('pastedNew',{name:nm, n:countGroupOf(target)});
+  setStatus('ok', carried ? base+' '+t('pasteCarrying') : base);
+  _clearHaloSoon(lay);
   return true;
+}
+
+// The halo is only worth a redraw while it is still showing.
+var _pasteCarry=false, _haloTimer=null;
+function _clearHaloSoon(lay){
+  if(_haloTimer) clearTimeout(_haloTimer);
+  _haloTimer=setTimeout(function(){
+    _haloTimer=null;
+    if(layouts[curSheet]===lay) draw(lay);
+  }, PASTE_HALO_MS+60);
+}
+var PASTE_HALO_MS=2000;
+
+// Escape while a copy is riding the cursor: take it back off the sheet, and
+// remove the part it added unless it was one the nester had left over.
+function cancelPasteCarry(lay){
+  var pl=dragP;
+  dragging=false; dragP=null; _pasteCarry=false;
+  if(!pl) return;
+  lay.placements=lay.placements.filter(function(x){ return x!==pl; });
+  if(pl.__pastedNew && pl.part){
+    parts=parts.filter(function(x){ return x!==pl.part; });
+    renderParts();
+  }
+  if(selP===pl) selP=null;
+  _refreshStats(); scheduleExportRebuild(); scheduleSave();
+  setStatus('', t('pasteCancelled'));
 }
 
 // Copy + paste in one keystroke, always placed beside the original.
@@ -10452,6 +10516,13 @@ function updateCanvasToolbar(){
   show('pr-btn', !!selP);
   show('cp-btn', !!selP);
   show('pa-btn', !!_clip && !!layouts[curSheet]);
+  var pa=document.getElementById('pa-btn');
+  if(pa){
+    // Filled = something is on the clipboard, waiting to be dropped.
+    pa.style.background=_clip?'#2f54eb':'';
+    pa.style.color=_clip?'#fff':'#2f54eb';
+    pa.style.borderColor='#2f54eb';
+  }
 }
 
 // Place one part the nester could not fit onto the sheet on screen, by hand.
