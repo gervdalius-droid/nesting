@@ -217,6 +217,16 @@ input[type=color]{padding:2px 3px;height:27px;cursor:pointer}
 .pli-rot.auto{color:#667085;opacity:.55}
 .pli-rot.free{color:#2f54eb;opacity:.95}
 .pli-rot.lock{color:#8a6d1a;opacity:.95}
+.pli-mach{font-size:11px;flex-shrink:0;cursor:pointer;opacity:.6;padding:0 2px;user-select:none;line-height:1}
+.pli-mach:hover{opacity:1}
+.pli-mach.auto{color:#667085;opacity:.35}
+.pli-mach.cnc,.pli-mach.saw{opacity:1;border-radius:3px;padding:0 2px}
+.pli-mach.cnc{color:#2f54eb;background:#eef2ff;box-shadow:inset 0 0 0 1px #2f54eb66}
+.pli-mach.saw{color:#8a6d1a;background:#fdf6e6;box-shadow:inset 0 0 0 1px #8a6d1a66}
+.pw-mach-btn.auto{opacity:.35;border-color:#e6e8ed}
+.pw-mach-btn.cnc{border-color:#2f54eb;background:#eef2ff}
+.pw-mach-btn.saw{border-color:#8a6d1a;background:#fdf6e6}
+.pw-mach-btn:hover{opacity:1}
 .pli.pli-done{opacity:.7}
 .pli.pli-done .pli-name{text-decoration:line-through;text-decoration-color:#2f54eb80}
 @keyframes pliFlash{0%{background:#fff6cc;border-color:#E8C547}100%{background:#ffffff;border-color:transparent}}
@@ -736,6 +746,7 @@ body.print-mode{background:#fff}
         <th data-col="w" onclick="pwSortBy('w')">W mm ↕</th>
         <th data-col="swap" title="Swap L and W for this row"></th>
         <th data-col="rot" title="Rotation — Auto / Allow / Lock. Click to cycle.">Rot</th>
+        <th data-col="mach" title="Which machine cuts this part. Auto reads the shape — a plain rectangle goes to the saw, a shaped or drilled part to the CNC. Click a cell to mark the part 🤖 CNC or 🪚 Saw yourself; the mark is the only way to send a plain rectangle to the CNC.">Mach</th>
         <th data-col="qty">Qty</th>
         <th data-col="area" onclick="pwSortBy('area')">Area m² ↕</th>
         <th data-col="thick">Thickness</th>
@@ -777,6 +788,13 @@ body.print-mode{background:#fff}
       <button class="btn bs" onclick="pwSetRotation('rotate')" title="Force selected parts rotatable — packer may turn them 90° to save sheets" style="color:#2f54eb;border-color:#2f54eb">🔄 Allow</button>
       <button class="btn bs" onclick="pwSetRotation('lock')" title="Lock selected parts — no rotation (preserve grain / face direction)" style="color:#8a6d1a;border-color:#8a6d1a">🔒 Lock</button>
     </div>
+    <div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap">
+      <span style="font-size:11px;color:#667085">Machine:</span>
+      <button class="btn bs" onclick="pwSetMachine('auto')" title="Let the shape decide again — plain rectangle → saw, shaped or drilled part → CNC">⟳ Auto</button>
+      <button class="btn bs" onclick="pwSetMachine('cnc')" title="Route the selected parts on the CNC even when they are plain rectangles with no cut-outs" style="color:#2f54eb;border-color:#2f54eb">🤖 CNC</button>
+      <button class="btn bs" onclick="pwSetMachine('saw')" title="Cut the selected parts on the saw" style="color:#8a6d1a;border-color:#8a6d1a">🪚 Saw</button>
+    </div>
+    <div id="pw-mach-hint" style="display:none;flex-basis:100%;font-size:11px;color:#8a6d1a;background:#fff8e6;border:1px solid #f0dfae;border-radius:6px;padding:5px 8px"></div>
     <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
       <span style="font-size:11px;color:#667085">Assign selected to group:</span>
       <select id="pw-grp-assign" style="font-size:11px;padding:3px 6px;width:auto"><option value="">— choose —</option></select>
@@ -2558,7 +2576,7 @@ function cheapFingerprint(){
   var fp=boards.length+'|'+parts.length+'|'+partGroups.length+'|'+layouts.length+'|'+curSheet;
   // Hash the last few boards/parts by id+key props (enough to detect edits, cheap to compute)
   for(var i=0;i<boards.length;i++){var b=boards[i];fp+='|b'+b.id+':'+b.mat+','+b.w+','+b.h+','+b.qty+','+(b.grain?1:0);}
-  for(var i=0;i<parts.length;i++){var p=parts[i];fp+='|p'+p.id+':'+p.l+','+p.w+','+p.mat+','+(p.groupId||'')+','+(p.rot?1:0);}
+  for(var i=0;i<parts.length;i++){var p=parts[i];fp+='|p'+p.id+':'+p.l+','+p.w+','+p.mat+','+(p.groupId||'')+','+(p.rot?1:0)+','+(p.machine||'');}
   for(var i=0;i<layouts.length;i++){
     var l=layouts[i];fp+='|L'+i+':'+(l.placements||[]).length;
     (l.placements||[]).forEach(function(pl){fp+=','+pl.x+','+pl.y+','+(pl.rot?1:0);});
@@ -5049,6 +5067,30 @@ function renderParts(){
     }
     var rotIcon = '<span class="pli-rot '+rotCls+'" title="'+esc(rotIconTitle)+'" onclick="event.stopPropagation();togglePartRotation(\''+k.replace(/'/g,"\\'")+'\')">'+rotGlyph+'</span>';
 
+    // ── Machine mark (3-state) ────────────────────────────────────
+    //   AUTO (faded)  — read from the shape: rectangle → saw, shaped/drilled → CNC
+    //   CNC  (🤖 blue) — operator's mark; the only way a plain rectangle is routed
+    //   SAW  (🪚 amber)— operator's mark; keeps a shaped part on the saw
+    var machStates = groupParts.map(machineState);
+    var machSame = machStates.every(function(st){ return st === machStates[0]; });
+    var machIcon;
+    (function(){
+      var st = machSame ? machStates[0] : 'mixed';
+      var det = autoMachine(groupParts[0]);
+      var cls, glyph, ti;
+      if(st === 'mixed'){
+        cls='auto'; glyph='⚙?'; ti='Mixed machine marks in this group — click to clear them back to auto';
+      } else if(st === 'cnc'){
+        cls='cnc'; glyph='🤖'; ti='Machine: CNC — your mark, kept even though the shape says '+(det==='cnc'?'CNC':'saw')+'. Click → 🪚 Saw.';
+      } else if(st === 'saw'){
+        cls='saw'; glyph='🪚'; ti='Machine: Saw — your mark, kept even though the shape says '+(det==='cnc'?'CNC':'saw')+'. Click → auto.';
+      } else {
+        cls='auto'; glyph=det==='cnc'?'🤖':'🪚';
+        ti='Machine: AUTO — read from the shape as '+(det==='cnc'?'CNC (shape, holes or a CNC op)':'Saw (plain rectangle)')+'. Click → mark 🤖 CNC.';
+      }
+      machIcon = '<span class="pli-mach '+cls+'" title="'+esc(ti)+'" onclick="event.stopPropagation();togglePartMachine(\''+k.replace(/'/g,"\\'")+'\')">'+glyph+'</span>';
+    })();
+
     var rowCls = 'pli' + flash + (allDone ? ' pli-done' : '');
     // Detect if this row represents a merged strip (one entry per merged part,
     // since each merge has a unique combined origName)
@@ -5069,6 +5111,7 @@ function renderParts(){
       +'<span class="pli-dot" style="background:'+color+'"></span>'
       +printTag
       +rotIcon
+      +machIcon
       +shapeTag
       +mergedTag
       +'<span class="pli-name">'+nameHtml+'</span>'
@@ -5104,6 +5147,7 @@ var PW_COLS=[
   {k:'w',     w:64,  min:44},
   {k:'swap',  w:32,  min:28},
   {k:'rot',   w:42,  min:32},
+  {k:'mach',  w:52,  min:44},
   {k:'qty',   w:54,  min:40},
   {k:'area',  w:70,  min:48},
   {k:'thick', w:70,  min:44},
@@ -5284,6 +5328,7 @@ function filteredPwParts(){
 function renderPartsWindow(){
   pwApplyColWidths();
   refreshPwMatDropdown();
+  pwRenderMachineHint();
   var filteredAll=filteredPwParts();
   // Deduplicate by group key so identical parts show as ONE row
   // (Qty column reflects how many copies exist). Keep the first occurrence
@@ -5338,6 +5383,7 @@ function renderPartsWindow(){
                 :'Rotation: AUTO — follows material — click → allow';
           return '<button class="pw-swap-btn" style="color:'+cl+'" title="'+ti+'" onclick="pwCycleRowRotation(\''+sid+'\')">'+gl+'</button>';
         })()+'</td>'
+      +'<td style="text-align:center;padding:0">'+machBtn(p,false,'pwCycleRowMachine(\''+sid+'\')')+'</td>'
       +'<td style="padding:0 2px"><input class="pw-edit pw-edit-num pw-edit-qty" data-id="'+sid+'" type="number" min="1" value="'+countGroupOf(p)+'" title="Total quantity of identical parts (same name + material + L×W + thickness). Editing clones or removes copies." onchange="pwSetQty(\''+sid+'\',this.value)"></td>'
       +'<td style="font-family:monospace;font-size:10px;color:#667085" data-id="'+sid+'-area">'+((p.l*p.w)/1e6).toFixed(4)+'</td>'
       +'<td><input class="pw-edit pw-edit-num pw-edit-t" data-id="'+sid+'" type="number" min="1" value="'+p.thick+'" onchange="pwEditField(\''+sid+'\',\'thick\',this.value)"></td>'
@@ -5363,6 +5409,20 @@ function renderPartsWindow(){
       pwToggleRow(chk.getAttribute('data-id'));
     });
   });
+}
+// Marks are ignored outside "Both" mode — say so where they are being made,
+// with the one click that fixes it.
+function pwRenderMachineHint(){
+  var hint=document.getElementById('pw-mach-hint');
+  if(!hint) return;
+  var mode=getMachineMode();
+  var ignored=(mode==='both') ? [] : parts.filter(function(p){ return machineState(p)!=='auto' && p.machine!==mode; });
+  if(!ignored.length){ hint.style.display='none'; hint.innerHTML=''; return; }
+  hint.style.display='block';
+  hint.innerHTML='⚠ '+ignored.length+' part'+(ignored.length>1?'s are':' is')+' marked '
+    +(mode==='saw'?'🤖 CNC':'🪚 Saw')+', but this project runs <b>'
+    +(mode==='saw'?'Saw only':'CNC only')+'</b> — the mark is ignored. '
+    +'<button class="btn bs" style="margin-left:6px" onclick="pwUseBothMachines()">Switch to 🪚🤖 Both</button>';
 }
 function pwToggleRow(id){
   id=String(id);
@@ -7069,11 +7129,98 @@ function renderVersionBar(){
 //     Otherwise SAW (plain rectangle is saw-friendly even if it came from DXF)
 function partMachine(p){
   if(p.machine==='saw' || p.machine==='cnc') return p.machine;
-  // Auto-detection — a DXF shape is only a CNC candidate if it's truly non-rectangular.
+  return autoMachine(p);
+}
+
+// What the shape alone says. A plain rectangle looks saw-friendly here even
+// when the operator knows it has to be routed — that is what the manual mark
+// below is for.
+function autoMachine(p){
+  // A DXF shape is only a CNC candidate if it's truly non-rectangular.
   var hasNonRectShape = p.shape && p.shape.length>=3 && !isAxisAlignedRectShape(p.shape, p.l, p.w);
   var hasHoles = p.holes && p.holes.length>0;
   var hasOps = !!(p.op1 || p.op2 || p.hasCNC);
   return (hasNonRectShape || hasHoles || hasOps) ? 'cnc' : 'saw';
+}
+
+// ── Manual machine mark ────────────────────────────────────────────────────
+// Three states, cycled from the parts list and the parts window:
+//   auto → 🤖 CNC → 🪚 Saw → auto
+// The mark is the only way to send a plain rectangle with no cut-outs to the
+// CNC (grooves cut on a second setup, a laminate that chips on the saw, a part
+// the CNC program already covers), and the only way to keep a shaped part on
+// the saw. It is stored as p.machine and read back by partMachine().
+function machineState(p){
+  return (p.machine==='cnc' || p.machine==='saw') ? p.machine : 'auto';
+}
+function nextMachineState(st){
+  return st==='auto' ? 'cnc' : (st==='cnc' ? 'saw' : 'auto');
+}
+function setPartsMachine(list, st){
+  list.forEach(function(p){ if(st==='auto') delete p.machine; else p.machine=st; });
+}
+// The clickable 3-state glyph shared by both parts views. `mixed` renders the
+// "this group disagrees with itself" look; `onclickJs` is the cycle call.
+function machBtn(p, mixed, onclickJs){
+  var st = mixed ? 'mixed' : machineState(p);
+  var det = autoMachine(p);
+  var glyph, cls, ti;
+  if(st==='mixed'){
+    glyph='⚙?'; cls='auto';
+    ti='Mixed machine marks in this group — click to clear them back to auto';
+  } else if(st==='cnc'){
+    glyph='🤖'; cls='cnc';
+    ti='Machine: CNC — your mark, kept even though the shape says '+(det==='cnc'?'CNC':'saw')+'. Click → 🪚 Saw';
+  } else if(st==='saw'){
+    glyph='🪚'; cls='saw';
+    ti='Machine: Saw — your mark, kept even though the shape says '+(det==='cnc'?'CNC':'saw')+'. Click → auto';
+  } else {
+    glyph = det==='cnc' ? '🤖' : '🪚'; cls='auto';
+    ti='Machine: AUTO — read from the shape as '+(det==='cnc'?'CNC (shape, holes or a CNC op)':'Saw (plain rectangle)')
+      +'. Click → mark 🤖 CNC';
+  }
+  return '<button class="pw-swap-btn pw-mach-btn '+cls+'" title="'+esc(ti)+'" onclick="'+onclickJs+'">'+glyph+'</button>';
+}
+// Parts-window row = one group, so the mark applies to every identical part.
+function pwCycleRowMachine(id){
+  var rep=parts.find(function(p){ return String(p.id)===String(id); });
+  if(!rep) return;
+  var key=partGroupKey(rep);
+  setPartsMachine(parts.filter(function(p){ return partGroupKey(p)===key; }), nextMachineState(machineState(rep)));
+  renderParts();
+  renderPartsWindow();
+  _reoptimizeSoon();
+}
+// Bulk mark from the parts-window footer.
+function pwSetMachine(st){
+  var sel=parts.filter(function(p){ return pwSel.has(String(p.id)); });
+  if(!sel.length){ alert('Select one or more parts first, then choose a machine.'); return; }
+  setPartsMachine(sel, st);
+  renderParts();
+  renderPartsWindow();
+  var label = st==='cnc' ? '🤖 CNC' : (st==='saw' ? '🪚 Saw' : 'auto');
+  setStatus && setStatus('ok','⚙ Machine → '+label+' for '+sel.length+' part'+(sel.length>1?'s':''));
+  _reoptimizeSoon();
+}
+// Sidebar list groups by name|material|L×W (no thickness), so it keys its own way.
+function togglePartMachine(key){
+  var grp=parts.filter(function(p){ return (p.origName+'|'+p.mat+'|'+p.l+'x'+p.w)===key; });
+  if(!grp.length) return;
+  var st=machineState(grp[0]);
+  var same=grp.every(function(p){ return machineState(p)===st; });
+  setPartsMachine(grp, same ? nextMachineState(st) : 'auto');
+  renderParts();
+  _reoptimizeSoon();
+}
+// A mark only has somewhere to go when both machines are in play.
+function pwUseBothMachines(){
+  var el=document.getElementById('machine-mode');
+  if(!el) return;
+  el.value='both';
+  onMachineModeChange();
+  renderPartsWindow();
+  setStatus && setStatus('ok','🪚🤖 Machine → Both — saw and CNC parts now get their own sheets');
+  _reoptimizeSoon();
 }
 
 // True if the shape polygon is just an axis-aligned rectangle matching the part's bbox.
@@ -7794,6 +7941,19 @@ function optimize(){
   if(isNaN(cncTrim))cncTrim=sawTrim; // fall back to saw trim if cnc not set
   layouts=[];selP=null;hovP=null;
   var warnings=[];
+  // A 🤖/🪚 mark only has somewhere to go when both machines are in play.
+  // Warn rather than quietly cut a CNC-marked part on the saw.
+  if(mode!=='both'){
+    var ignoredMarks=parts.filter(function(p){ return machineState(p)!=='auto' && p.machine!==mode; });
+    if(ignoredMarks.length){
+      var markNames=[];
+      ignoredMarks.forEach(function(p){ var n=p.origName||p.name||'?'; if(markNames.indexOf(n)<0)markNames.push(n); });
+      warnings.push('⚠ '+ignoredMarks.length+' part'+(ignoredMarks.length>1?'s are':' is')+' marked '
+        +(mode==='saw'?'🤖 CNC':'🪚 Saw')+' but this project runs '+(mode==='saw'?'Saw only':'CNC only')+'.\n'
+        +'   '+markNames.slice(0,6).join(', ')+(markNames.length>6?' +'+(markNames.length-6)+' more':'')+'\n'
+        +'   Set Machine → "Both" for the mark to take effect.');
+    }
+  }
   var unplacedByMat={}; // mat -> count of parts that didn't fit
   var unfitRows=[];     // {part, board, reason} — drives the "did not fit" table
   var byBoard={};
