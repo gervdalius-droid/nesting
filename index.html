@@ -598,12 +598,19 @@ body.print-mode{background:#fff}
   <div style="display:flex;gap:5px;margin-top:6px;flex-wrap:wrap">
     <button class="btn bp" onclick="optimize()" data-i18n="optimize" style="flex:1 1 100%;padding:9px;font-size:13px">▶ Optimize &amp; Cut</button>
     <button class="btn bs" onclick="openMergeDialog()" title="Find narrow parts (≤150mm) with matching length and merge them into strips up to 800mm wide. Saves kerf and improves nesting." style="flex:1 1 auto;padding:8px 10px;font-size:11px;color:#647488;border-color:#647488;white-space:nowrap">🔗 Merge narrow</button>
-    <select id="nestRot" title="Pasukimo žingsnis — smulkesnis kampas = geriau telpa, bet lėčiau. (Su rąsto kryptimi/grain leidžiama tik 0°/180°.)" style="flex:0 1 auto;padding:8px 4px;font-size:11px;border:1px solid #534AB7;border-radius:6px;color:#534AB7;background:#fff">
+    <select id="nestRot" title="Smulkiausias leidžiamas pasukimo kampas. Paieška išbando ir stambesnius žingsnius ir palieka geriausią — todėl 1° gali tik pridėti variantų. (Su rąsto kryptimi/grain leidžiama tik 0°/180°.)" style="flex:0 1 auto;padding:8px 4px;font-size:11px;border:1px solid #534AB7;border-radius:6px;color:#534AB7;background:#fff">
       <option value="90">↻ 90°</option>
       <option value="45">↻ 45°</option>
       <option value="15" selected>↻ 15°</option>
       <option value="5">↻ 5°</option>
       <option value="1">↻ 1°</option>
+    </select>
+    <select id="nestTime" title="Paieškos laikas — programa perdėlioja detales daug kartų ir palieka geriausią variantą. Ilgesnis laikas = mažiau lakštų." style="flex:0 1 auto;padding:8px 4px;font-size:11px;border:1px solid #534AB7;border-radius:6px;color:#534AB7;background:#fff">
+      <option value="0">⏱ greitai</option>
+      <option value="5000" selected>⏱ 5 s</option>
+      <option value="15000">⏱ 15 s</option>
+      <option value="30000">⏱ 30 s</option>
+      <option value="60000">⏱ 60 s</option>
     </select>
     <button class="btn bs" onclick="runShapeNestWasm()" title="DXF nest: true-shape nesting (WASM engine) — nests irregular DXF parts into the sheet by their real outline, rotating to interlock. Best for non-rectangular parts." style="flex:1 1 auto;padding:8px 10px;font-size:11px;color:#534AB7;border-color:#534AB7;white-space:nowrap">🧩 DXF nest</button>
   </div>
@@ -7370,17 +7377,95 @@ function getNestWorker(){
   });
   return _nestWkReady;
 }
-function nestSolve(instJson, kerf){
+var _nestSolveId=0;
+function nestSolve(instJson, kerf, seed){
   return new Promise(function(resolve,reject){
-    var w=_nestWk;
+    var w=_nestWk, id=++_nestSolveId;
     function onmsg(e){
       var d=e.data;
-      if(d&&d.type==='result'){ w.removeEventListener('message',onmsg); resolve(d.json); }
-      else if(d&&d.type==='error'){ w.removeEventListener('message',onmsg); reject(new Error(d.msg||'solve error')); }
+      if(!d || d.id!==id) return;                 // a reply to a solve we abandoned
+      if(d.type==='result'){ w.removeEventListener('message',onmsg); resolve(d.json); }
+      else if(d.type==='error'){ w.removeEventListener('message',onmsg); reject(new Error(d.msg||'solve error')); }
     }
     w.addEventListener('message', onmsg);
-    w.postMessage({type:'solve', inst:instJson, kerf:kerf});
+    w.postMessage({type:'solve', id:id, inst:instJson, kerf:kerf, seed:seed||1});
   });
+}
+
+// ── What the solver is shown, and how many questions it is asked ──────────
+// nestPoly — the ring the DXF export actually cuts — always keeps full arc
+// resolution. The solver does not need it: at 0.01 mm a single rounded corner
+// is ~55 points and one plate can reach 500, which is pure cost in the
+// collision engine. Simplifying the *solver's* copy to a fraction of the kerf
+// cut a 60-part arc-heavy solve from 1480 ms to 743 ms and moved the packing
+// density by 0.0003. Tolerance stays under an eighth of the kerf, so the worst
+// case (two parts each shaved inward by the tolerance) still leaves them far
+// further apart than the blade is wide.
+function _nestSimpTol(kerf){ return Math.min(0.25, Math.max(0.05, (kerf||3)/8)); }
+function _dpSimplify(pts, tol){
+  // Douglas–Peucker, iterative (a 500-point ring would blow a recursive stack
+  // on the pathological input), on an open polyline.
+  var n=pts.length; if(n<3) return pts.slice();
+  var keep=new Array(n); keep[0]=keep[n-1]=true;
+  var stack=[[0,n-1]], t2=tol*tol;
+  while(stack.length){
+    var seg=stack.pop(), a=seg[0], b=seg[1];
+    if(b<=a+1) continue;
+    var A=pts[a], B=pts[b], dx=B.x-A.x, dy=B.y-A.y, L2=dx*dx+dy*dy;
+    var far=-1, fd=-1;
+    for(var i=a+1;i<b;i++){
+      var P=pts[i], px=P.x-A.x, py=P.y-A.y, d2;
+      if(L2<=0){ d2=px*px+py*py; }
+      else { var t=(px*dx+py*dy)/L2; if(t<0)t=0; else if(t>1)t=1;
+             var ex=px-t*dx, ey=py-t*dy; d2=ex*ex+ey*ey; }
+      if(d2>fd){ fd=d2; far=i; }
+    }
+    if(fd>t2){ keep[far]=true; stack.push([a,far]); stack.push([far,b]); }
+  }
+  var out=[]; for(var k=0;k<n;k++) if(keep[k]) out.push(pts[k]);
+  return out;
+}
+function _nestSimplifyRing(ring, tol){
+  if(!ring || ring.length<8) return (ring||[]).slice();
+  // A closed ring has no natural endpoints; anchor it at the vertex furthest
+  // from the centroid so the split never lands mid-curve and rounds a corner off.
+  var cx=0, cy=0, n=ring.length;
+  for(var i=0;i<n;i++){ cx+=ring[i].x; cy+=ring[i].y; }
+  cx/=n; cy/=n;
+  var far=0, fd=-1;
+  for(var j=0;j<n;j++){ var d=(ring[j].x-cx)*(ring[j].x-cx)+(ring[j].y-cy)*(ring[j].y-cy); if(d>fd){fd=d;far=j;} }
+  var rot=ring.slice(far).concat(ring.slice(0,far));
+  rot.push({x:rot[0].x, y:rot[0].y});               // close it for the polyline pass
+  var simp=_dpSimplify(rot, tol);
+  simp.pop();                                        // drop the duplicated first point
+  return simp.length>=3 ? simp : ring.slice();
+}
+function _nestSolverGeom(part, tol){
+  var g=_partNestGeom(part);
+  return { outer:_nestSimplifyRing(g.outer, tol),
+           holes:(g.holes||[]).map(function(h){ return _nestSimplifyRing(h, tol); })
+                              .filter(function(h){ return h && h.length>=3; }) };
+}
+
+// Identical parts are one question, not fifty. The engine takes a `demand`
+// count per item; feeding it fifty separate items with the same outline made it
+// re-derive the same geometry fifty times — 120 L-brackets solved in 580 ms as
+// separate items and 218 ms as one item with demand 120, for a bit-identical
+// packing. On arc-heavy parts the gap was 1480 ms vs 111 ms. That saved time is
+// what pays for the multi-start search.
+function _nestGroupKey(part){
+  var g=_partNestGeom(part);
+  function ring(r){ return r.map(function(p){ return Math.round(p.x*10)+','+Math.round(p.y*10); }).join(' '); }
+  return ring(g.outer)+'|'+(g.holes||[]).map(ring).join('#');
+}
+function _nestGroups(mparts){
+  var by={}, order=[];
+  mparts.forEach(function(p){
+    var k=_nestGroupKey(p);
+    if(!by[k]){ by[k]=[]; order.push(k); }
+    by[k].push(p);
+  });
+  return order.map(function(k){ return by[k]; });
 }
 
 // Build a jagua-rs bin-packing instance (ExtBPInstance) for one material.
@@ -7392,16 +7477,10 @@ function nestSolve(instJson, kerf){
 // grown by one kerf per side to cancel it; the placements are shifted back by
 // the same amount. Pocket bins deliberately keep the inset, because there the
 // wall really is cut.
-function _bpInstanceForMaterial(name, mparts, uw, uh, grain, kerfPad, maxSheets){
+function _bpInstanceForMaterial(name, groups, geoms, orient, uw, uh, kerfPad, maxSheets, nParts){
   kerfPad=kerfPad||0;
-  // Rotation step from the selector. Grain-locked boards may only flip 0°/180°
-  // (preserves grain direction); otherwise snap at the chosen angle increment.
-  var step = parseInt((document.getElementById('nestRot')||{}).value) || 45;
-  var orient;
-  if(grain){ orient=[0.0,180.0]; }
-  else { orient=[]; for(var a=0; a<360; a+=step) orient.push(a); }
-  var items = mparts.map(function(p, idx){
-    var g=_partNestGeom(p); // {outer:[{x,y}], holes:[[{x,y}]]}  (y-up)
+  var items = groups.map(function(grp, idx){
+    var g=geoms[idx];               // {outer:[{x,y}], holes:[[{x,y}]]}  (y-up)
     var outer = g.outer.map(function(pt){ return [pt.x, pt.y]; });
     var shape;
     if(g.holes && g.holes.length){
@@ -7409,11 +7488,123 @@ function _bpInstanceForMaterial(name, mparts, uw, uh, grain, kerfPad, maxSheets)
     } else {
       shape = { type:'simple_polygon', data: outer };
     }
-    return { id: idx, demand: 1, allowed_orientations: orient, shape: shape, min_quality: null };
+    return { id: idx, demand: grp.length, allowed_orientations: orient, shape: shape, min_quality: null };
   });
   var bin = { id:0, shape:{ type:'rectangle', data:{ x_min:0, y_min:0, width:uw+2*kerfPad, height:uh+2*kerfPad } },
-              stock: Math.max(1, Math.min(maxSheets||mparts.length, mparts.length)), cost: 1 };
+              stock: Math.max(1, Math.min(maxSheets||nParts, nParts)), cost: 1 };
   return { name: name||'job', items: items, bins: [bin] };
+}
+
+// ── Which rotations to offer, and why not simply "all of them" ────────────
+// A finer step is not a better nest. LBF samples a fixed number of candidate
+// poses per part, so spreading them over 360 orientations thins the search
+// instead of widening it: 100 right triangles landed on 2 sheets at 90° and on
+// 3 at 15°, 5° and 1°; 100 L-brackets went from 2 sheets to 3 below 15°. So the
+// selector now sets the *finest* rotation the search may use, and the search
+// tries the coarse sets too and keeps whatever actually packed best. Picking 1°
+// can therefore only add options, never take a good nest away.
+function _nestOrientPool(step, grain, geoms){
+  if(grain) return [[0.0,180.0]];                  // grain direction is not negotiable
+  var pool=[], seen={};
+  [90,45,180,15,30,10,5,2,1].forEach(function(st){
+    if(st<step || seen[st]) return;
+    seen[st]=1;
+    var o=[]; for(var a=0; a<360; a+=st) o.push(a);
+    pool.push(o);
+  });
+  if(!pool.length) pool.push([0,90,180,270]);
+  // One set built from the parts' own edge directions, at 1° resolution: it lets
+  // a diagonal outline lie flat against the sheet edge, which no fixed step
+  // offers. Only worth asking when some edge is genuinely off-axis.
+  var ang={}, offAxis=false;
+  geoms.forEach(function(g){
+    var r=g.outer;
+    for(var i=0;i<r.length;i++){
+      var a=r[i], b=r[(i+1)%r.length];
+      if(Math.abs(b.x-a.x)+Math.abs(b.y-a.y) < 20) continue;   // ignore tessellation crumbs
+      var deg=Math.atan2(b.y-a.y, b.x-a.x)*180/Math.PI;
+      for(var k=0;k<4;k++) ang[((Math.round(-deg)+k*90)%360+360)%360]=1;
+      var m=((Math.round(deg)%90)+90)%90;
+      if(m>2 && m<88) offAxis=true;
+    }
+  });
+  var edge=Object.keys(ang).map(Number).sort(function(x,y){ return x-y; });
+  if(offAxis && edge.length>=2 && edge.length<=48) pool.splice(Math.min(2,pool.length), 0, edge);
+  return pool;
+}
+
+// ── Scoring one candidate nest ────────────────────────────────────────────
+// First: how many parts got placed at all (stock caps the sheets, so a run that
+// strands fewer parts on this board size is strictly better — the rest spill to
+// the next size). Then: fewest sheets. Then, between nests that tie on both,
+// prefer the one that concentrates its waste: sum of squared densities is
+// highest when one sheet is left mostly empty, and a mostly-empty sheet is an
+// offcut worth keeping rather than four half-used boards.
+function _nestScore(sol){
+  var lays=(sol&&sol.layouts)||[];
+  var placed=0, conc=0;
+  lays.forEach(function(l){
+    placed += (l.placed_items||[]).length;
+    var d=l.density||0; conc += d*d;
+  });
+  return { placed:placed, sheets:lays.length, conc:conc };
+}
+function _nestBetter(a, b){
+  if(!b) return true;
+  if(a.placed!==b.placed) return a.placed>b.placed;
+  if(a.sheets!==b.sheets) return a.sheets<b.sheets;
+  return a.conc>b.conc;
+}
+
+// ── The time-boxed search ─────────────────────────────────────────────────
+// One LBF pass takes 100–300 ms, and its result swings by a whole sheet with
+// nothing but the random seed. So spend the budget: keep asking with a
+// different (rotation set, seed) pair and hold on to the best answer. Stops
+// early when the nest reaches the area lower bound — no packing can beat it, so
+// there is nothing left to buy with the remaining seconds.
+async function _nestSearchBest(matName, mparts, uw, uh, grain, kerf, capSheets, budgetMs, onTry){
+  var groups=_nestGroups(mparts);
+  var tol=_nestSimpTol(kerf);
+  var geoms=groups.map(function(g){ return _nestSolverGeom(g[0], tol); });
+  var pool=_nestOrientPool(parseInt((document.getElementById('nestRot')||{}).value)||45, grain, geoms);
+  var partArea=0;
+  groups.forEach(function(grp,i){
+    var a=_polyArea(geoms[i].outer);
+    (geoms[i].holes||[]).forEach(function(h){ a-=_polyArea(h); });
+    partArea += Math.max(0,a)*grp.length;
+  });
+  var lowBound=Math.max(1, Math.ceil(partArea/((uw*uh)||1) - 1e-9));
+  if(capSheets) lowBound=Math.min(lowBound, capSheets);
+
+  // Only the seed changes between tries of the same rotation set, so each set's
+  // instance is serialised once instead of once per try.
+  var instJson={};
+  var t0=Date.now(), best=null, tries=0, err=null, stale=0;
+  for(var i=0; ; i++){
+    if(_nestCancelled) break;
+    var elapsed=Date.now()-t0;
+    if(i>0 && elapsed>=budgetMs) break;
+    var pi=i%pool.length, seed=1+Math.floor(i/pool.length);
+    if(!instJson[pi]) instJson[pi]=JSON.stringify(
+      _bpInstanceForMaterial(matName, groups, geoms, pool[pi], uw, uh, kerf, capSheets||undefined, mparts.length));
+    var sol=null;
+    try{ sol=JSON.parse(await nestSolve(instJson[pi], kerf, seed)); }
+    catch(e){ err=e; if(i===0) break; continue; }
+    tries++;
+    var sc=_nestScore(sol);
+    if(_nestBetter(sc, best&&best.score)){ best={sol:sol, score:sc, groups:groups}; stale=0; }
+    else stale++;
+    if(onTry) onTry(tries, Math.min(1,(Date.now()-t0)/Math.max(1,budgetMs)), best.score);
+    if(best.score.placed===mparts.length && best.score.sheets<=lowBound) break;   // provably optimal
+    // These runs plateau: measured across the test set the winning nest turned up
+    // by try 7, and tries 8–66 never beat it. Once every rotation set has had
+    // several fresh seeds with nothing to show, stop — so picking 30 s or 60 s
+    // for a job that needs neither costs nothing.
+    if(stale>=Math.max(12, pool.length*4)) break;
+  }
+  if(!best && err) throw err;
+  if(best) best.tries=tries;
+  return best;
 }
 
 async function runShapeNestWasm(){
@@ -7424,6 +7615,9 @@ async function runShapeNestWasm(){
 
   var kerf=parseInt((document.getElementById('kerf')||{}).value)||3;
   var trim=parseInt((document.getElementById('trim')||{}).value)||0;
+  var budgetMs=parseInt((document.getElementById('nestTime')||{}).value);
+  if(isNaN(budgetMs)) budgetMs=5000;
+  var tBudget0=Date.now();
   var byMat={}; parts.forEach(function(p){ var m=normalizeMat(p.mat); (byMat[m]=byMat[m]||[]).push(p); });
   var matKeys=Object.keys(byMat), newLayouts=[], unplaced=[];
 
@@ -7467,21 +7661,40 @@ async function runShapeNestWasm(){
     var capSheets=jobs[mi].cap||0;
     var uw=Math.max(10, bd.w-2*trim), uh=Math.max(10, bd.h-2*trim);
     var grain=!!bd.grain;
-    _nestProgressMat(mi, jobs.length, bd.mat, 0.15);
-    var inst=_bpInstanceForMaterial(mat, mparts, uw, uh, grain, kerf, capSheets||undefined);
-    var sol=null;
+    _nestProgressMat(mi, jobs.length, bd.mat, 0.02);
+    // Split what is left of the budget between the board sizes still to come,
+    // so "5 s" means five seconds for the whole nest and not per board.
+    var jobsLeft=0;
+    for(var jj=mi; jj<jobs.length; jj++){
+      var jp=jobs[jj].parts || pending[jobs[jj].mat] || [];
+      if(jp.length || jobs[jj].mat===mat) jobsLeft++;
+    }
+    // 70% of the clock goes on finding a good nest, the rest is held back for
+    // the rescue pass — so the number on the control is what the run costs.
+    var searchBudget=Math.round(budgetMs*0.7);
+    var slice=budgetMs<=0 ? 0
+      : Math.max(700, Math.round((searchBudget-(Date.now()-tBudget0))/Math.max(1,jobsLeft)));
+    var best=null;
     try{
-      var resStr=await nestSolve(JSON.stringify(inst), kerf);
-      sol=JSON.parse(resStr);
+      best=await _nestSearchBest(mat, mparts, uw, uh, grain, kerf, capSheets, slice,
+        (function(mi,bd){ return function(tries, frac, score){
+          _nestProgressMat(mi, jobs.length, bd.mat, frac, tries, score);
+        }; })(mi,bd));
     }catch(e){
       console.error('shape-nest error', e);
       mparts.forEach(function(p){ unplaced.push(p.origName||p.name||'?'); });
       continue;
     }
+    if(!best){ continue; }
+    var sol=best.sol;
+    // The solver was asked about groups of identical parts, not about each part
+    // in turn; hand the placements back out to the real parts one at a time.
+    var queues=best.groups.map(function(g){ return g.slice(); });
     (sol.layouts||[]).forEach(function(lay){
       var pls=[];
       (lay.placed_items||[]).forEach(function(pi){
-        var part=mparts[pi.item_id]; if(!part) return;
+        var q=queues[pi.item_id];
+        var part=q && q.shift(); if(!part) return;
         var g=_partNestGeom(part);
         var ang=(pi.transformation&&pi.transformation.rotation)||0;          // radians
         var tr=(pi.transformation&&pi.transformation.translation)||[0,0];
@@ -7528,6 +7741,16 @@ async function runShapeNestWasm(){
     (pending[m]||[]).forEach(function(p){ unplaced.push(p.origName||p.name||'?'); });
   });
 
+  // ── Rescue pass: empty the sheets that are barely used ────────────────────
+  // Worth its own slice of the clock — removing a board is the single biggest
+  // saving the nester can make, and it is the one thing a one-shot LBF cannot do.
+  try{
+    _nestProgressStage('Tuštinami mažai užpildyti lakštai…');
+    await _rescueSheets(newLayouts, kerf, budgetMs<=0?0:Math.max(1200, budgetMs-(Date.now()-tBudget0)), function(n){
+      _nestProgressStage('Atlaisvinta lakštų: '+n);
+    });
+  }catch(e){ console.warn('sheet rescue skipped:', e && e.message); }
+
   // ── Second pass: nest leftovers into the cut-outs of parts already placed ──
   // The engine will not do this itself — offered a part with a big pocket and a
   // small part that only fits inside it, it puts the small one on a NEW sheet.
@@ -7540,6 +7763,190 @@ async function runShapeNestWasm(){
   _nestRunning=false; _nestHideProgress();
   if(_nestCancelled) return;
   _finishShapeNest(newLayouts, unplaced);
+}
+
+// ── Second chance for the emptiest sheet ──────────────────────────────────
+// LBF fills one sheet at a time and never reopens a sheet it has moved past, so
+// a part that would have slotted into a gap on sheet 1 can end up alone on
+// sheet 3 — and a sheet holding three parts still costs a whole board. This
+// pass measures what is genuinely still free on every other sheet (the sheet
+// rectangle minus the outlines already on it, holes and all), hands those
+// regions to the engine as bins, and asks it to take the emptiest sheet's parts.
+// It commits only when the donor empties completely: half-emptying a sheet
+// shuffles the layout without saving a board.
+var _CLIP_SC=1000;                       // Clipper works in integers; 0.001 mm
+function _placementRing(pl){
+  if(pl.nestPoly && pl.nestPoly.length>2)
+    return pl.nestPoly.map(function(q){ return {x:q.x+pl.x, y:q.y+pl.y}; });
+  return [{x:pl.x,y:pl.y},{x:pl.x+pl.pw,y:pl.y},{x:pl.x+pl.pw,y:pl.y+pl.ph},{x:pl.x,y:pl.y+pl.ph}];
+}
+// The free space of one sheet, as engine-frame (y-up) rings ready to be a bin.
+function _sheetFreeRegions(lay, minArea, minSide){
+  var uw=lay.uw, uh=lay.uh;
+  var C=new ClipperLib.Clipper();
+  function toClip(ring){ return ring.map(function(q){ return {X:Math.round(q.x*_CLIP_SC), Y:Math.round(q.y*_CLIP_SC)}; }); }
+  C.AddPaths([toClip([{x:0,y:0},{x:uw,y:0},{x:uw,y:uh},{x:0,y:uh}])], ClipperLib.PolyType.ptSubject, true);
+  var clips=(lay.placements||[]).map(function(pl){ return toClip(_placementRing(pl)); });
+  if(clips.length) C.AddPaths(clips, ClipperLib.PolyType.ptClip, true);
+  var tree=new ClipperLib.PolyTree();
+  if(!C.Execute(ClipperLib.ClipType.ctDifference, tree,
+                ClipperLib.PolyFillType.pftNonZero, ClipperLib.PolyFillType.pftNonZero)) return [];
+  var out=[];
+  (tree.Childs()||[]).forEach(function(node){
+    if(node.IsHole()) return;
+    function ring(c){ return c.map(function(q){ return {x:q.X/_CLIP_SC, y:q.Y/_CLIP_SC}; }); }
+    var outer=ring(node.Contour());
+    if(outer.length<3) return;
+    var bb=_polyBBox(outer);
+    if(Math.min(bb.w,bb.h)<minSide) return;
+    var inner=(node.Childs()||[]).filter(function(k){ return k.IsHole() && k.Contour().length>=3; })
+                                 .map(function(k){ return ring(k.Contour()); });
+    var area=_polyArea(outer);
+    inner.forEach(function(h){ area-=_polyArea(h); });
+    if(area<minArea) return;
+    // Sheet frame is y-down, the engine's is y-up: one flip, undone on the way back.
+    function up(r){ return r.map(function(q){ return [q.x, uh-q.y]; }); }
+    out.push({ outer:up(outer), inner:inner.map(up), area:area });
+  });
+  return out;
+}
+async function _rescueSheets(newLayouts, kerf, budgetMs, onProgress){
+  if(typeof ClipperLib==='undefined' || newLayouts.length<2 || budgetMs<=0) return 0;
+  var t0=Date.now(), removed=0;
+  // Only sheets of the same material can trade parts, and a grain-locked board
+  // can only take a part that is upright — which is a different question to ask
+  // the engine, so those sheets form their own pool.
+  var pools={};
+  newLayouts.forEach(function(l,i){
+    var k=normalizeMat(l.matName)+'|'+(l.grainLocked?1:0);
+    (pools[k]=pools[k]||[]).push(i);
+  });
+  var dead={};
+  for(var pk in pools){
+    var idxs=pools[pk];
+    if(idxs.length<2) continue;
+    for(;;){
+      if(_nestCancelled || Date.now()-t0>=budgetMs) break;
+      var live=idxs.filter(function(i){ return !dead[i]; });
+      if(live.length<2) break;
+      // Emptiest sheet first: it is the cheapest one to empty and the one whose
+      // removal is worth the most.
+      live.sort(function(a,b){
+        function used(l){ return (l.placements||[]).reduce(function(n,p){ return n+_placementUsedArea(p); },0)/((l.uw*l.uh)||1); }
+        return used(newLayouts[a])-used(newLayouts[b]);
+      });
+      var donorI=live[0], donor=newLayouts[donorI];
+      if(!donor.placements.length){ dead[donorI]=1; continue; }
+      var moved=await _tryEmptySheet(newLayouts, donorI, live.slice(1), kerf,
+                                     Math.max(500, budgetMs-(Date.now()-t0)));
+      if(!moved) break;                     // this pool has nothing left to give
+      dead[donorI]=1; removed++;
+      if(onProgress) onProgress(removed);
+    }
+  }
+  if(removed){
+    for(var i=newLayouts.length-1;i>=0;i--) if(!newLayouts[i].placements.length) newLayouts.splice(i,1);
+    newLayouts.forEach(function(l,i){ l.idx=i; });
+  }
+  return removed;
+}
+async function _tryEmptySheet(newLayouts, donorI, targetIdxs, kerf, budgetMs){
+  var donor=newLayouts[donorI], donorPls=donor.placements.slice();
+  if(!donorPls.length) return false;
+  var parts=donorPls.map(function(p){ return p.part; }).filter(Boolean);
+  if(parts.length!==donorPls.length) return false;     // a hand-placed copy with no part behind it
+  var minArea=Infinity, minSide=Infinity;
+  donorPls.forEach(function(p){
+    minArea=Math.min(minArea,_placementUsedArea(p));
+    minSide=Math.min(minSide,Math.min(p.pw,p.ph));
+  });
+  // Every free region on every other sheet becomes a bin, so the engine can
+  // spread the donor's parts over several sheets in one answer.
+  var bins=[], binMap=[], freeArea=0;
+  targetIdxs.forEach(function(ti){
+    _sheetFreeRegions(newLayouts[ti], minArea, minSide).forEach(function(reg){
+      var id=bins.length;
+      bins.push({ id:id, cost:1, stock:1,
+                  shape: reg.inner.length ? {type:'polygon', data:{outer:reg.outer, inner:reg.inner}}
+                                          : {type:'simple_polygon', data:reg.outer} });
+      binMap.push({lay:ti, reg:reg});
+      freeArea += reg.area;
+    });
+  });
+  if(!bins.length) return false;
+  // If the donor's parts do not even fit by area they cannot fit by shape, and
+  // no number of seeds will change that. Cheap to check, and it is the common
+  // case once the good sheets are full.
+  var donorArea=donorPls.reduce(function(a,p){ return a+_placementUsedArea(p); },0);
+  if(donorArea>freeArea) return false;
+
+  var groups=_nestGroups(parts), tol=_nestSimpTol(kerf);
+  var geoms=groups.map(function(g){ return _nestSolverGeom(g[0], tol); });
+  var orient = donor.grainLocked ? [0.0,180.0]
+             : _nestOrientPool(parseInt((document.getElementById('nestRot')||{}).value)||45, false, geoms)[0];
+  var inst={ name:'rescue',
+    items: groups.map(function(grp,i){
+      var g=geoms[i], outer=g.outer.map(function(q){ return [q.x,q.y]; });
+      return { id:i, demand:grp.length, allowed_orientations:orient, min_quality:null,
+        shape: g.holes.length ? {type:'polygon', data:{outer:outer, inner:g.holes.map(function(h){ return h.map(function(q){ return [q.x,q.y]; }); })}}
+                              : {type:'simple_polygon', data:outer} };
+    }), bins: bins };
+
+  var t0=Date.now(), sol=null, instStr=JSON.stringify(inst), bestGot=-1, stale=0;
+  for(var seed=1; seed<=200; seed++){
+    if(_nestCancelled) break;
+    var r=null;
+    try{ r=JSON.parse(await nestSolve(instStr, kerf, seed)); }catch(e){ break; }
+    var got=(r.layouts||[]).reduce(function(a,l){ return a+(l.placed_items||[]).length; },0);
+    if(got===parts.length){ sol=r; break; }              // the whole sheet fits elsewhere
+    // Only a complete move is worth committing, so seeds that keep landing short
+    // are not progress. Give up on this donor rather than spend the rest of the
+    // clock on it — the same plateau the main search shows.
+    if(got>bestGot){ bestGot=got; stale=0; } else stale++;
+    if(stale>=12) break;
+    if(Date.now()-t0>=budgetMs) break;
+  }
+  if(!sol) return false;
+
+  // Commit: rebuild each moved placement in its new sheet's frame.
+  var queues=groups.map(function(g){ return g.slice(); });
+  var added=[];
+  (sol.layouts||[]).forEach(function(sl){
+    var bm=binMap[sl.container_id]; if(!bm) return;
+    var lay=newLayouts[bm.lay], uh=lay.uh;
+    (sl.placed_items||[]).forEach(function(pi){
+      var q=queues[pi.item_id], part=q && q.shift(); if(!part) return;
+      var g=_partNestGeom(part);
+      var ang=(pi.transformation&&pi.transformation.rotation)||0;
+      var tr=(pi.transformation&&pi.transformation.translation)||[0,0];
+      var c=Math.cos(ang), sn=Math.sin(ang);
+      // engine (y-up, bin frame) → sheet (y-down). The bin IS the sheet here, so
+      // the flip is the sheet's own height and nothing has to be re-offset.
+      function toSheet(pt){ return {x: pt.x*c - pt.y*sn + tr[0], y: uh - (pt.x*sn + pt.y*c + tr[1])}; }
+      var sOuter=g.outer.map(toSheet), sHoles=(g.holes||[]).map(function(h){ return h.map(toSheet); });
+      var bb=_polyBBox(sOuter), deg=ang*180/Math.PI;
+      var np={ part:part, x:bb.minX, y:bb.minY,
+        pw:Math.round(bb.w), ph:Math.round(bb.h),
+        rot:(Math.round(deg)%360!==0), color:lay.matColor||'#888',
+        nestPoly:sOuter.map(function(q2){ return {x:q2.x-bb.minX, y:q2.y-bb.minY}; }),
+        nestHoles:sHoles.map(function(h){ return h.map(function(q2){ return {x:q2.x-bb.minX, y:q2.y-bb.minY}; }); }),
+        nestAngle:deg };
+      lay.placements.push(np);
+      added.push({lay:lay, pl:np});
+    });
+  });
+  if(added.length!==parts.length){
+    // Should not happen — the loop above only accepts a full solution — but a
+    // half-moved sheet would leave the same part on two boards, so undo the
+    // move rather than trust it.
+    added.forEach(function(a){
+      var k=a.lay.placements.indexOf(a.pl);
+      if(k>=0) a.lay.placements.splice(k,1);
+    });
+    return false;
+  }
+  donor.placements.length=0;
+  return true;
 }
 
 // Minimum useful pocket: anything smaller is a handle slot or a service hole,
@@ -7808,7 +8215,8 @@ function _nestShowProgress(matCount){
         +'<div style="width:22px;height:22px;border:3px solid #e3e0f5;border-top-color:#534AB7;border-radius:50%;animation:nestspin .8s linear infinite;flex-shrink:0"></div>'
         +'<div style="font-size:15px;font-weight:600;color:#1b1e26">🧩 DXF nesting…</div>'
       +'</div>'
-      +'<div id="nest-prog-sub" style="font-size:12px;color:#667085;margin-bottom:14px">Pradedama…</div>'
+      +'<div id="nest-prog-sub" style="font-size:12px;color:#667085;margin-bottom:2px">Pradedama…</div>'
+      +'<div id="nest-prog-det" style="font-size:12px;color:#534AB7;font-weight:600;margin-bottom:12px;min-height:15px"></div>'
       +'<div style="height:10px;background:#e9edf3;border-radius:6px;overflow:hidden"><div id="nest-prog-bar" style="height:100%;width:0;background:#534AB7;transition:width .2s"></div></div>'
       +'<div style="display:flex;justify-content:flex-end;margin-top:16px"><button id="nest-prog-cancel" style="padding:7px 16px;border:1px solid #B84040;color:#B84040;background:#fff;border-radius:8px;font-size:13px;cursor:pointer">Atšaukti</button></div>'
       +'</div>';
@@ -7819,13 +8227,26 @@ function _nestShowProgress(matCount){
   _nestMatCount=matCount;
 }
 var _nestMatCount=1;
-function _nestProgressMat(mi, matCount, matName, frac){
+function _nestProgressMat(mi, matCount, matName, frac, tries, best){
   var bar=document.getElementById('nest-prog-bar');
   var sub=document.getElementById('nest-prog-sub');
+  var det=document.getElementById('nest-prog-det');
   // overall progress = finished materials + current material fraction
   var overall=(mi + (frac||0))/Math.max(1,matCount);
   if(bar) bar.style.width=Math.round(overall*100)+'%';
-  if(sub) sub.textContent='Material '+(mi+1)+'/'+matCount+': '+(matName||'')+' — '+Math.round((frac||0)*100)+'%';
+  if(sub) sub.textContent=(matCount>1?('Medžiaga '+(mi+1)+'/'+matCount+': '):'')+(matName||'')+' — '+Math.round((frac||0)*100)+'%';
+  // The search runs dozens of packings and keeps the best; showing which try it
+  // is on, and what the best one costs so far, is the difference between a
+  // spinner that looks stuck and one that is visibly buying something.
+  // "lakšt." / "det." follow the abbreviation the rest of the app uses, which is
+  // how it stays out of Lithuanian's three-way plural.
+  if(det) det.textContent = tries
+    ? ('Bandymas '+tries+' · geriausia: '+best.sheets+' lakšt. · '+best.placed+' det.')
+    : '';
+}
+function _nestProgressStage(text){
+  var det=document.getElementById('nest-prog-det');
+  if(det) det.textContent=text;
 }
 function _nestHideProgress(){
   var ov=document.getElementById('nest-prog-ov');
@@ -7838,7 +8259,11 @@ function _finishShapeNest(newLayouts, unplaced){
   curSheet=0; selP=null; hovP=null;
   // Stats cards (same IDs the rectangular optimizer fills)
   var totA=layouts.reduce(function(a,l){return a+l.uw*l.uh;},0);
-  var usedA=layouts.reduce(function(a,l){return a+l.placements.reduce(function(b,p){return b+p.pw*p.ph;},0);},0);
+  // True outline area, not the bounding box. A shape nest whose parts are half
+  // air was reporting the air as used material, so the headline efficiency read
+  // higher than the per-sheet badge on the very same layout — and higher than
+  // the board it actually consumes.
+  var usedA=layouts.reduce(function(a,l){return a+l.placements.reduce(function(b,p){return b+_placementUsedArea(p);},0);},0);
   var eff=totA?Math.round(usedA/totA*100):0;
   var partsOnSheets=layouts.reduce(function(a,l){return a+l.placements.length;},0);
   var sv1=document.getElementById('sv1'); if(sv1)sv1.textContent=layouts.length;
@@ -8595,7 +9020,11 @@ function optimize(){
   // Sheet numbering must be contiguous after any sheets were moved.
   layouts.forEach(function(l,i){ l.idx=i; });
   var totA=layouts.reduce(function(a,l){return a+l.uw*l.uh;},0);
-  var usedA=layouts.reduce(function(a,l){return a+l.placements.reduce(function(b,p){return b+p.pw*p.ph;},0);},0);
+  // True outline area, not the bounding box. A shape nest whose parts are half
+  // air was reporting the air as used material, so the headline efficiency read
+  // higher than the per-sheet badge on the very same layout — and higher than
+  // the board it actually consumes.
+  var usedA=layouts.reduce(function(a,l){return a+l.placements.reduce(function(b,p){return b+_placementUsedArea(p);},0);},0);
   var eff=totA?Math.round(usedA/totA*100):0;
   document.getElementById('sv1').textContent=layouts.length;
   document.getElementById('sv2').textContent=layouts.reduce(function(a,l){return a+l.placements.length;},0);
