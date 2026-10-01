@@ -1693,6 +1693,7 @@ var I18N={
     imported:'✓ Imported',
     newProject:'New project',
     offline:'⚠ Offline — local only',
+    notSaved:'⛔ NOT SAVED — storage full/blocked, export the project!',
     notFound:'⚠ Not found',
     nameRequired:'Name required',
     // move-to-sheet popover
@@ -1922,6 +1923,7 @@ var I18N={
     imported:'✓ Importuota',
     newProject:'Naujas projektas',
     offline:'⚠ Neprisijungta — tik vietoje',
+    notSaved:'⛔ NEIŠSAUGOTA — saugykla pilna/užblokuota, eksportuokite projektą!',
     notFound:'⚠ Nerasta',
     nameRequired:'Reikalingas pavadinimas',
     moveSel:'Perkelti',
@@ -2097,6 +2099,82 @@ var _lastSavedHash='';
 var _savingNow=false;
 var _supabaseOnline=true; // optimistic; flips false on first network error
 var _suppressSave=false; // set during load to prevent save-triggered-by-load
+var _lastSaveLost=false; // true when the last save reached NEITHER cloud nor local
+
+// ── Vietinė kopija: IndexedDB (be 5 MB ribos), localStorage — tik atsarginė ──
+// localStorage telpa ~5 MB; DXF projektai su kontūrais ją greitai viršija, o
+// setItem klaida anksčiau buvo tik console.warn → projektas niekur neišsaugotas.
+var _idbP=null, _idbNames={};
+function _idb(){
+  if(_idbP)return _idbP;
+  _idbP=new Promise(function(res,rej){
+    try{
+      var rq=indexedDB.open('fabflow_projects',1);
+      rq.onupgradeneeded=function(){rq.result.createObjectStore('projects',{keyPath:'name'});};
+      rq.onsuccess=function(){res(rq.result);};
+      rq.onerror=function(){rej(rq.error);};
+    }catch(e){rej(e);}
+  });
+  _idbP.catch(function(){_idbP=null;});
+  return _idbP;
+}
+function _idbReq(mode,fn){
+  return _idb().then(function(db){return new Promise(function(res,rej){
+    var tx=db.transaction('projects',mode), st=tx.objectStore('projects'), out;
+    var rq=fn(st); if(rq)rq.onsuccess=function(){out=rq.result;};
+    tx.oncomplete=function(){res(out);};
+    tx.onerror=tx.onabort=function(){rej(tx.error||new Error('IDB tx failed'));};
+  });});
+}
+function _lsGet(name){try{var raw=localStorage.getItem(LS_PROJECT_PREFIX+name);return raw?JSON.parse(raw):null;}catch(e){return null;}}
+function _newer(a,b){if(!a)return b;if(!b)return a;return (a.updated_at||'')>=(b.updated_at||'')?a:b;}
+// Returns true when at least one local store holds the project.
+async function localPut(obj){
+  var ok=false;
+  try{await _idbReq('readwrite',function(st){return st.put(obj);});_idbNames[obj.name]=1;ok=true;}
+  catch(e){console.warn('IndexedDB save failed',e);}
+  try{localStorage.setItem(LS_PROJECT_PREFIX+obj.name,JSON.stringify(obj));ok=true;}
+  catch(e){
+    // Per didelis localStorage'ui — pašalinam pasenusią kopiją, kad neužgožtų naujos.
+    if(ok){try{localStorage.removeItem(LS_PROJECT_PREFIX+obj.name);}catch(_){}}
+    else console.warn('localStorage save failed',e);
+  }
+  return ok;
+}
+async function localGet(name){
+  var a=null;try{a=await _idbReq('readonly',function(st){return st.get(name);});}catch(e){}
+  return _newer(a||null,_lsGet(name));
+}
+async function localDelete(name){
+  try{await _idbReq('readwrite',function(st){return st.delete(name);});}catch(e){}
+  delete _idbNames[name];
+  try{localStorage.removeItem(LS_PROJECT_PREFIX+name);}catch(e){}
+}
+async function localAll(){
+  var m={};
+  try{
+    for(var i=0;i<localStorage.length;i++){
+      var k=localStorage.key(i);
+      if(!k||k.indexOf(LS_PROJECT_PREFIX)!==0)continue;
+      var o=_lsGet(k.substring(LS_PROJECT_PREFIX.length));
+      if(o&&o.name)m[o.name]=o;
+    }
+  }catch(e){}
+  try{
+    var rows=await _idbReq('readonly',function(st){return st.getAll();})||[];
+    rows.forEach(function(o){if(o&&o.name){_idbNames[o.name]=1;m[o.name]=_newer(m[o.name],o);}});
+  }catch(e){}
+  return m;
+}
+function localHasName(name){
+  if(_idbNames[name])return true;
+  try{return !!localStorage.getItem(LS_PROJECT_PREFIX+name);}catch(e){return false;}
+}
+localAll(); // užpildo _idbNames
+// Neleisti uždaryti skirtuko, kol paskutinis išsaugojimas niekur nenukeliavo.
+window.addEventListener('beforeunload',function(e){
+  if(_lastSaveLost){e.preventDefault();e.returnValue='';}
+});
 
 function supaHeaders(){
   return {
@@ -2750,10 +2828,8 @@ async function saveProject(){
   var serialized;
   try{serialized=JSON.stringify(data);}catch(e){_savingNow=false;setStatus('error','⚠ Serialize failed');console.error(e);return;}
   var updatedAt=new Date().toISOString();
-  // Always write to localStorage as a mirror (backup + offline fallback)
-  try{
-    localStorage.setItem(LS_PROJECT_PREFIX+name,JSON.stringify({name:name,data:data,updated_at:updatedAt}));
-  }catch(e){console.warn('localStorage save failed',e);}
+  // Always write a local mirror (backup + offline fallback)
+  var localOk=await localPut({name:name,data:data,updated_at:updatedAt});
   // Attempt cloud save
   if(supaConfigured()){
     try{
@@ -2768,17 +2844,30 @@ async function saveProject(){
       }
       _supabaseOnline=true;
       _lastSavedHash=fp;
+      _lastSaveLost=false;
       setStatus('saved',t('saved'));
       drainPendingQueue();
     }catch(err){
       _supabaseOnline=false;
-      queueForLater(name);
-      setStatus('offline',t('offline'));
       console.warn('Supabase save failed',err);
+      if(localOk){
+        queueForLater(name);
+        _lastSavedHash=fp;
+        _lastSaveLost=false;
+        setStatus('offline',t('offline'));
+      } else {
+        // Neišsaugota niekur — garsiai pranešti, hash nekeisti (kitas pakeitimas bandys vėl).
+        _lastSaveLost=true;
+        setStatus('error',t('notSaved'));
+      }
     }
-  } else {
+  } else if(localOk){
     _lastSavedHash=fp;
+    _lastSaveLost=false;
     setStatus('saved',t('savedLocal'));
+  } else {
+    _lastSaveLost=true;
+    setStatus('error',t('notSaved'));
   }
   _savingNow=false;
 }
@@ -2887,25 +2976,34 @@ function queueForLater(name){
     if(q.indexOf(name)<0){q.push(name);localStorage.setItem(LS_PENDING_QUEUE,JSON.stringify(q));}
   }catch(e){}
 }
+var _draining=false;
 async function drainPendingQueue(){
-  if(!_supabaseOnline||!supaConfigured())return;
+  // Anksčiau grįždavo, kai _supabaseOnline===false — t.y. būtent tada, kai
+  // reikia bandyti iš naujo. Dabar bandoma visada; sėkmė grąžina "online".
+  if(_draining||!supaConfigured())return;
   var q;try{q=JSON.parse(localStorage.getItem(LS_PENDING_QUEUE)||'[]');}catch(e){q=[];}
   if(!q.length)return;
-  var remaining=[];
-  for(var i=0;i<q.length;i++){
-    var nm=q[i];
-    var raw=localStorage.getItem(LS_PROJECT_PREFIX+nm);if(!raw){continue;}
-    var obj;try{obj=JSON.parse(raw);}catch(e){continue;}
-    try{
-      var r=await fetch(SUPABASE_URL+'/rest/v1/'+PROJECT_TABLE+'?on_conflict=name',{
-        method:'POST',
-        headers:Object.assign(supaHeaders(),{'Prefer':'resolution=merge-duplicates,return=representation'}),
-        body:JSON.stringify({name:obj.name,data:obj.data,updated_at:obj.updated_at})
-      });
-      if(!r.ok)remaining.push(nm);
-    }catch(e){remaining.push(nm);}
-  }
-  localStorage.setItem(LS_PENDING_QUEUE,JSON.stringify(remaining));
+  _draining=true;
+  var remaining=[], anyOk=false;
+  try{
+    for(var i=0;i<q.length;i++){
+      var nm=q[i];
+      var obj=await localGet(nm);if(!obj){continue;}
+      try{
+        var r=await fetch(SUPABASE_URL+'/rest/v1/'+PROJECT_TABLE+'?on_conflict=name',{
+          method:'POST',
+          headers:Object.assign(supaHeaders(),{'Prefer':'resolution=merge-duplicates,return=minimal'}),
+          body:JSON.stringify({name:obj.name,data:obj.data,updated_at:obj.updated_at})
+        });
+        if(r.ok)anyOk=true;else remaining.push(nm);
+      }catch(e){remaining.push(nm);}
+    }
+    try{localStorage.setItem(LS_PENDING_QUEUE,JSON.stringify(remaining));}catch(e){}
+    if(anyOk){
+      _supabaseOnline=true;
+      if(!remaining.length&&!_savingNow)setStatus('saved',t('saved'));
+    }
+  }finally{_draining=false;}
 }
 
 function onProjectNameChange(){
@@ -2923,16 +3021,11 @@ async function listProjects(){
   // Merge Supabase results + localStorage mirror; sorted by updated_at desc.
   var merged={};
   // Local first (always available)
-  try{
-    for(var i=0;i<localStorage.length;i++){
-      var k=localStorage.key(i);
-      if(!k||k.indexOf(LS_PROJECT_PREFIX)!==0)continue;
-      var raw=localStorage.getItem(k);if(!raw)continue;
-      var obj;try{obj=JSON.parse(raw);}catch(e){continue;}
-      if(!obj.name)continue;
-      merged[obj.name]={name:obj.name,updated_at:obj.updated_at,source:'local',data:obj.data};
-    }
-  }catch(e){}
+  var locals=await localAll();
+  Object.keys(locals).forEach(function(nm){
+    var obj=locals[nm];
+    merged[nm]={name:nm,updated_at:obj.updated_at,source:'local',data:obj.data};
+  });
   // Cloud — overrides local for same name (cloud is source of truth)
   if(supaConfigured()){
     try{
@@ -2981,10 +3074,8 @@ async function loadProjectByName(name){
       }
     }catch(e){_supabaseOnline=false;}
   }
-  if(!loaded){
-    var raw=localStorage.getItem(LS_PROJECT_PREFIX+name);
-    if(raw){try{loaded=JSON.parse(raw);}catch(e){}}
-  }
+  // Imti naujesnę kopiją — vietinė gali būti naujesnė, jei debesis buvo nepasiekiamas.
+  loaded=_newer(loaded,await localGet(name));
   if(!loaded){setStatus('error',t('notFound'));return false;}
   currentProjectName=loaded.name;
   document.getElementById('projName').value=loaded.name;
@@ -3000,7 +3091,7 @@ async function deleteProjectByName(name){
       await fetch(SUPABASE_URL+'/rest/v1/'+PROJECT_TABLE+'?name=eq.'+encodeURIComponent(name),{method:'DELETE',headers:supaHeaders()});
     }catch(e){console.warn('Cloud delete failed',e);}
   }
-  try{localStorage.removeItem(LS_PROJECT_PREFIX+name);}catch(e){}
+  await localDelete(name);
 }
 
 async function duplicateProjectByName(name){
@@ -3011,7 +3102,7 @@ async function duplicateProjectByName(name){
       if(r.ok){var rows=await r.json();if(rows.length)src=rows[0];}
     }catch(e){}
   }
-  if(!src){var raw=localStorage.getItem(LS_PROJECT_PREFIX+name);if(raw){try{src=JSON.parse(raw);}catch(e){}}}
+  src=_newer(src,await localGet(name));
   if(!src)return false;
   var newName=name+' (copy)',n=2;
   var existingNames={};(await listProjects()).forEach(function(p){existingNames[p.name]=1;});
@@ -3107,7 +3198,7 @@ function newProject(){
   // Generate a fresh default name
   var base='Untitled',n=1,tryName=base;
   try{
-    while(localStorage.getItem(LS_PROJECT_PREFIX+tryName)){n++;tryName=base+' '+n;}
+    while(localHasName(tryName)){n++;tryName=base+' '+n;}
   }catch(e){}
   currentProjectName=tryName;
   document.getElementById('projName').value=tryName;
@@ -3135,16 +3226,7 @@ function newProject(){
 async function newProjectPrompt(){
   // Collect existing project names (both cloud and local) for collision check
   var existing={};
-  try{
-    for(var i=0;i<localStorage.length;i++){
-      var k=localStorage.key(i);
-      if(k&&k.indexOf(LS_PROJECT_PREFIX)===0){
-        var nm=k.substring(LS_PROJECT_PREFIX.length);
-        existing[nm]=1;
-      }
-    }
-  }catch(e){}
-  // Also check cloud so the picker suggests a truly unique default
+  // listProjects() covers local (IndexedDB + localStorage) and cloud so the picker suggests a truly unique default
   try{
     var cloudList=await listProjects();
     cloudList.forEach(function(p){existing[p.name]=1;});
