@@ -486,6 +486,10 @@ body.print-mode{background:#fff}
   .pp{box-shadow:none;margin:0}
 }
 </style>
+<link rel="stylesheet" href="ux.css">
+<script defer src="ux.js"></script>
+<link rel="stylesheet" href="layout-v2.css">
+<script defer src="layout-v2.js"></script>
 </head>
 <body>
 <!-- Print view — populated and shown when openPrintView() is called -->
@@ -3800,10 +3804,15 @@ async function processFile(f){
           { hdrIdx=i; break; }
       }
       var isSAGA = false;
+      // Column D "DETALĖS KODAS" — shown as the part name on the layout only.
+      var codeCol = 3;
       if(hdrIdx>=0){
         var hr=plRows[hdrIdx]||[];
         // col8: SA_GA_VIRT has 'KIEKIS', RIMANTE_ZAB has thickness value
         isSAGA = String(hr[8]||'').trim()==='KIEKIS';
+        for(var hc=0;hc<hr.length;hc++){
+          if(/DETAL[ĖE]S\s*KODAS/i.test(String(hr[hc]||''))){ codeCol=hc; break; }
+        }
       }
       var curThick=18;
       var dataStart=hdrIdx>=0?hdrIdx+1:9;
@@ -3826,9 +3835,10 @@ async function processFile(f){
         var shortName=String(row[4]||'').split('_')[0].trim()||solidName.split('_')[0];
         var eb=em[solidName]||em[shortName]||{eb1:'',eb2:'',eb3:'',eb4:''};
         var opIds=opIdMap[solidName]||opIdMap[shortName]||{op1:'',op2:'',hasCNC:false};
+        var layoutName=String(row[codeCol]==null?'':row[codeCol]).trim();
         ensureBoard(mat);
         for(var j=0;j<qty;j++){
-          parts.push({id:Date.now()+added,name:shortName,origName:solidName,
+          parts.push({id:Date.now()+added,name:shortName,origName:solidName,layoutName:layoutName,
             l:L,w:W,mat:mat,thick:T,eb:eb,
             op1:opIds.op1,op2:opIds.op2,hasCNC:opIds.hasCNC,
             labelRange:opIds.range||''});
@@ -3942,6 +3952,11 @@ async function processFile(f){
     st.style.color='#B84040';st.textContent='⚠ '+err.message;console.error(err);
   }
 }
+
+// Name drawn on the layout: PARTLIST column D (DETALĖS KODAS) when present,
+// otherwise the usual part name. Display only — all logic (grouping, colours,
+// labels, QR data, exports) keeps using origName.
+function layName(part){ return (part && (part.layoutName || part.origName || part.name)) || ''; }
 
 // ═══════════════════════════════════════════════════════════════
 // DXF IMPORT — parse shaped parts and add them as polygons
@@ -6506,6 +6521,7 @@ function _buildMergedPart(constituents, mode, kerf, idSuffix){
     __mergedMode: mode,
     name: 'MERGED ×' + constituents.length,
     origName: constituents.map(function(p){return p.origName||p.name;}).join(' + '),
+    layoutName: constituents.some(function(p){return p.layoutName;}) ? constituents.map(layName).join(' + ') : '',
     l: mergedL, w: mergedW,
     mat: constituents[0].mat, thick: constituents[0].thick,
     eb: {eb1:'',eb2:'',eb3:'',eb4:''}, op1:'', op2:'', hasCNC:false, labelRange:'', printed:false
@@ -10312,27 +10328,14 @@ function renderCanvas(idx){
   draw(lay);bindCanvas(lay);
 }
 function draw(lay){
-  var cv=document.getElementById('cv'),W=cv.width,H=cv.height,ctx=cv.getContext('2d');
+  var cv=document.getElementById('cv'),W=cv._logicalWidth||cv.width,H=cv._logicalHeight||cv.height,ctx=cv.getContext('2d');
+  var pixelRatio=cv._pixelRatio||1;ctx.setTransform(pixelRatio,0,0,pixelRatio,0,0);
   var tx=lay.trim*SC,ty=lay.trim*SC,uw=lay.uw*SC,uh=lay.uh*SC;
-  ctx.clearRect(0,0,W,H);ctx.fillStyle='#CEC9BB';ctx.fillRect(0,0,W,H);_rotHandle=null;
+  ctx.clearRect(0,0,W,H);ctx.fillStyle='#e6eaee';ctx.fillRect(0,0,W,H);_rotHandle=null;
   if(lay.trim>0){ctx.fillStyle='rgba(0,0,0,.05)';ctx.fillRect(0,0,W,ty);ctx.fillRect(0,H-ty,W,ty);ctx.fillRect(0,0,tx,H);ctx.fillRect(W-tx,0,tx,H);}
-  ctx.fillStyle='#EDE9DF';ctx.fillRect(tx,ty,uw,uh);
-  if(lay.trim>0){ctx.strokeStyle='#B0A898';ctx.lineWidth=1;ctx.setLineDash([4,4]);ctx.strokeRect(tx+.5,ty+.5,uw-1,uh-1);ctx.setLineDash([]);ctx.fillStyle='rgba(0,0,0,.25)';ctx.font='9px monospace';ctx.textAlign='left';ctx.textBaseline='top';ctx.fillText('trim '+lay.trim+'mm',3,2);}
-  ctx.strokeStyle='#888';ctx.lineWidth=1.5;ctx.strokeRect(.75,.75,W-1.5,H-1.5);
-  // ── SHEET SIZE, top-right ────────────────────────────────────────────────
-  // With one material stocked in several sizes every sheet looked alike, so
-  // there was no way to tell from the drawing which board a sheet was cut from.
-  (function(){
-    var label=lay.sw+' × '+lay.sh+' mm';
-    ctx.font='bold 11px monospace'; ctx.textAlign='right'; ctx.textBaseline='top';
-    var tw=ctx.measureText(label).width;
-    ctx.fillStyle='rgba(255,255,255,.82)';
-    ctx.fillRect(W-tw-11, 3, tw+8, 15);
-    ctx.strokeStyle='rgba(0,0,0,.18)'; ctx.lineWidth=1;
-    ctx.strokeRect(W-tw-10.5, 3.5, tw+7, 14);
-    ctx.fillStyle='#1b1e26';
-    ctx.fillText(label, W-7, 5);
-  })();
+  ctx.fillStyle='#fafbfc';ctx.fillRect(tx,ty,uw,uh);
+  if(lay.trim>0){ctx.strokeStyle='#b9c5cd';ctx.lineWidth=1;ctx.setLineDash([4,4]);ctx.strokeRect(tx+.5,ty+.5,uw-1,uh-1);ctx.setLineDash([]);ctx.fillStyle='rgba(0,0,0,.25)';ctx.font='9px monospace';ctx.textAlign='left';ctx.textBaseline='top';}
+  ctx.strokeStyle='#aebec6';ctx.lineWidth=1;ctx.strokeRect(.75,.75,W-1.5,H-1.5);
   // ── REGISTER POINT (0,0) — bottom-left corner of usable area ──────
   // Matches the typical CNC / beam-saw convention where the work-coordinate
   // origin sits at the bottom-left of the sheet (Y axis points up from there).
@@ -10366,20 +10369,10 @@ function draw(lay){
     ctx.font = 'bold 9px monospace';
     ctx.textAlign = 'left';
     ctx.textBaseline = 'bottom';
-    ctx.fillText('(0,0)', rx + 5, ry - 4);
+    
     ctx.restore();
   })();
   if(lay.trimWarning){ctx.fillStyle='rgba(184,64,64,.82)';ctx.fillRect(0,0,W,17);ctx.fillStyle='#fff';ctx.font='bold 10px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('⚠ NO TRIM — cut edge-to-edge',W/2,8.5);}
-  if(lay.grainLocked){
-    ctx.fillStyle='rgba(61,107,79,.15)';ctx.fillRect(tx,ty,uw,uh);
-    var ay=ty+uh-14;
-    ctx.strokeStyle='rgba(61,107,79,.6)';ctx.lineWidth=1.5;ctx.setLineDash([6,4]);
-    ctx.beginPath();ctx.moveTo(tx+10,ay);ctx.lineTo(tx+uw-10,ay);ctx.stroke();ctx.setLineDash([]);
-    ctx.fillStyle='rgba(61,107,79,.6)';
-    ctx.beginPath();ctx.moveTo(tx+uw-10,ay);ctx.lineTo(tx+uw-18,ay-4);ctx.lineTo(tx+uw-18,ay+4);ctx.closePath();ctx.fill();
-    ctx.fillStyle='rgba(61,107,79,.8)';ctx.font='bold 9px sans-serif';ctx.textAlign='left';ctx.textBaseline='middle';
-    ctx.fillText('🌾 GRAIN →',tx+4,ay);
-  }
   // Helper — transform a part's local shape point into current bbox coords (pw × ph)
   // accounting for 90° CW rotation when p.rot is true.
   // Local shape coord system: x in [0, part.l], y in [0, part.w].
@@ -10448,20 +10441,22 @@ function draw(lay){
     var isMerged=!!(p.part&&p.part.__merged);
     // Group color ring
     var grp=p.part.groupId?partGroups.find(function(g){return g.id===p.part.groupId;}):null;
-    var fillAlpha=isSel?'FF':isHov?'EE':'BB';
+    var fillAlpha='FF';
     // For merged strips, override the per-part tint with a recognisable
     // brown/amber so the operator can spot them at a glance on the sheet.
-    var fillColor = isMerged ? '#C28F5E' : p.color;
+    var key=p.part.origName||p.part.name||'';var hue=0;for(var ci=0;ci<key.length;ci++)hue=(hue*31+key.charCodeAt(ci))>>>0;
+    var palette=['#e7f1eb','#e4eef4','#f3ede0','#eae9f4','#e1efec'];
+    var fillColor=isSel?'#bddfcc':isHov?'#d3e7dd':isMerged?'#f2dfbe':palette[hue%palette.length];
     ctx.fillStyle=fillColor+fillAlpha;
     if(hasShape){
       // Fill outline with holes punched out (even-odd rule)
       traceShapePathWithHoles(ctx,p,x,y,SC);
-      ctx.fillStyle=p.color+fillAlpha;
+      ctx.fillStyle=fillColor+fillAlpha;
       ctx.fill('evenodd');
       // Stroke outline on top
       tracePartPath(ctx,p,x,y,SC);
       if(grp){ctx.strokeStyle=grp.color;ctx.lineWidth=isSel?3:2;ctx.stroke();}
-      ctx.strokeStyle=isSel?'#1b1e26':isDragged?'#2f54eb':'rgba(0,0,0,.5)';
+      ctx.strokeStyle=isSel?'#26765c':isDragged?'#26765c':'#9bb4ad';
       ctx.lineWidth=isSel?2:isDragged?1.8:1;
       ctx.stroke();
       // Stroke each hole so the cutouts are visible
@@ -10478,7 +10473,7 @@ function draw(lay){
     } else {
       ctx.fillRect(x,y,w,h);
       if(grp){ctx.strokeStyle=grp.color;ctx.lineWidth=isSel?3:2;ctx.strokeRect(x+1,y+1,w-2,h-2);}
-      ctx.strokeStyle=isSel?'#1b1e26':isDragged?'#2f54eb':'rgba(0,0,0,.3)';
+      ctx.strokeStyle=isSel?'#26765c':isDragged?'#26765c':'#9bb4ad';
       ctx.lineWidth=isSel?2.5:isDragged?2:1;ctx.strokeRect(x+.5,y+.5,w-1,h-1);
     }
     // ── MERGED STRIP: internal saw-cut markers ────────────────────
@@ -10568,11 +10563,14 @@ function draw(lay){
         ctx.fillText('✓', bx+bSize/2, by+bSize/2+0.5);
       }
     }
-    if(w>26&&h>15){
-      var fs=Math.max(8,Math.min(11,w/11));
-      ctx.fillStyle='rgba(0,0,0,.7)';ctx.font='500 '+fs+'px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
-      ctx.fillText(p.part.origName,x+w/2,y+h/2-(fs*.55),w-8);
-      ctx.font=fs+'px monospace';ctx.fillStyle='rgba(0,0,0,.45)';ctx.fillText(p.pw+'×'+p.ph,x+w/2,y+h/2+(fs*.6),w-8);
+    if(w>42&&h>24){
+      var fs=Math.max(9,Math.min(13,w/10));
+      var showDims=window.NEST_UI_DIMENSIONS!==false && h>38;
+      ctx.fillStyle='#263d3b';ctx.font='600 '+fs+'px Inter, system-ui, sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
+      var partLabel=layName(p.part);
+      while(partLabel.length>3 && ctx.measureText(partLabel).width>w-18)partLabel=partLabel.slice(0,-2)+'…';
+      ctx.fillText(partLabel,x+w/2,y+h/2-(showDims?8:0));
+      if(showDims){ctx.font='400 '+Math.max(9,fs-1)+'px Inter, system-ui, sans-serif';ctx.fillStyle='#607975';ctx.fillText(p.pw+' × '+p.ph,x+w/2,y+h/2+10,w-12);}
     }
     // Collision flash for dragged piece
     if(isDragged&&!p.nestPoly&&checkCollision(lay,p,p.x,p.y)){
@@ -10599,9 +10597,6 @@ function draw(lay){
   });
   var used=lay.placements.reduce(function(a,p){return a+_placementUsedArea(p);},0);
   var eff=lay.uw*lay.uh>0?Math.round(used/(lay.uw*lay.uh)*100):0;
-  ctx.fillStyle='rgba(0,0,0,.2)';ctx.fillRect(W-60,H-13,58,10);
-  ctx.fillStyle=eff>75?'#4A9E5C':eff>50?'#B87030':'#B84040';ctx.fillRect(W-60,H-13,Math.round(58*eff/100),10);
-  ctx.fillStyle='#fff';ctx.font='8px monospace';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(eff+'%',W-31,H-8);
 }
 
 // ── Collision detection (axis-aligned, kerf gap) ──
@@ -10686,7 +10681,7 @@ function resolveCollision(lay,movingP,rawX,rawY){
 
 function bindCanvas(lay){
   var cv=document.getElementById('cv'),tip=document.getElementById('tip');
-  function gp(e){var r=cv.getBoundingClientRect();return{mx:(e.clientX-r.left)*cv.width/r.width,my:(e.clientY-r.top)*cv.height/r.height};}
+  function gp(e){var r=cv.getBoundingClientRect();return{mx:(e.clientX-r.left)*(cv._logicalWidth||cv.width)/r.width,my:(e.clientY-r.top)*(cv._logicalHeight||cv.height)/r.height};}
   function hit(mx,my){var tx=lay.trim*SC,ty=lay.trim*SC,f=null;lay.placements.forEach(function(p){var x=tx+p.x*SC,y=ty+p.y*SC,w=p.pw*SC,h=p.ph*SC;if(mx>=x&&mx<=x+w&&my>=y&&my<=y+h)f=p;});return f;}
   var _dragMoved=false;
   cv.onmousemove=function(e){
@@ -12050,7 +12045,7 @@ function printSheetSVG(lay,widthMm){
     // to fit both the part's inner width AND height (so long names don't overflow).
     var rotMark=p.rot?' ↻':'';
     var cx=ax+pw/2, cy=ay+ph/2;
-    var nameText='#'+labelIdx+' '+p.part.origName+rotMark;
+    var nameText='#'+labelIdx+' '+layName(p.part)+rotMark;
     var PAD=10; // inner mm padding from part edge
     var innerW=Math.max(10,pw-PAD*2);
     var innerH=Math.max(10,ph-PAD*2);
