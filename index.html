@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <!-- Enables cross-origin isolation so the WASM nesting engine (shared memory) can load on static hosting. On a real server, send COOP/COEP headers and remove this. -->
 <script src="coi-serviceworker.js"></script>
-<title>Nesting Studio — cut optimisation</title>
+<title>Dėdės Baldai — Nesting</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
@@ -495,8 +495,8 @@ body.print-mode{background:#fff}
 <!-- Print view — populated and shown when openPrintView() is called -->
 <div class="print-root" id="print-root"></div>
 <div class="hdr">
-  <img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxIDEiLz4=" alt="Nesting Studio" width="28" height="28" style="display:block;object-fit:contain;filter:brightness(0) invert(1)">
-  <div><div class="ht">Nesting Studio</div><div class="hs" data-i18n="tagline">SWOOD cut list · QR codes · DXF for vCarve · Zebra LP2824</div></div>
+  <img src="data:image/png;base64,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" alt="Dėdės Baldai" width="28" height="28" style="display:block;object-fit:contain;filter:brightness(0) invert(1)">
+  <div><div class="ht">Dėdės Baldai</div><div class="hs" data-i18n="tagline">SWOOD cut list · QR codes · DXF for vCarve · Zebra LP2824</div></div>
   <div style="margin-left:auto;display:flex;align-items:center;gap:8px">
     <button onclick="openSettings()" title="Numatytieji nustatymai" style="font-size:15px;padding:4px 9px;border:1px solid #2c3340;background:#232a36;color:#e8ebf0;border-radius:6px;cursor:pointer">⚙</button>
     <select id="langSel" onchange="setLanguage(this.value)" title="Language" style="font-size:11px;padding:4px 6px;border:1px solid #2c3340;background:#232a36;color:#e8ebf0;border-radius:6px;cursor:pointer;width:auto">
@@ -504,7 +504,7 @@ body.print-mode{background:#fff}
       <option value="lt">🇱🇹 LT</option>
     </select>
     <label data-i18n="project" style="font-size:10px;color:#667085;font-family:monospace">PROJECT</label>
-    <input id="projName" data-i18n-ph="untitled" placeholder="Untitled" onchange="onProjectNameChange()" oninput="scheduleSave()" style="width:190px;font-size:12px;font-weight:500;padding:4px 8px;border:1px solid #e6e8ed;background:#ffffff;border-radius:6px;outline:none"><span id="warehouseLink" style="display:none;font-size:10px;color:#2f54eb;font-weight:700;margin-left:6px"></span>
+    <input id="projName" data-i18n-ph="untitled" placeholder="Untitled" onchange="onProjectNameChange()" oninput="scheduleSave()" style="width:190px;font-size:12px;font-weight:500;padding:4px 8px;border:1px solid #e6e8ed;background:#ffffff;border-radius:6px;outline:none"><span id="gvsLink" style="display:none;font-size:10px;color:#2f54eb;font-weight:700;margin-left:6px"></span>
     <span id="saveStatus" class="save-status" title="Save status"></span>
     <button id="undoBtn" class="urbtn" onclick="undo()" data-i18n-title="undoTip" title="Undo (Ctrl+Z)" disabled>↶</button>
     <button id="redoBtn" class="urbtn" onclick="redo()" data-i18n-title="redoTip" title="Redo (Ctrl+Shift+Z)" disabled>↷</button>
@@ -523,6 +523,7 @@ body.print-mode{background:#fff}
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px">
       <div class="sec" data-i18n="materialBoards" style="margin:0">Material Boards</div>
       <div style="display:flex;gap:4px">
+        <button class="sec-add-board" onclick="openWarehouseModal()" title="Naršyti sandėlio likučius ir pridėti į plokštes">📦 Sandėlis</button>
         <button class="sec-add-board" onclick="document.getElementById('scrapBoardIn').click()" title="Import a scrap/offcut DXF and use it as a board for nesting">♻ Scrap</button>
         <button class="sec-add-board" onclick="addBoard()"><span style="font-size:14px">＋</span> <span data-i18n="addBoardBtn">Add board</span></button>
       </div>
@@ -650,6 +651,7 @@ body.print-mode{background:#fff}
   <div id="stockwarn" style="display:none;margin:4px 0 2px"></div>
   <!-- Parts that could not be placed, with the reason for each -->
   <div id="unfit" style="display:none;margin:4px 0 2px"></div>
+  <div style="display:flex;justify-content:flex-end;margin:-2px 0 2px"><button class="btn bp" onclick="reserveForCutting()" title="Rezervuoti panaudotus lakštus pjovimui — patvirtinama GVS sandėlyje" style="background:#1b1e26;border-color:#1b1e26;color:#fff">📤 Naudoti iš sandėlio (pjovimui)</button></div>
   <!-- ─── Quotation panel ──────────────────────────────────────────
        Shows itemized pricing: material area + cutting length + per-part + edgeband,
        per material, then overall totals. Pricing inputs are stored per board. -->
@@ -729,8 +731,8 @@ body.print-mode{background:#fff}
     </div>
   </div>
   <div class="wlc" id="wlc">
-    <img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxIDEiLz4=" alt="Nesting Studio" width="80" height="80" style="display:block;object-fit:contain;margin:0 auto 12px">
-    <h2 data-i18n="welcomeTitle">Nesting Studio — Nesting</h2>
+    <img src="data:image/png;base64,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" alt="Dėdės Baldai" width="80" height="80" style="display:block;object-fit:contain;margin:0 auto 12px">
+    <h2 data-i18n="welcomeTitle">Dėdės Baldai — Nesting</h2>
     <p>Drop your SWOOD .xlsm — boards auto-created from materials.<br>Reads <strong>PARTLIST</strong> (SA_GA_VIRT / RIMANTE_ZAB format) with edgebands &amp; QR op IDs from LABEL sheet automatically.<br><br><span style="font-size:11px;opacity:.6">Drag parts · Right-click → Zebra label with QR · DXF export for vCarve</span></p>
   </div>
 </div>
@@ -996,7 +998,7 @@ body.print-mode{background:#fff}
     <div class="startup-brand">
       <div class="startup-logo">🪵</div>
       <div>
-        <div class="startup-title">Nesting Studio</div>
+        <div class="startup-title">Dėdės Baldai</div>
         <div class="startup-sub">Nesting &amp; cut optimization</div>
       </div>
     </div>
@@ -1006,13 +1008,13 @@ body.print-mode{background:#fff}
   </div>
 </div>
 
-<!-- LOGIN GATE — inert in this demo build (no cloud configured) -->
+<!-- LOGIN GATE — shared account with the GVS warehouse / db app -->
 <div class="startup-overlay" id="auth-overlay" style="z-index:600">
   <div class="startup-box" style="width:380px">
     <div class="startup-brand">
       <div class="startup-logo">🔒</div>
       <div>
-        <div class="startup-title">Nesting Studio</div>
+        <div class="startup-title">Dėdės Baldai</div>
         <div class="startup-sub">Prisijunkite, kad tęstumėte</div>
       </div>
     </div>
@@ -1038,7 +1040,7 @@ body.print-mode{background:#fff}
       </div>
       <div id="auth-err" style="display:none;color:#B84040;font-size:11px;background:#fdf0f0;border:1px solid #e0b0b0;border-radius:6px;padding:6px 9px"></div>
       <button id="auth-btn" type="submit" class="btn bp" style="width:100%;padding:11px;margin-top:2px;font-size:14px">Prisijungti</button>
-      <div style="font-size:10px;color:#8A8472;text-align:center;line-height:1.5">Tas pats prisijungimas kaip the warehouse system.</div>
+      <div style="font-size:10px;color:#8A8472;text-align:center;line-height:1.5">Tas pats prisijungimas kaip GVS sandėlio sistemoje.</div>
     </form>
   </div>
 </div>
@@ -1626,7 +1628,7 @@ var I18N={
   en:{
     // header
     tagline:'SWOOD cut list · QR codes · DXF for vCarve · Zebra LP2824',
-    welcomeTitle:'Nesting Studio — Nesting',
+    welcomeTitle:'Dėdės Baldai — Nesting',
     // print view
     printPdf:'🖨 Print PDF',
     printPdfTip:'Open printable layout (Save as PDF in print dialog)',
@@ -1879,7 +1881,7 @@ var I18N={
   },
   lt:{
     tagline:'SWOOD pjovimas · QR kodai · DXF vCarve · Zebra LP2824',
-    welcomeTitle:'Nesting Studio — Nesting',
+    welcomeTitle:'Dėdės Baldai — Nesting',
     // print view
     printPdf:'🖨 Spausdinti PDF',
     printPdfTip:'Atidaryti spausdinimui paruoštą išdėstymą (spausdinimo dialoge pasirinkite „Išsaugoti kaip PDF“)',
@@ -2173,8 +2175,8 @@ document.addEventListener('DOMContentLoaded',function(){translateAll();applyNDTo
 // ═══════════════════════════════════════════════════════════════
 // PROJECT PERSISTENCE — Supabase with localStorage fallback
 // ═══════════════════════════════════════════════════════════════
-var SUPABASE_URL='YOUR_SUPABASE_URL';
-var SUPABASE_ANON_KEY='';
+var SUPABASE_URL='https://qnnhvngjxrvqamikkocw.supabase.co';
+var SUPABASE_ANON_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFubmh2bmdqeHJ2cWFtaWtrb2N3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY0MTkwNjYsImV4cCI6MjA5MTk5NTA2Nn0.5pOH_TSsOaMhcPF8ff45EFJT25PXoLbS2vtjKvZ7Mw0';
 var PROJECT_TABLE='fabflow_projects';
 var LS_PROJECT_PREFIX='fabflow_project:'; // localStorage fallback key prefix
 var LS_LAST_PROJECT='fabflow_last_project'; // last-opened project name
@@ -2277,19 +2279,19 @@ function supaConfigured(){
 }
 
 // ═══════════════════════════════════════════════════════════════
-// SHARED WAREHOUSE — reads live stock from a Supabase project when one is configured.
+// SHARED WAREHOUSE — read live stock that GVS publishes (project byvtqycd).
 // This is a SECOND Supabase target, separate from this app's own project.
 // It powers the "type-or-pick" material field on each board.
 // ═══════════════════════════════════════════════════════════════
-var WH_SB_URL='YOUR_SUPABASE_URL';
-var WH_SB_KEY='';
+var WH_SB_URL='https://byvtqycdgboqbmpoysyt.supabase.co';
+var WH_SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ5dnRxeWNkZ2JvcWJtcG95c3l0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU3ODA0MzAsImV4cCI6MjA5MTM1NjQzMH0.IoQRxA4m45--5fQ9U40ChNVCwsBPmxTM4p8sM1-3AUo';
 var WH_STOCK=[], WH_OFFCUTS=[], WH_WS='';
-var WAREHOUSE_PROJECT_ID='';
+var GVS_PROJECT_ID='';
 
 // ═══════════════════════════════════════════════════════════════
-// AUTHENTICATION — optional shared login; disabled in this demo build.
+// AUTHENTICATION — shared login with the GVS warehouse / db app.
 // Both apps authenticate against the SAME Supabase project (the
-// warehouse project) so ONE account works in both places.
+// warehouse, byvtqycd) so ONE account works in both places.
 // The familiar "code + name" is kept, plus a password; together they
 // map to a Supabase Auth account (email = name.code@AUTH_DOMAIN).
 // The logged-in user's JWT then replaces the shared anon key on every
@@ -2297,11 +2299,11 @@ var WAREHOUSE_PROJECT_ID='';
 // who may read/write. NOTE: the login UI only becomes real protection
 // once RLS is enabled on the warehouse tables — see WAREHOUSE_AUTH_SETUP.md.
 // ═══════════════════════════════════════════════════════════════
-var AUTH_DOMAIN='example.invalid';   // synthetic email domain (no real mail is sent)
-var WORKSHOP_CODE='demo';            // baked-in workshop code — workers never type it; keeps the hidden email unique
-var TEAM_WORKSPACE_CODE='DEMO';    // team namespace in the warehouse project, when one is configured
+var AUTH_DOMAIN='dedesbaldai.lt';   // synthetic email domain (no real mail is sent)
+var WORKSHOP_CODE='gvs';            // baked-in workshop code — workers never type it; keeps the hidden email unique
+var GVS_WORKSPACE_CODE='S4OQX';     // GVS team namespace in the warehouse project — login is restricted to this team
 var PIN_LEN=4;                      // PIN length (raise to 5–6 for more brute-force resistance)
-var AUTH_PIN_SALT='_demo';         // appended to the PIN to form the real Supabase password (meets the 6-char minimum)
+var AUTH_PIN_SALT='_dedes';         // appended to the PIN to form the real Supabase password (meets the 6-char minimum)
 var LS_AUTH='fabflow_auth';         // localStorage session key
 var AUTH=null;                      // {access_token,refresh_token,expires_at,name,code,user}
 var _authTimer=null, _pin='';
@@ -2380,11 +2382,11 @@ function authRenderUser(){
   if(AUTH&&AUTH.name){el.style.display='inline-flex';var n=el.querySelector('.auth-chip-name');if(n)n.textContent=AUTH.name;}
   else{el.style.display='none';}
 }
-// Is this person on the configured team? true = yes, false = no, null = couldn't check.
-// Reads the workspace user list the companion app maintains (same Supabase project).
-async function authIsTeamMember(name){
+// Is this person on the GVS team? true = yes, false = no, null = couldn't check.
+// Reads the GVS workspace user list the db app maintains (same Supabase project).
+async function authIsGvsMember(name){
   try{
-    var r=await fetch(WH_SB_URL+'/rest/v1/fabflow?key=eq.fab_'+TEAM_WORKSPACE_CODE+'_users&select=value',{headers:whHeaders()});
+    var r=await fetch(WH_SB_URL+'/rest/v1/fabflow?key=eq.fab_'+GVS_WORKSPACE_CODE+'_users&select=value',{headers:whHeaders()});
     if(!r.ok)return null;
     var d=await r.json();
     if(!d.length)return null;
@@ -2404,11 +2406,11 @@ async function submitLogin(ev){
   if(btn){btn.disabled=true;btn.textContent='Jungiamasi…';}
   try{
     await authLogin(name,_pin);
-    // Gate: only people on the configured team may use the app. (null = couldn't check → allow, since they already passed auth.)
-    var member=await authIsTeamMember(name);
+    // Gate: only people on the GVS team may use the app. (null = couldn't check → allow, since they already passed auth.)
+    var member=await authIsGvsMember(name);
     if(member===false){
       authClear();_pin='';pinRender();
-      if(err){err.textContent='You are not on this team. Contact your manager.';err.style.display='block';}
+      if(err){err.textContent='Jūs nesate GVS komandoje. Kreipkitės į vadovą.';err.style.display='block';}
       if(btn){btn.disabled=false;btn.textContent='Prisijungti';}
       return false;
     }
@@ -2708,7 +2710,7 @@ function whAddBoardFromOffcut(id){
   if(typeof toast==='function')toast('Pridėta atraiža');
 }
 
-// ── Reserve the sheets this nest uses, for cutting (confirmed later in the warehouse) ──
+// ── Reserve the sheets this nest uses, for cutting (confirmed later in GVS warehouse) ──
 async function reserveForCutting(){
   if(!layouts||!layouts.length){ alert('Pirma paleiskite optimizaciją (Optimize).'); return; }
   var used={};
@@ -2721,16 +2723,16 @@ async function reserveForCutting(){
   var pn=document.getElementById('projName');
   var proj=((pn&&pn.value)||'').trim()||'Nesting';
   var total=lines.reduce(function(s,l){return s+l.qty_reserved;},0);
-  if(!confirm('Rezervuoti pjovimui '+total+' lakšt. ('+lines.length+' medžiaga(-os))?\nProjektas: '+proj+'\n\nConfirm it in the warehouse app.'))return;
+  if(!confirm('Rezervuoti pjovimui '+total+' lakšt. ('+lines.length+' medžiaga(-os))?\nProjektas: '+proj+'\n\nPatvirtinsite GVS → Sandėlis.'))return;
   var id='cj_'+Date.now()+'_'+Math.random().toString(36).slice(2,7);
-  var body=[{id:id,workspace_code:WH_WS||null,project_name:proj,warehouse_project_id:WAREHOUSE_PROJECT_ID||null,status:'reserved',lines:lines,offcuts:[],created_by:((AUTH&&AUTH.name)?AUTH.name:'nesting')}];
+  var body=[{id:id,workspace_code:WH_WS||null,project_name:proj,gvs_project_id:GVS_PROJECT_ID||null,status:'reserved',lines:lines,offcuts:[],created_by:((AUTH&&AUTH.name)?AUTH.name:'nesting')}];
   try{
     var r=await fetch(WH_SB_URL+'/rest/v1/fabflow_cut_jobs',{method:'POST',headers:Object.assign({},whHeaders(),{'Prefer':'return=minimal'}),body:JSON.stringify(body)});
     if(!r.ok){var t=await r.text();throw new Error(r.status+' '+t.slice(0,140));}
-    alert('✓ Rezervuota: '+total+' lakšt.\nOpen the warehouse app and confirm.');
+    alert('✓ Rezervuota: '+total+' lakšt.\nAtidarykite GVS → Sandėlis ir patvirtinkite.');
   }catch(e){ alert('Klaida rezervuojant: '+(e&&e.message)); }
 }
-function updateWarehouseBadge(){var el=document.getElementById('warehouseLink');if(!el)return;if(WAREHOUSE_PROJECT_ID){el.style.display='inline';el.textContent='\uD83D\uDD17 the warehouse';el.title='Susietas su the warehouse projektu';}else{el.style.display='none';}}
+function updateGvsBadge(){var el=document.getElementById('gvsLink');if(!el)return;if(GVS_PROJECT_ID){el.style.display='inline';el.textContent='\uD83D\uDD17 GVS';el.title='Susietas su GVS projektu';}else{el.style.display='none';}}
 
 function collectProjectState(){
   // Snapshot everything the app needs to fully restore a project.
@@ -2738,7 +2740,7 @@ function collectProjectState(){
   // Deep-copying here just wastes CPU during saves.
   return {
     v:1,
-    warehouseId:WAREHOUSE_PROJECT_ID,
+    gvsId:GVS_PROJECT_ID,
     boards:boards,
     bId:bId,
     parts:parts,
@@ -2797,7 +2799,7 @@ function applyProjectState(d){
   if(!d||typeof d!=='object')return;
   _suppressSave=true;
   try{
-    if(d.warehouseId)WAREHOUSE_PROJECT_ID=d.warehouseId; if(typeof updateWarehouseBadge==='function')updateWarehouseBadge();
+    if(d.gvsId)GVS_PROJECT_ID=d.gvsId; if(typeof updateGvsBadge==='function')updateGvsBadge();
     boards=(d.boards||[]).map(function(b){return Object.assign({},b);});
     bId=d.bId||(boards.reduce(function(m,b){return Math.max(m,b.id||0);},0)+1);
     parts=(d.parts||[]).map(function(p){return Object.assign({},p);});
@@ -3418,14 +3420,14 @@ function bootApp(){
   // Apply initial machine mode (default 'cnc' hides the saw kerf input)
   if(typeof onMachineModeChange==='function') onMachineModeChange();
   // URL override: ?project=NAME → deep-link straight in, skip the picker.
-  var urlName=null, urlWarehouse='';
-  try{var u=new URLSearchParams(location.search);urlName=u.get('project');urlWarehouse=u.get('warehouse')||'';}catch(e){}
-  if(urlWarehouse)WAREHOUSE_PROJECT_ID=urlWarehouse;
+  var urlName=null, urlGvs='';
+  try{var u=new URLSearchParams(location.search);urlName=u.get('project');urlGvs=u.get('gvs')||'';}catch(e){}
+  if(urlGvs)GVS_PROJECT_ID=urlGvs;
   if(urlName){
     loadProjectByName(urlName).then(function(ok){
       if(!ok){startupNew(true);var pn=document.getElementById('projName');if(pn)pn.value=urlName;}
-      if(urlWarehouse)WAREHOUSE_PROJECT_ID=urlWarehouse;
-      if(typeof updateWarehouseBadge==='function')updateWarehouseBadge();
+      if(urlGvs)GVS_PROJECT_ID=urlGvs;
+      if(typeof updateGvsBadge==='function')updateGvsBadge();
       if(typeof resetHistory==='function') resetHistory();
     });
     return;
@@ -3435,9 +3437,15 @@ function bootApp(){
 }
 
 // On load: require a valid shared login before the app boots.
-// DEMO BUILD — no shared login and no cloud. The nesting engine, the importers
-// and the exporters all run entirely in the browser, so the app boots straight in.
-document.addEventListener('DOMContentLoaded',function(){ bootApp(); });
+document.addEventListener('DOMContentLoaded',function(){
+  authLoad();
+  if(authValid()){ authStartRefreshTimer(); authRenderUser(); bootApp(); return; }
+  // A stored session may just be expired — try a silent refresh before asking.
+  authRefresh().then(function(ok){
+    if(ok){ authStartRefreshTimer(); authRenderUser(); bootApp(); }
+    else { showAuthOverlay(); }
+  });
+});
 
 // ── STARTUP PROJECT PICKER ─────────────────────────────────────────
 // Shows on launch: "New Project" or "Continue" the most recently-opened
@@ -11625,7 +11633,7 @@ function openQuotePrint(){
 
   // Project-derived header. Falls back to plain "Nesting" so an unnamed project
   // doesn't print "Untitled — Nesting". Used in both the <title> (PDF filename)
-  // and the visible header. Nesting Studio still appears in the footer as seller.
+  // and the visible header. Dėdės Baldai still appears in the footer as seller.
   var hasProjName = !!(currentProjectName && currentProjectName.trim());
   var headerTitle = hasProjName ? (currentProjectName + ' — Nesting') : 'Nesting';
 
@@ -11766,7 +11774,7 @@ function openQuotePrint(){
     + 'and processing for the parts listed above.'
     + '</div>'
     + '<div class="foot">'
-    + '<b>Nesting Studio</b> · Cutting &amp; nesting services<br>'
+    + '<b>Dėdės Baldai</b> · Cutting &amp; nesting services<br>'
     + 'Thank you for your business.'
     + '</div>'
     + '</body></html>';
