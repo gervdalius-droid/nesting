@@ -935,7 +935,7 @@ body.print-mode{background:#fff}
   <div style="padding:8px 16px;display:flex;gap:14px;align-items:end;flex-wrap:wrap;border-bottom:1px solid #e9edf3">
     <div><label class="fl">Material</label><select id="rl-mat" style="min-width:170px"></select></div>
     <div><label class="fl">Thickness mm</label><input id="rl-thick" type="number" min="1" value="18" style="width:84px"></div>
-    <div style="font-size:11px;color:#667085;flex:1;min-width:220px" data-i18n="rlHint">Grey lines are the names drawn in the file. Type the name each part should carry on the layout and label.</div>
+    <div style="font-size:11px;color:#667085;flex:1;min-width:220px" data-i18n="rlHint">Grey lines are the names drawn in the file; pink lines are on-line cuts (markings, the part stays whole). Type the name each part should carry on the layout and label.</div>
   </div>
   <div class="dxf-body" id="rl-body" style="padding:0;display:block;max-height:62vh;overflow:auto"></div>
   <div class="dxf-foot">
@@ -1836,7 +1836,7 @@ var I18N={
     rlLink:'📋 Ready sheet layout DXF',
     rlTitle:'Ready sheet layout — name the parts',
     rlIntro:'{s} sheet(s), {n} part(s). Every part stays exactly where it is in the drawing — nothing is re-nested.',
-    rlHint:'Grey lines are the names drawn in the file. Type the name each part should carry on the layout and label.',
+    rlHint:'Grey lines are the names drawn in the file; pink lines are on-line cuts (markings, the part stays whole). Type the name each part should carry on the layout and label.',
     rlSheet:'Sheet',
     rlPart:'Part',
     rlSize:'Size (mm)',
@@ -2096,7 +2096,7 @@ var I18N={
     rlLink:'📋 Paruoštas lapo išdėstymas DXF',
     rlTitle:'Paruoštas lapo išdėstymas — pavadinkite detales',
     rlIntro:'{s} lap. ({n} det.). Kiekviena detalė lieka tiksliai ten, kur yra brėžinyje — niekas neperdėliojama.',
-    rlHint:'Pilkos linijos — brėžinyje nupieštas pavadinimas. Įrašykite pavadinimą, kuris bus ant išdėstymo ir etiketės.',
+    rlHint:'Pilkos linijos — brėžinyje nupieštas pavadinimas; rožinės — pjūvis ant linijos (žymė, detalė lieka vientisa). Įrašykite pavadinimą, kuris bus ant išdėstymo ir etiketės.',
     rlSheet:'Lapas',
     rlPart:'Detalė',
     rlSize:'Dydis (mm)',
@@ -4215,7 +4215,10 @@ function entitiesToPolygons(ents){
           pts.push({x:vn.x,y:vn.y});
         }
       }
-      polys.push({pts:pts,closed:!!e.closed});
+      if(e.closed) polys.push({pts:pts,closed:true});
+      // An open polyline is a piece of a loop: let the chainer below join it with
+      // the pieces it meets end to end (e.g. a slot drawn as two open halves).
+      else if(pts.length>=2) segs.push({type:'POLY',p1:pts[0],p2:pts[pts.length-1],pts:pts});
     } else if(e.type==='CIRCLE'){
       var n=Math.max(16,Math.ceil((2*Math.PI)/(2*Math.acos(Math.max(0,1-DXF_TESS_TOL/e.r)))));
       if(n>DXF_TESS_MAX_SEGS)n=DXF_TESS_MAX_SEGS;
@@ -4466,6 +4469,13 @@ function _extractPolysFromDXF(text){
   var polys=entitiesToPolygons(ents).filter(function(p){return p.closed&&p.pts.length>=3;});
   return {ents:ents, polys:polys};
 }
+// Cuts that follow the line without cutting through — on-line engraving, grooves,
+// scores, pockets (e.g. PROFILE_CUT_ON_LINE). A closed loop on such a layer is a
+// marking on the part, not a cut-out: the material inside stays part of the panel,
+// so it must not turn its contents into separate parts.
+function _isMarkLayer(name){
+  return /on[_\s-]?line|groove|score|pocket/i.test(String(name||''));
+}
 // Layer names CAD tools habitually use for things that are not cut geometry.
 function _isNoiseLayer(name){
   return /dim|text|annot|note|label|hatch|title|frame|border|marker|logo/i.test(String(name||''));
@@ -4473,9 +4483,9 @@ function _isNoiseLayer(name){
 function extractLayoutParts(text, opts){
   opts=opts||{};
   var minSide=opts.minSide!=null?opts.minSide:20;      // mm — below this it is annotation, not a part
-  var pr=opts.ents
-    ? {ents:opts.ents, polys:entitiesToPolygons(opts.ents).filter(function(p){return p.closed&&p.pts.length>=3;})}
-    : _extractPolysFromDXF(text);
+  var allEnts=opts.ents||parseDXFText(text);
+  var cutEnts=allEnts.filter(function(e){ return !_isMarkLayer(e.layer); });
+  var pr={ents:allEnts, polys:entitiesToPolygons(cutEnts).filter(function(p){return p.closed&&p.pts.length>=3;})};
   var polys=pr.polys.map(function(p){
     return {pts:p.pts, area:_polyArea(p.pts), bb:_polyBBox(p.pts)};
   }).filter(function(p){
@@ -4896,8 +4906,10 @@ function _rlAnalyse(text, fileName){
   var res=extractLayoutParts(null,{minSide:3, ents:geo});
   var stem=String(fileName||'SHEET').replace(/\.dxf$/i,'').split(/[_\s.]+/)[0]||'SHEET';
   var mThick=String(fileName||'').match(/(\d+(?:[.,]\d+)?)\s*mm/i);
-  var labelLines=[];
+  var labelLines=[], markLines=[];
   lbl.forEach(function(e){ _entityPolylines(e).forEach(function(pl){ labelLines.push(pl); }); });
+  geo.filter(function(e){ return _isMarkLayer(e.layer); })
+     .forEach(function(e){ _entityPolylines(e).forEach(function(pl){ markLines.push(pl); }); });
   var sheetAt=res.sheetAt||{x:0,y:0};
   var sw=res.sheet?res.sheet.w:0, sh=res.sheet?res.sheet.h:0;
   if(!res.sheet){
@@ -4907,17 +4919,22 @@ function _rlAnalyse(text, fileName){
       sw=Math.max(sw, Math.ceil(p.atExact.x+bb.maxX)); sh=Math.max(sh, Math.ceil(p.atExact.y+bb.maxY));
     });
   }
+  // Reading order: top row first, left to right; top edges within 50 mm count as one row.
+  var topOf=function(p){ return p.atExact.y+_polyBBox(p.shape).maxY; };
+  res.parts.sort(function(a,b){ var d=topOf(b)-topOf(a); return Math.abs(d)>50 ? d : (a.atExact.x-b.atExact.x); });
   res.parts.forEach(function(p,i){
     p.name=stem+'_'+(i+1);
     // Name lines drawn inside this part (for the hint thumbnail).
     var abs=p.shape.map(function(q){ return {x:q.x+p.atExact.x, y:q.y+p.atExact.y}; });
-    p.labelLines=labelLines.filter(function(pl){
+    var inside=function(pl){
       var mx=0,my=0; pl.forEach(function(q){ mx+=q.x; my+=q.y; }); mx/=pl.length; my/=pl.length;
       return _pointInPoly(mx,my,abs);
-    });
+    };
+    p.labelLines=labelLines.filter(inside);
+    p.markLines=markLines.filter(inside);
   });
   return {fileName:fileName, stem:stem, thick:mThick?Math.round(parseFloat(mThick[1].replace(',','.'))):0,
-          sheet:res.sheet, sheetAt:sheetAt, sw:sw, sh:sh, parts:res.parts, labelLines:labelLines};
+          sheet:res.sheet, sheetAt:sheetAt, sw:sw, sh:sh, parts:res.parts, labelLines:labelLines, markLines:markLines};
 }
 async function readyLayoutPick(inputEl){
   var files=Array.prototype.slice.call(inputEl.files||[]);
@@ -4964,6 +4981,7 @@ function _rlSheetSVG(f, W, H){
     svg+='<polygon points="'+ring(p.shape,p.atExact.x,p.atExact.y)+'" fill="#2f54eb18" stroke="#2f54eb" stroke-width="1"/>';
     (p.holes||[]).forEach(function(h){ svg+='<polygon points="'+ring(h,p.atExact.x,p.atExact.y)+'" fill="#fff" stroke="#8a6d1a" stroke-width="0.7"/>'; });
   });
+  (f.markLines||[]).forEach(function(pl){ svg+='<polyline points="'+ring(pl,0,0)+'" fill="none" stroke="#d63adf" stroke-width="1"/>'; });
   f.labelLines.forEach(function(pl){ svg+='<polyline points="'+ring(pl,0,0)+'" fill="none" stroke="#98a2b3" stroke-width="0.8"/>'; });
   f.parts.forEach(function(p,i){
     var bb=_polyBBox(p.shape), cx=X(p.atExact.x+bb.minX+bb.w/2), cy=Y(p.atExact.y+bb.minY+bb.h/2);
@@ -4980,6 +4998,7 @@ function _rlPartSVG(p, W, H){
   var svg='<svg width="'+W+'" height="'+H+'" style="display:block">';
   svg+='<polygon points="'+ring(p.shape,0,0)+'" fill="#2f54eb12" stroke="#2f54eb" stroke-width="1"/>';
   (p.holes||[]).forEach(function(h){ svg+='<polygon points="'+ring(h,0,0)+'" fill="#fff" stroke="#8a6d1a" stroke-width="0.6"/>'; });
+  (p.markLines||[]).forEach(function(pl){ svg+='<polyline points="'+ring(pl,p.atExact.x,p.atExact.y)+'" fill="none" stroke="#d63adf" stroke-width="1"/>'; });
   (p.labelLines||[]).forEach(function(pl){ svg+='<polyline points="'+ring(pl,p.atExact.x,p.atExact.y)+'" fill="none" stroke="#1b1e26" stroke-width="1.4"/>'; });
   return svg+'</svg>';
 }
