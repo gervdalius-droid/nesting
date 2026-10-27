@@ -565,6 +565,11 @@ body.print-mode{background:#fff}
          style="font-size:11px;color:#2f54eb;text-decoration:none;border-bottom:1px dotted #2f54eb;cursor:pointer">⤢ Extract parts from a layout DXF</a>
       <input type="file" id="exdxf-in" accept=".dxf,.DXF" style="display:none" onchange="extractLayoutPick(this)">
       <span style="color:#c9ccd3"> · </span>
+      <a href="#" onclick="event.preventDefault();document.getElementById('rl-in').click()" data-i18n="rlLink"
+         title="Sheets already laid out in CAD: keep every part where it is, name the parts and print labels. No nesting."
+         style="font-size:11px;color:#2f54eb;text-decoration:none;border-bottom:1px dotted #2f54eb;cursor:pointer">📋 Ready sheet layout DXF</a>
+      <input type="file" id="rl-in" accept=".dxf,.DXF" multiple style="display:none" onchange="readyLayoutPick(this)">
+      <span style="color:#c9ccd3"> · </span>
       <a href="#" onclick="event.preventDefault();document.getElementById('dxfview-in').click()" data-i18n="dvLink"
          title="Open a DXF and look at it: layers, entity counts, and what the extractor reads as a part, a cut-out or noise."
          style="font-size:11px;color:#2f54eb;text-decoration:none;border-bottom:1px dotted #2f54eb;cursor:pointer">🔍 Inspect DXF</a>
@@ -914,6 +919,28 @@ body.print-mode{background:#fff}
   <div class="dxf-foot">
     <button class="btn bs" onclick="closeExtractDialog()">Cancel</button>
     <button class="btn bp" onclick="confirmExtractLayout()" style="flex:1" data-i18n="exImport">✓ Import parts</button>
+  </div>
+</div>
+</div>
+
+<!-- READY SHEET LAYOUT (DXF) — keep positions, name parts -->
+<div class="dxf-overlay" id="rl-overlay" onclick="if(event.target===this)closeReadyLayout()">
+<div class="dxf-box" style="width:900px;max-width:96vw">
+  <div class="dxf-head">
+    <span style="font-size:16px">📋</span>
+    <h3 style="flex:1;font-size:14px;font-weight:600" data-i18n="rlTitle">Ready sheet layout — name the parts</h3>
+    <button class="btn bs br" onclick="closeReadyLayout()">✕</button>
+  </div>
+  <div id="rl-intro" style="padding:10px 16px 0;font-size:11px;color:#667085"></div>
+  <div style="padding:8px 16px;display:flex;gap:14px;align-items:end;flex-wrap:wrap;border-bottom:1px solid #e9edf3">
+    <div><label class="fl">Material</label><select id="rl-mat" style="min-width:170px"></select></div>
+    <div><label class="fl">Thickness mm</label><input id="rl-thick" type="number" min="1" value="18" style="width:84px"></div>
+    <div style="font-size:11px;color:#667085;flex:1;min-width:220px" data-i18n="rlHint">Grey lines are the names drawn in the file. Type the name each part should carry on the layout and label.</div>
+  </div>
+  <div class="dxf-body" id="rl-body" style="padding:0;display:block;max-height:62vh;overflow:auto"></div>
+  <div class="dxf-foot">
+    <button class="btn bs" onclick="closeReadyLayout()">Cancel</button>
+    <button class="btn bp" onclick="confirmReadyLayout()" style="flex:1" data-i18n="rlImport">✓ Use this layout</button>
   </div>
 </div>
 </div>
@@ -1806,6 +1833,19 @@ var I18N={
     dvExtract:'⤢ Extract parts from this file',
     dvEmpty:'No entities found in that DXF.',
     exLink:'⤢ Extract parts from a layout DXF',
+    rlLink:'📋 Ready sheet layout DXF',
+    rlTitle:'Ready sheet layout — name the parts',
+    rlIntro:'{s} sheet(s), {n} part(s). Every part stays exactly where it is in the drawing — nothing is re-nested.',
+    rlHint:'Grey lines are the names drawn in the file. Type the name each part should carry on the layout and label.',
+    rlSheet:'Sheet',
+    rlPart:'Part',
+    rlSize:'Size (mm)',
+    rlHoles:'Holes',
+    rlName:'Name',
+    rlImport:'✓ Use this layout',
+    rlFrom:'Ready layout from DXF',
+    rlVersion:'From DXF — {f}',
+    rlImported:'✓ {n} part(s) on {s} sheet(s) from the ready layout',
     exTitle:'Extract parts from layout',
     exImport:'✓ Import parts',
     exIntro:'{file} — {n} part(s) found ({u} unique) · sheet {sheet} · {holes} cut-out(s). Check the preview, then import them as parts you can re-nest.',
@@ -2053,6 +2093,19 @@ var I18N={
     dvExtract:'⤢ Išskirti detales iš šio failo',
     dvEmpty:'Šiame DXF elementų nerasta.',
     exLink:'⤢ Išskirti detales iš išdėstymo DXF',
+    rlLink:'📋 Paruoštas lapo išdėstymas DXF',
+    rlTitle:'Paruoštas lapo išdėstymas — pavadinkite detales',
+    rlIntro:'{s} lap. ({n} det.). Kiekviena detalė lieka tiksliai ten, kur yra brėžinyje — niekas neperdėliojama.',
+    rlHint:'Pilkos linijos — brėžinyje nupieštas pavadinimas. Įrašykite pavadinimą, kuris bus ant išdėstymo ir etiketės.',
+    rlSheet:'Lapas',
+    rlPart:'Detalė',
+    rlSize:'Dydis (mm)',
+    rlHoles:'Angos',
+    rlName:'Pavadinimas',
+    rlImport:'✓ Naudoti šį išdėstymą',
+    rlFrom:'Paruoštas išdėstymas iš DXF',
+    rlVersion:'Iš DXF — {f}',
+    rlImported:'✓ {n} det. ant {s} lap. iš paruošto išdėstymo',
     exTitle:'Išskirti detales iš išdėstymo',
     exImport:'✓ Importuoti detales',
     exIntro:'{file} — rasta {n} detalė(-ių) ({u} unikalios) · lakštas {sheet} · {holes} išpjova(-os). Peržiūrėkite ir importuokite jas kaip detales naujam išdėstymui.',
@@ -4420,7 +4473,9 @@ function _isNoiseLayer(name){
 function extractLayoutParts(text, opts){
   opts=opts||{};
   var minSide=opts.minSide!=null?opts.minSide:20;      // mm — below this it is annotation, not a part
-  var pr=_extractPolysFromDXF(text);
+  var pr=opts.ents
+    ? {ents:opts.ents, polys:entitiesToPolygons(opts.ents).filter(function(p){return p.closed&&p.pts.length>=3;})}
+    : _extractPolysFromDXF(text);
   var polys=pr.polys.map(function(p){
     return {pts:p.pts, area:_polyArea(p.pts), bb:_polyBBox(p.pts)};
   }).filter(function(p){
@@ -4451,9 +4506,10 @@ function extractLayoutParts(text, opts){
   // layout; cut-outs at a deeper level confirm those things are parts, not holes.
   var guess=polys.length>1 && allInside && isRectish && (hasGrandKids || kids>=2);
   var useSheet = opts.sheetMode==='yes' ? true : opts.sheetMode==='no' ? false : guess;
-  var sheet=null, base=0;
+  var sheet=null, base=0, sheetAt=null;
   if(useSheet && polys.length>1){
     sheet={w:Math.round(top.bb.w), h:Math.round(top.bb.h)};
+    sheetAt={x:top.bb.minX, y:top.bb.minY};
     base=1; // parts sit one level in from the sheet
   }
   // Even offsets from the base level are material (parts); odd ones are voids.
@@ -4481,12 +4537,13 @@ function extractLayoutParts(text, opts){
       outlineEnts:cls.outline.map(function(e){ return _shiftEntity(e,bb.minX,bb.minY); }),
       holeEnts:holeGroups.map(function(g){ return g.map(function(e){ return _shiftEntity(e,bb.minX,bb.minY); }); }),
       l:Math.round(bb.w), w:Math.round(bb.h),
-      area:op.area, at:{x:Math.round(bb.minX), y:Math.round(bb.minY)}
+      area:op.area, at:{x:Math.round(bb.minX), y:Math.round(bb.minY)},
+      atExact:{x:bb.minX, y:bb.minY}
     };
   });
   // Position order: top-left first, so the numbering follows how a person reads the sheet.
   parts.sort(function(a,b){ return (b.at.y-a.at.y) || (a.at.x-b.at.x); });
-  return {sheet:sheet, parts:parts, ents:pr.ents, dropped:pr.polys.length-polys.length, guessedSheet:guess};
+  return {sheet:sheet, sheetAt:sheetAt, parts:parts, ents:pr.ents, dropped:pr.polys.length-polys.length, guessedSheet:guess};
 }
 // Collapse identical outlines into one row with a quantity. Compares the
 // normalised outline point-by-point, so two copies of the same part match
@@ -4813,6 +4870,216 @@ function confirmExtractLayout(){
   var pl=document.getElementById('plist'); if(pl) pl.scrollTop=0;
   var st=document.getElementById('ist');
   if(st){ st.style.color='#2f54eb'; st.textContent=t('exImported',{n:added}); }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// READY SHEET LAYOUT (DXF) — keep the layout exactly as drawn, no nesting.
+// For sheets that were already laid out in CAD (e.g. a supplier's cutting
+// files): every part stays where it is on the sheet, the operator gives each
+// part a name, and the app then treats the sheet like any other layout —
+// labels, printed sheet, part list — without re-optimising anything.
+// One DXF file = one sheet. Lines on label/text layers (LABELS_ENGRAVE,
+// LABELS_PENCIL, …) are not geometry: they are kept only as a visual hint in
+// the naming dialog, so the operator can read the name the drawing carries.
+// ═══════════════════════════════════════════════════════════════════════════
+var _rl=null;   // {files:[{fileName, stem, thick, sheet:{w,h}|null, sheetAt:{x,y}, sw, sh, parts:[…], labelLines:[[pt…]…]}]}
+
+function _rlIsLabelLayer(name){
+  return /label|text|engrav|pencil|annot|note|dim|title|logo/i.test(String(name||''));
+}
+function _rlAnalyse(text, fileName){
+  var ents=parseDXFText(text);
+  var geo=ents.filter(function(e){ return !_rlIsLabelLayer(e.layer); });
+  var lbl=ents.filter(function(e){ return _rlIsLabelLayer(e.layer); });
+  // Small minimum on purpose: in a finished layout every closed outline is real —
+  // thin slots and drill holes belong on the label picture.
+  var res=extractLayoutParts(null,{minSide:3, ents:geo});
+  var stem=String(fileName||'SHEET').replace(/\.dxf$/i,'').split(/[_\s.]+/)[0]||'SHEET';
+  var mThick=String(fileName||'').match(/(\d+(?:[.,]\d+)?)\s*mm/i);
+  var labelLines=[];
+  lbl.forEach(function(e){ _entityPolylines(e).forEach(function(pl){ labelLines.push(pl); }); });
+  var sheetAt=res.sheetAt||{x:0,y:0};
+  var sw=res.sheet?res.sheet.w:0, sh=res.sheet?res.sheet.h:0;
+  if(!res.sheet){
+    // No border drawn: the sheet starts at the DXF origin and reaches at least the parts.
+    res.parts.forEach(function(p){
+      var bb=_polyBBox(p.shape);
+      sw=Math.max(sw, Math.ceil(p.atExact.x+bb.maxX)); sh=Math.max(sh, Math.ceil(p.atExact.y+bb.maxY));
+    });
+  }
+  res.parts.forEach(function(p,i){
+    p.name=stem+'_'+(i+1);
+    // Name lines drawn inside this part (for the hint thumbnail).
+    var abs=p.shape.map(function(q){ return {x:q.x+p.atExact.x, y:q.y+p.atExact.y}; });
+    p.labelLines=labelLines.filter(function(pl){
+      var mx=0,my=0; pl.forEach(function(q){ mx+=q.x; my+=q.y; }); mx/=pl.length; my/=pl.length;
+      return _pointInPoly(mx,my,abs);
+    });
+  });
+  return {fileName:fileName, stem:stem, thick:mThick?Math.round(parseFloat(mThick[1].replace(',','.'))):0,
+          sheet:res.sheet, sheetAt:sheetAt, sw:sw, sh:sh, parts:res.parts, labelLines:labelLines};
+}
+async function readyLayoutPick(inputEl){
+  var files=Array.prototype.slice.call(inputEl.files||[]);
+  inputEl.value='';
+  if(!files.length) return;
+  var st=document.getElementById('ist');
+  try{
+    var out=[];
+    for(var i=0;i<files.length;i++){
+      var a=_rlAnalyse(await files[i].text(), files[i].name);
+      if(a.parts.length) out.push(a);
+    }
+    if(!out.length){ alert(t('exNothing')); return; }
+    _rl={files:out};
+    var matSel=document.getElementById('rl-mat');
+    var mats=boards.map(function(b){return b.mat;});
+    if(!mats.length) mats=['PLYWOOD '+(out[0].thick||18)+'mm'];
+    matSel.innerHTML=mats.map(function(m){return '<option value="'+esc(m)+'">'+esc(m)+'</option>';}).join('')
+      +'<option value="__new__">+ New material…</option>';
+    var th=out[0].thick; if(th) document.getElementById('rl-thick').value=th;
+    document.getElementById('rl-overlay').classList.add('open');
+    renderReadyLayout();
+  }catch(err){
+    console.error(err);
+    if(st){ st.style.color='#B84040'; st.textContent='⚠ '+err.message; }
+    alert('Could not read that layout: '+err.message);
+  }
+}
+function closeReadyLayout(){
+  document.getElementById('rl-overlay').classList.remove('open');
+  _rl=null;
+}
+function rlSetName(fi,pi,val){ if(_rl&&_rl.files[fi]&&_rl.files[fi].parts[pi]) _rl.files[fi].parts[pi].name=val; }
+function rlSetSize(fi,key,val){ var v=parseFloat(val); if(_rl&&_rl.files[fi]&&v>0){ _rl.files[fi][key]=v; renderReadyLayout(); } }
+// Sheet preview: outlines, cut-outs, the drawing's own name lines (grey) and a number per part.
+function _rlSheetSVG(f, W, H){
+  var sc=Math.min((W-8)/f.sw,(H-8)/f.sh), ox=(W-f.sw*sc)/2, oy=(H-f.sh*sc)/2;
+  var X=function(x){ return (ox+(x-f.sheetAt.x)*sc).toFixed(1); };
+  var Y=function(y){ return (oy+(f.sh-(y-f.sheetAt.y))*sc).toFixed(1); };
+  var ring=function(pts,dx,dy){ return pts.map(function(q){ return X(q.x+dx)+','+Y(q.y+dy); }).join(' '); };
+  var svg='<svg width="'+W+'" height="'+H+'" style="display:block;background:#F7F5F0;border:1px solid #e6e8ed;border-radius:6px">'
+    +'<rect x="'+ox.toFixed(1)+'" y="'+oy.toFixed(1)+'" width="'+(f.sw*sc).toFixed(1)+'" height="'+(f.sh*sc).toFixed(1)+'" fill="#fff" stroke="#98a2b3"/>';
+  f.parts.forEach(function(p){
+    svg+='<polygon points="'+ring(p.shape,p.atExact.x,p.atExact.y)+'" fill="#2f54eb18" stroke="#2f54eb" stroke-width="1"/>';
+    (p.holes||[]).forEach(function(h){ svg+='<polygon points="'+ring(h,p.atExact.x,p.atExact.y)+'" fill="#fff" stroke="#8a6d1a" stroke-width="0.7"/>'; });
+  });
+  f.labelLines.forEach(function(pl){ svg+='<polyline points="'+ring(pl,0,0)+'" fill="none" stroke="#98a2b3" stroke-width="0.8"/>'; });
+  f.parts.forEach(function(p,i){
+    var bb=_polyBBox(p.shape), cx=X(p.atExact.x+bb.minX+bb.w/2), cy=Y(p.atExact.y+bb.minY+bb.h/2);
+    svg+='<circle cx="'+cx+'" cy="'+cy+'" r="10" fill="#1b1e26"/><text x="'+cx+'" y="'+cy+'" dy="0.35em" text-anchor="middle" font-size="11" font-weight="700" fill="#fff" font-family="sans-serif">'+(i+1)+'</text>';
+  });
+  return svg+'</svg>';
+}
+// Small picture of one part with the name lines the drawing carries.
+function _rlPartSVG(p, W, H){
+  var bb=_polyBBox(p.shape), sc=Math.min((W-6)/Math.max(1,bb.w),(H-6)/Math.max(1,bb.h));
+  var ox=(W-bb.w*sc)/2-bb.minX*sc, oy=(H-bb.h*sc)/2;
+  var X=function(x){ return (ox+x*sc).toFixed(1); }, Y=function(y){ return (oy+(bb.maxY-y)*sc).toFixed(1); };
+  var ring=function(pts,dx,dy){ return pts.map(function(q){ return X(q.x-dx)+','+Y(q.y-dy); }).join(' '); };
+  var svg='<svg width="'+W+'" height="'+H+'" style="display:block">';
+  svg+='<polygon points="'+ring(p.shape,0,0)+'" fill="#2f54eb12" stroke="#2f54eb" stroke-width="1"/>';
+  (p.holes||[]).forEach(function(h){ svg+='<polygon points="'+ring(h,0,0)+'" fill="#fff" stroke="#8a6d1a" stroke-width="0.6"/>'; });
+  (p.labelLines||[]).forEach(function(pl){ svg+='<polyline points="'+ring(pl,p.atExact.x,p.atExact.y)+'" fill="none" stroke="#1b1e26" stroke-width="1.4"/>'; });
+  return svg+'</svg>';
+}
+function renderReadyLayout(){
+  if(!_rl) return;
+  var nParts=_rl.files.reduce(function(n,f){ return n+f.parts.length; },0);
+  document.getElementById('rl-intro').textContent=t('rlIntro',{s:_rl.files.length, n:nParts});
+  document.getElementById('rl-body').innerHTML=_rl.files.map(function(f,fi){
+    var rows=f.parts.map(function(p,pi){
+      var bb=_polyBBox(p.shape);
+      var holes=(p.holes||[]).length;
+      return '<tr><td style="font-weight:700;text-align:center">'+(pi+1)+'</td>'
+        +'<td style="padding:2px 4px">'+_rlPartSVG(p,96,70)+'</td>'
+        +'<td style="font-family:monospace;white-space:nowrap">'+Math.round(bb.w)+' × '+Math.round(bb.h)+'</td>'
+        +'<td style="text-align:center">'+(holes||'—')+'</td>'
+        +'<td><input type="text" value="'+esc(p.name)+'" style="width:100%;min-width:120px;font-weight:600" '
+        +'oninput="rlSetName('+fi+','+pi+',this.value)" onfocus="this.select()"></td></tr>';
+    }).join('');
+    return '<div style="display:flex;gap:14px;padding:12px 16px;border-bottom:1px solid #e9edf3;flex-wrap:wrap">'
+      +'<div style="flex:0 0 250px">'
+        +'<div style="font-size:12px;font-weight:600;margin-bottom:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(f.fileName)+'">'+esc(f.fileName)+'</div>'
+        +_rlSheetSVG(f,250,330)
+        +'<div style="display:flex;gap:6px;align-items:center;margin-top:6px;font-size:11px;color:#667085">'+t('rlSheet')
+          +' <input type="number" value="'+f.sw+'" style="width:70px" onchange="rlSetSize('+fi+',\'sw\',this.value)"> ×'
+          +' <input type="number" value="'+f.sh+'" style="width:70px" onchange="rlSetSize('+fi+',\'sh\',this.value)"> mm'
+          +(f.sheet?'':' <span style="color:#B87030">· '+t('exNoSheet')+'</span>')
+        +'</div>'
+      +'</div>'
+      +'<div style="flex:1;min-width:300px;overflow:auto;max-height:400px">'
+        +'<table class="pw-tbl" style="width:100%;table-layout:auto"><thead><tr><th style="width:26px">#</th><th>'+t('rlPart')+'</th><th>'+t('rlSize')+'</th><th>'+t('rlHoles')+'</th><th>'+t('rlName')+'</th></tr></thead>'
+        +'<tbody>'+rows+'</tbody></table>'
+      +'</div></div>';
+  }).join('');
+}
+function confirmReadyLayout(){
+  if(!_rl) return;
+  var mat=document.getElementById('rl-mat').value;
+  if(mat==='__new__'){
+    mat=(prompt('New material name:','PLYWOOD '+(document.getElementById('rl-thick').value||18)+'mm')||'').trim();
+    if(!mat) return;
+  }
+  mat=normalizeMat(mat);
+  var thick=parseInt(document.getElementById('rl-thick').value,10)||18;
+  var bd=boards.find(function(b){return b.mat===mat;});
+  if(!bd){
+    bd=ensureBoard(mat);
+    bd.w=_rl.files[0].sw; bd.h=_rl.files[0].sh;     // a new material takes the sheet size from the drawing
+    renderBoards(); refreshSel();
+  }
+  var kerf=parseInt((document.getElementById('kerf-cnc')||{}).value)||parseInt((document.getElementById('kerf')||{}).value)||0;
+  var newParts=[], newLays=[], added=0, t0=Date.now(), fileNames=[];
+  _rl.files.forEach(function(f){
+    var pls=[];
+    f.parts.forEach(function(p,pi){
+      var nm=String(p.name||'').trim()||(f.stem+'_'+(pi+1));
+      var bb=_polyBBox(p.shape), bw=bb.maxX, bh=bb.maxY;
+      var part={ id:t0+added, name:nm, origName:nm,
+        l:Math.round(bw), w:Math.round(bh), mat:mat, thick:thick,
+        eb:{eb1:'',eb2:'',eb3:'',eb4:''}, op1:'', op2:'', hasCNC:false,
+        shape:p.shape.map(function(q){ return {x:q.x,y:q.y}; }),
+        holes:(p.holes||[]).map(function(h){ return h.map(function(q){ return {x:q.x,y:q.y}; }); }),
+        outlineEnts:p.outlineEnts?JSON.parse(JSON.stringify(p.outlineEnts)):null,
+        holeEnts:p.holeEnts?JSON.parse(JSON.stringify(p.holeEnts)):null,
+        layoutFile:f.fileName };
+      added++;
+      newParts.push(part);
+      // DXF (y-up) → sheet frame (y-down), exactly where the drawing has it. No trim:
+      // the drawing already leaves its own margins.
+      var flip=function(q){ return {x:q.x, y:bh-q.y}; };
+      pls.push({ part:part,
+        x:p.atExact.x-f.sheetAt.x,
+        y:f.sh-(p.atExact.y-f.sheetAt.y)-bh,
+        pw:Math.round(bw), ph:Math.round(bh), rot:false, color:bd.color||'#888',
+        nestPoly:p.shape.map(flip), nestHoles:(p.holes||[]).map(function(h){ return h.map(flip); }), nestAngle:0 });
+    });
+    newLays.push({ idx:0, uw:f.sw, uh:f.sh, sw:f.sw, sh:f.sh, trim:0,
+      matName:mat, matColor:bd.color||'#888', grainLocked:false, trimWarning:false,
+      placements:pls, kerf:kerf, machine:'cnc', shapeNest:true });
+    fileNames.push(f.stem);
+  });
+  parts=parts.concat(newParts);
+  var first=layouts.length;
+  layouts=layouts.concat(newLays);
+  layouts.forEach(function(l,i){ l.idx=i; });
+  closeReadyLayout();
+  renderParts();
+  document.getElementById('albl').textContent=t('rlFrom')+' · '+layouts.length+' sheets';
+  document.getElementById('stats').style.display='grid';
+  document.getElementById('wlc').style.display='none';
+  document.getElementById('cvc').style.display='block';
+  _refreshStats();
+  buildExport(); buildTabs(); activateTab(first);
+  // Keep this arrangement as a named version: if someone presses Generate later,
+  // it can be brought back from the version list.
+  addVersion(t('rlVersion',{f:fileNames.join(', ')}), false);
+  // Make Generate ask before replacing the drawn layout.
+  _autoVersionFp='__ready_layout__';
+  if(typeof window.uxMarkLayoutFresh==='function') window.uxMarkLayoutFresh();
+  var st=document.getElementById('ist');
+  if(st){ st.style.color='#2f54eb'; st.textContent=t('rlImported',{n:added, s:newLays.length}); }
 }
 
 // Dialog flow: user drops N DXFs → modal asks material + qty (per file), then imports all.
