@@ -1853,7 +1853,7 @@ var I18N={
     exNothing:'No parts found in that DXF. It may hold only open lines, or everything is below the size filter.',
     exFound:'✓ {n} part(s) found in the layout',
     exImported:'✓ {n} part(s) imported from the layout',
-    exPreviewNote:'blue = detected part · amber = cut-out',
+    exPreviewNote:'blue = detected part · amber = cut-out · pink = on-line cut (part stays whole)',
     tplLink:'⤓ Parts list template (CSV)',
     tplTip:'Download a small CSV you can fill in — just name, size and quantity. Far simpler than a full SWOOD report.',
     tplDone:'✓ Template downloaded — fill it in and drop it back here',
@@ -2113,7 +2113,7 @@ var I18N={
     exNothing:'Šiame DXF detalių nerasta. Gali būti, kad jame tik atviros linijos arba viskas mažiau už dydžio filtrą.',
     exFound:'✓ išdėstyme rasta {n} detalė(-ių)',
     exImported:'✓ importuota {n} detalė(-ių) iš išdėstymo',
-    exPreviewNote:'mėlyna = rasta detalė · geltona = išpjova',
+    exPreviewNote:'mėlyna = rasta detalė · geltona = išpjova · rožinė = pjūvis ant linijos (detalė vientisa)',
     tplLink:'⤓ Detalių sąrašo šablonas (CSV)',
     tplTip:'Atsisiųskite paprastą CSV — tereikia pavadinimo, matmenų ir kiekio. Daug paprasčiau nei pilna SWOOD ataskaita.',
     tplDone:'✓ Šablonas atsisiųstas — užpildykite ir įkelkite atgal čia',
@@ -4485,6 +4485,7 @@ function extractLayoutParts(text, opts){
   var minSide=opts.minSide!=null?opts.minSide:20;      // mm — below this it is annotation, not a part
   var allEnts=opts.ents||parseDXFText(text);
   var cutEnts=allEnts.filter(function(e){ return !_isMarkLayer(e.layer); });
+  var markEnts=allEnts.filter(function(e){ return _isMarkLayer(e.layer); });
   var pr={ents:allEnts, polys:entitiesToPolygons(cutEnts).filter(function(p){return p.closed&&p.pts.length>=3;})};
   var polys=pr.polys.map(function(p){
     return {pts:p.pts, area:_polyArea(p.pts), bb:_polyBBox(p.pts)};
@@ -4541,8 +4542,17 @@ function extractLayoutParts(text, opts){
       return true;
     });
     var holeGroups=_groupInnerEntsByHole(innerEnts, holes.map(function(h){return h.pts;}));
+    // On-line cuts inside this part (not inside a part nested in its cut-outs).
+    var marks=[];
+    markEnts.forEach(function(e){
+      var rp=_entityRepresentativePoint(e);
+      if(!rp || !_pointInPoly(rp.x,rp.y,op.pts)) return;
+      for(var k=0;k<nested.length;k++){ if(_pointInPoly(rp.x,rp.y,nested[k].pts)) return; }
+      _entityPolylines(e).forEach(function(pl){ if(pl.length>1) marks.push(norm(pl)); });
+    });
     return {
       shape:norm(op.pts),
+      marks:marks,
       holes:holes.map(function(h){ return norm(h.pts); }),
       outlineEnts:cls.outline.map(function(e){ return _shiftEntity(e,bb.minX,bb.minY); }),
       holeEnts:holeGroups.map(function(g){ return g.map(function(e){ return _shiftEntity(e,bb.minX,bb.minY); }); }),
@@ -4813,6 +4823,11 @@ function _exPreviewSVG(sheet, parts, W, H){
       var hp=h.map(function(q){ return (ox+(q.x+p.at.x)*sc).toFixed(1)+','+fy(q.y+p.at.y).toFixed(1); }).join(' ');
       svg+='<polygon points="'+hp+'" fill="#F7F5F0" stroke="#8a6d1a" stroke-width="0.8"/>';
     });
+    var ax=p.atExact?p.atExact.x:p.at.x, ay=p.atExact?p.atExact.y:p.at.y;
+    (p.marks||[]).forEach(function(m){
+      var mp=m.map(function(q){ return (ox+(q.x+ax)*sc).toFixed(1)+','+fy(q.y+ay).toFixed(1); }).join(' ');
+      svg+='<polyline points="'+mp+'" fill="none" stroke="#d63adf" stroke-width="1"/>';
+    });
   });
   return svg+'</svg>';
 }
@@ -4867,6 +4882,7 @@ function confirmExtractLayout(){
         // Deep-copied per part: parts must never share mutable geometry.
         shape:p.shape.map(function(q){ return {x:q.x,y:q.y}; }),
         holes:(p.holes||[]).map(function(h){ return h.map(function(q){ return {x:q.x,y:q.y}; }); }),
+        marks:(p.marks||[]).map(function(m){ return m.map(function(q){ return {x:q.x,y:q.y}; }); }),
         outlineEnts:p.outlineEnts?JSON.parse(JSON.stringify(p.outlineEnts)):null,
         holeEnts:p.holeEnts?JSON.parse(JSON.stringify(p.holeEnts)):null
       });
@@ -4906,10 +4922,9 @@ function _rlAnalyse(text, fileName){
   var res=extractLayoutParts(null,{minSide:3, ents:geo});
   var stem=String(fileName||'SHEET').replace(/\.dxf$/i,'').split(/[_\s.]+/)[0]||'SHEET';
   var mThick=String(fileName||'').match(/(\d+(?:[.,]\d+)?)\s*mm/i);
-  var labelLines=[], markLines=[];
+  var labelLines=[];
   lbl.forEach(function(e){ _entityPolylines(e).forEach(function(pl){ labelLines.push(pl); }); });
-  geo.filter(function(e){ return _isMarkLayer(e.layer); })
-     .forEach(function(e){ _entityPolylines(e).forEach(function(pl){ markLines.push(pl); }); });
+
   var sheetAt=res.sheetAt||{x:0,y:0};
   var sw=res.sheet?res.sheet.w:0, sh=res.sheet?res.sheet.h:0;
   if(!res.sheet){
@@ -4931,10 +4946,9 @@ function _rlAnalyse(text, fileName){
       return _pointInPoly(mx,my,abs);
     };
     p.labelLines=labelLines.filter(inside);
-    p.markLines=markLines.filter(inside);
   });
   return {fileName:fileName, stem:stem, thick:mThick?Math.round(parseFloat(mThick[1].replace(',','.'))):0,
-          sheet:res.sheet, sheetAt:sheetAt, sw:sw, sh:sh, parts:res.parts, labelLines:labelLines, markLines:markLines};
+          sheet:res.sheet, sheetAt:sheetAt, sw:sw, sh:sh, parts:res.parts, labelLines:labelLines};
 }
 async function readyLayoutPick(inputEl){
   var files=Array.prototype.slice.call(inputEl.files||[]);
@@ -4981,7 +4995,9 @@ function _rlSheetSVG(f, W, H){
     svg+='<polygon points="'+ring(p.shape,p.atExact.x,p.atExact.y)+'" fill="#2f54eb18" stroke="#2f54eb" stroke-width="1"/>';
     (p.holes||[]).forEach(function(h){ svg+='<polygon points="'+ring(h,p.atExact.x,p.atExact.y)+'" fill="#fff" stroke="#8a6d1a" stroke-width="0.7"/>'; });
   });
-  (f.markLines||[]).forEach(function(pl){ svg+='<polyline points="'+ring(pl,0,0)+'" fill="none" stroke="#d63adf" stroke-width="1"/>'; });
+  f.parts.forEach(function(p){
+    (p.marks||[]).forEach(function(m){ svg+='<polyline points="'+ring(m,p.atExact.x,p.atExact.y)+'" fill="none" stroke="#d63adf" stroke-width="1"/>'; });
+  });
   f.labelLines.forEach(function(pl){ svg+='<polyline points="'+ring(pl,0,0)+'" fill="none" stroke="#98a2b3" stroke-width="0.8"/>'; });
   f.parts.forEach(function(p,i){
     var bb=_polyBBox(p.shape), cx=X(p.atExact.x+bb.minX+bb.w/2), cy=Y(p.atExact.y+bb.minY+bb.h/2);
@@ -4998,7 +5014,7 @@ function _rlPartSVG(p, W, H){
   var svg='<svg width="'+W+'" height="'+H+'" style="display:block">';
   svg+='<polygon points="'+ring(p.shape,0,0)+'" fill="#2f54eb12" stroke="#2f54eb" stroke-width="1"/>';
   (p.holes||[]).forEach(function(h){ svg+='<polygon points="'+ring(h,0,0)+'" fill="#fff" stroke="#8a6d1a" stroke-width="0.6"/>'; });
-  (p.markLines||[]).forEach(function(pl){ svg+='<polyline points="'+ring(pl,p.atExact.x,p.atExact.y)+'" fill="none" stroke="#d63adf" stroke-width="1"/>'; });
+  (p.marks||[]).forEach(function(m){ svg+='<polyline points="'+ring(m,0,0)+'" fill="none" stroke="#d63adf" stroke-width="1"/>'; });
   (p.labelLines||[]).forEach(function(pl){ svg+='<polyline points="'+ring(pl,p.atExact.x,p.atExact.y)+'" fill="none" stroke="#1b1e26" stroke-width="1.4"/>'; });
   return svg+'</svg>';
 }
@@ -5060,6 +5076,7 @@ function confirmReadyLayout(){
         eb:{eb1:'',eb2:'',eb3:'',eb4:''}, op1:'', op2:'', hasCNC:false,
         shape:p.shape.map(function(q){ return {x:q.x,y:q.y}; }),
         holes:(p.holes||[]).map(function(h){ return h.map(function(q){ return {x:q.x,y:q.y}; }); }),
+        marks:(p.marks||[]).map(function(m){ return m.map(function(q){ return {x:q.x,y:q.y}; }); }),
         outlineEnts:p.outlineEnts?JSON.parse(JSON.stringify(p.outlineEnts)):null,
         holeEnts:p.holeEnts?JSON.parse(JSON.stringify(p.holeEnts)):null,
         layoutFile:f.fileName };
@@ -6101,6 +6118,7 @@ function rotateShape90(o){
   function rot(pts){ return pts.map(function(pt){ return {x:pt.y, y:oldL-pt.x}; }); }
   if(o.shape&&o.shape.length)o.shape=rot(o.shape);
   if(o.holes)o.holes=o.holes.map(rot);
+  if(o.marks)o.marks=o.marks.map(rot);
   if(o.outlineEnts)o.outlineEnts=o.outlineEnts.map(function(e){return _rotEntity90(e,oldL);});
   if(o.holeEnts)o.holeEnts=o.holeEnts.map(function(g){return g.map(function(e){return _rotEntity90(e,oldL);});});
   var tmp=o.l; o.l=o.w; o.w=tmp;
@@ -10764,6 +10782,16 @@ function draw(lay){
           ctx.stroke();
         }
       }
+      // On-line cuts (markings — the part stays whole under them)
+      if(p.part.marks&&p.part.marks.length){
+        var mf=_markPlacer(p);
+        ctx.strokeStyle='#d63adf'; ctx.lineWidth=1.2;
+        p.part.marks.forEach(function(m){
+          ctx.beginPath();
+          m.forEach(function(q,qi){ var t=mf(q); if(qi) ctx.lineTo(x+t[0]*SC,y+t[1]*SC); else ctx.moveTo(x+t[0]*SC,y+t[1]*SC); });
+          ctx.stroke();
+        });
+      }
     } else {
       ctx.fillRect(x,y,w,h);
       if(grp){ctx.strokeStyle=grp.color;ctx.lineWidth=isSel?3:2;ctx.strokeRect(x+1,y+1,w-2,h-2);}
@@ -12330,6 +12358,10 @@ function printSheetSVG(lay,widthMm){
         d+='Z';
       });
       svg+='<path d="'+d+'" fill="'+p.color+'33" stroke="#1b1e26" stroke-width="1.2" fill-rule="evenodd"/>';
+      (part.marks||[]).forEach(function(m){
+        svg+='<polyline points="'+m.map(function(pt){ var xy=localToPlaced(pt.x,pt.y); return xy[0].toFixed(1)+','+xy[1].toFixed(1); }).join(' ')
+          +'" fill="none" stroke="#d63adf" stroke-width="1.6"/>';
+      });
       // Dashed bbox so operator sees nesting footprint
       svg+='<rect x="'+ax+'" y="'+ay+'" width="'+pw+'" height="'+ph+'" fill="none" stroke="#667085" stroke-width=".6" stroke-dasharray="8 4"/>';
     } else {
@@ -12915,6 +12947,49 @@ function downloadBlob(name,blob){
 }
 function lwpoly(L,layer,pts){L.push('0','LWPOLYLINE','8',layer,'90',String(pts.length),'70','1');pts.forEach(function(p){L.push('10',p[0].toFixed(3),'20',p[1].toFixed(3));});}
 // LWPOLYLINE with per-vertex bulges (for arcs inside polylines, preserved losslessly)
+// Where a part-local point (y-up, the frame of part.shape/holes/marks) lands inside
+// a placement, as placement-local mm, y-down (the frame of nestPoly). A true-shape
+// placement can be at any angle, so the transform is read off the placement itself:
+// nestPoly is part.shape moved point-for-point, and three well-spread point pairs
+// pin down the affine map. Plain placements use the 0°/90° rule the canvas uses.
+function _markPlacer(p){
+  var part=p.part;
+  var sh=part&&part.shape, np=p.nestPoly;
+  if(np && sh && np.length===sh.length && sh.length>=3){
+    var i0=0,i1=0,i2=0,k,best=-1;
+    for(k=0;k<sh.length;k++){ if(sh[k].x+sh[k].y<sh[i0].x+sh[i0].y) i0=k; }
+    for(k=0;k<sh.length;k++){ var d=Math.hypot(sh[k].x-sh[i0].x, sh[k].y-sh[i0].y); if(d>best){ best=d; i1=k; } }
+    best=-1;
+    for(k=0;k<sh.length;k++){
+      var c=Math.abs((sh[i1].x-sh[i0].x)*(sh[k].y-sh[i0].y)-(sh[i1].y-sh[i0].y)*(sh[k].x-sh[i0].x));
+      if(c>best){ best=c; i2=k; }
+    }
+    var a=sh[i0],b=sh[i1],c2=sh[i2];
+    var det=a.x*(b.y-c2.y)-a.y*(b.x-c2.x)+(b.x*c2.y-c2.x*b.y);
+    if(Math.abs(det)>1e-6){
+      var solve=function(u0,u1,u2){   // coefficients (A,B,C) with A*x+B*y+C = u
+        return [ (u0*(b.y-c2.y)-a.y*(u1-u2)+(u1*c2.y-u2*b.y))/det,
+                 (a.x*(u1-u2)-u0*(b.x-c2.x)+(b.x*u2-c2.x*u1))/det,
+                 (a.x*(b.y*u2-c2.y*u1)-a.y*(b.x*u2-c2.x*u1)+u0*(b.x*c2.y-c2.x*b.y))/det ];
+      };
+      var X=solve(np[i0].x,np[i1].x,np[i2].x), Y=solve(np[i0].y,np[i1].y,np[i2].y);
+      return function(q){ return [X[0]*q.x+X[1]*q.y+X[2], Y[0]*q.x+Y[1]*q.y+Y[2]]; };
+    }
+  }
+  return function(q){
+    var ux=q.x, uy=q.y;
+    if(p.rot){ ux=q.y; uy=part.l-q.x; }
+    return [ux, p.ph-uy];
+  };
+}
+// On-line cuts of every placed part, written as polylines on their own layer.
+function _pushMarks(L,p,x,y){
+  var marks=p.part&&p.part.marks; if(!marks||!marks.length) return;
+  var f=_markPlacer(p);
+  marks.forEach(function(m){
+    lwpolyBulge(L,'ON_LINE', m.map(function(q){ var t=f(q); return {x:x+t[0], y:y+(p.ph-t[1]), bulge:0}; }), false);
+  });
+}
 function lwpolyBulge(L,layer,verts,closed){
   L.push('0','LWPOLYLINE','8',layer,'90',String(verts.length),'70',closed?'1':'0');
   verts.forEach(function(v){
@@ -12932,9 +13007,10 @@ function dxfArc(L,layer,cx,cy,r,a1,a2){
 
 function dxfHeader(){
   return ['0','SECTION','2','HEADER','9','$INSUNITS','70','4','9','$MEASUREMENT','70','1','0','ENDSEC',
-    '0','SECTION','2','TABLES','0','TABLE','2','LAYER','70','2',
+    '0','SECTION','2','TABLES','0','TABLE','2','LAYER','70','3',
     '0','LAYER','2','PARTS','70','0','62','1','6','CONTINUOUS',
     '0','LAYER','2','HOLES','70','0','62','5','6','CONTINUOUS',
+    '0','LAYER','2','ON_LINE','70','0','62','6','6','CONTINUOUS',
     '0','ENDTAB','0','ENDSEC',
     '0','SECTION','2','ENTITIES'];
 }
@@ -13020,6 +13096,7 @@ function pushLayoutEntities(L,lay,dx,dy){
     } else {
       lwpoly(L,'PARTS',[[x,y],[x+p.pw,y],[x+p.pw,y+p.ph],[x,y+p.ph]]);
     }
+    _pushMarks(L,p,x,y);
   });
 }
 function makeDXF(lay){
