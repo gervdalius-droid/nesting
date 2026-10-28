@@ -442,8 +442,9 @@ body.print-mode{background:#fff}
    typical 2800×2070 board). Parts table shrinks to compensate. */
 .pp.sheet-page{display:flex;flex-direction:column}
 .pp.sheet-page > h1{flex-shrink:0;margin:4px 0 6px}
-.pp.sheet-page .pp-sheet-svg{flex-shrink:0;text-align:center;margin:4px 0;max-height:155mm;overflow:hidden}
-.pp.sheet-page .pp-sheet-svg svg{max-width:100%;max-height:155mm;width:auto;height:auto}
+.pp.sheet-page .pp-sheet-svg{flex-shrink:0;text-align:center;margin:4px 0;max-height:160mm;overflow:hidden}
+.pp.sheet-page .pp-sheet-svg svg{max-width:100%;max-height:160mm;width:auto;height:auto}
+.pp.sheet-page.roomy .pp-sheet-svg,.pp.sheet-page.roomy .pp-sheet-svg svg{max-height:178mm}
 .pp.sheet-page .sheet-specs{flex-shrink:0;font-size:9.5px;padding:4px 8px;line-height:1.35;
   display:grid;grid-template-columns:1fr 1fr;gap:0 14px;margin-bottom:4px}
 .pp.sheet-page .sheet-specs .row{padding:0}
@@ -476,6 +477,60 @@ body.print-mode{background:#fff}
 .pp .sheet-specs .row{display:flex;justify-content:space-between;gap:8px}
 .pp .sheet-specs .row b{color:#2f54eb}
 .pp .note{font-size:9px;color:#667085;margin-top:6px;font-style:italic}
+/* ── Print redesign: what to cut, at a glance ── */
+.pp,.pp *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.pp .dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;vertical-align:middle;border:1px solid rgba(0,0,0,.25)}
+.pj{display:flex;flex-direction:column;align-items:center;justify-content:center;background:#1b1e26;color:#fff;border-radius:8px;padding:6px 16px;min-width:30mm;flex-shrink:0;line-height:1.05;text-align:center}
+.pj .pj-l{font-size:12px;font-weight:800;letter-spacing:.2em}
+.pj .pj-n{font-size:36px;font-weight:800;margin:2px 0}
+.pj .pj-u{font-size:11px;font-weight:600;opacity:.85}
+.pj.pj-xl{padding:12px 26px;min-width:48mm;border-radius:10px}
+.pj.pj-xl .pj-l{font-size:20px}
+.pj.pj-xl .pj-n{font-size:72px;margin:4px 0}
+.pj.pj-xl .pj-u{font-size:16px}
+.pj.pj-lg .pj-n{font-size:44px}
+.pj.pj-sm{flex-direction:row;gap:8px;padding:5px 12px;min-width:0}
+.pj.pj-sm .pj-n{font-size:20px;margin:0}
+.pp-cover-top{display:flex;align-items:stretch;gap:16px;margin:14px 0 6px}
+.pp-proj{flex:1;min-width:0}
+.pp-proj-name{font-size:28px;font-weight:800;line-height:1.15}
+.pp-proj-sub{font-size:11px;color:#667085;margin:3px 0 12px}
+.pp-mats{display:flex;flex-direction:column;gap:5px}
+.pp-mat{display:flex;align-items:center;gap:6px;font-size:12px;border:1px solid #d2d7df;border-radius:6px;padding:6px 9px}
+.pp-mat b{flex:1}
+.pp-mat-size{color:#667085;font-family:monospace;font-size:11px}
+.pp-mat-n{font-weight:800;font-size:13px;margin-left:8px}
+.pp table.pp-plan td{vertical-align:middle;font-size:11px;padding:5px 7px}
+.pp table.pp-plan th{font-size:9px}
+.pp .pp-thumb{width:18mm;text-align:center}
+.pp .pp-thumb svg{display:block;margin:0 auto}
+.pp .pp-sheetno{font-size:18px}
+.pp .pp-same,.pp .pp-sub{font-size:9px;color:#667085}
+.pp .pj-col{text-align:center!important}
+.pp .pj-cell{display:inline-block;background:#1b1e26;color:#fff;font-weight:800;font-size:15px;border-radius:5px;padding:2px 10px;font-family:sans-serif}
+.pp tr.pp-total td{font-weight:800;background:#e9edf3!important;font-size:12px}
+.pp-stats{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin:12px 0 8px}
+.pp-stats div{border:1px solid #d2d7df;border-radius:6px;padding:6px 8px;display:flex;flex-direction:column}
+.pp-stats span{font-size:8.5px;color:#667085;text-transform:uppercase;letter-spacing:.04em}
+.pp-stats b{font-size:14px;margin-top:2px}
+.pp-legend{font-size:9.5px;color:#3F3B31;display:flex;flex-wrap:wrap;gap:4px 14px;align-items:center;border-top:1px solid #e9edf3;padding-top:8px}
+.pp i.lg-badge{display:inline-flex;align-items:center;justify-content:center;min-width:15px;height:15px;padding:0 3px;border-radius:8px;background:#1b1e26;color:#fff;font-style:normal;font-weight:700;font-size:8.5px;font-family:sans-serif;box-sizing:border-box}
+.pp-sheet-top{display:flex;align-items:stretch;gap:12px;margin:2px 0 6px;flex-shrink:0}
+.pp-sheet-id{flex:1;min-width:0;border:2px solid #1b1e26;border-radius:8px;padding:6px 10px;display:flex;flex-direction:column;justify-content:center;gap:2px}
+.pp-sheet-id .sid-n{font-size:22px;font-weight:800;line-height:1.1}
+.pp-sheet-id .sid-mat{font-size:13px;font-weight:700}
+.pp-sheet-id .sid-meta{font-size:10px;color:#3F3B31;display:flex;flex-wrap:wrap;gap:2px 12px}
+.pp-sheet-id .sid-meta span+span:before{content:'·';margin-right:12px;color:#98a2b3}
+.pp-sheet-id .sid-same{font-size:10px;font-weight:700}
+.pp-sheet-id .sid-warn{font-size:10px;color:#B84040;font-weight:700}
+.pp .pp-orig{display:block;font-size:8px;color:#667085;font-weight:400}
+.pp table.ppt td.b{font-weight:700}
+.pp table.ppt td.pp-eb{font-size:9px}
+.pp table.ppt td.pp-pos{color:#667085}
+.pp-sum-top{display:flex;align-items:center;justify-content:space-between;margin:8px 0 6px}
+.pp-sum-top h1{margin:0;font-size:18px}
+.pp.sheet-page:not(.dense):not(.ultra-dense):not(.nano-dense) table.ppt{font-size:11px}
+.pp.sheet-page:not(.dense):not(.ultra-dense):not(.nano-dense) table.ppt td{padding:4px 6px}
 .pp .footer{position:absolute;bottom:4mm;left:10mm;right:10mm;display:flex;justify-content:space-between;font-size:8px;color:#667085;border-top:1px solid #e9edf3;padding-top:3px;flex-shrink:0}
 .pp .scalebar{display:inline-block;font-size:8px;color:#667085;margin-top:4px}
 .pp .scalebar .bar{display:inline-block;height:3px;background:#1b1e26;vertical-align:middle;margin-right:4px}
@@ -555,32 +610,39 @@ body.print-mode{background:#fff}
       ondragover="event.preventDefault();this.classList.add('ov')"
       ondragleave="this.classList.remove('ov')"
       ondrop="handleDrop(event)">
+      <svg class="drop-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15.5V4m-4.5 4.5L12 4l4.5 4.5M4.5 14.5V19a1.5 1.5 0 0 0 1.5 1.5h12a1.5 1.5 0 0 0 1.5-1.5v-4.5"/></svg>
       <span data-i18n="dropHint">📂 Drop .xlsm / .xlsx / .csv / .dxf here</span><br>
       <span data-i18n="dropSub" style="font-size:10px;opacity:.6">SWOOD: full project · CSV: part list · DXF: shaped parts</span>
       <input type="file" id="fin" accept=".xlsm,.xlsx,.xls,.csv,.dxf,.DXF" multiple style="display:none" onchange="loadFile(this)">
     </div>
-    <div style="margin-top:5px;text-align:center">
-      <a href="#" onclick="event.preventDefault();document.getElementById('exdxf-in').click()" data-i18n="exLink"
-         title="Already have a cutting layout as a DXF? Pull the nested parts back out of it so they can be re-optimised."
-         style="font-size:11px;color:#2f54eb;text-decoration:none;border-bottom:1px dotted #2f54eb;cursor:pointer">⤢ Extract parts from a layout DXF</a>
+    <div id="ist" style="font-size:11px;margin-top:4px;min-height:14px"></div>
+    <!-- Other ways in: a finished sheet layout (keep or re-nest), plus small tools -->
+    <div id="imp-opts" class="imp-opts">
+      <div class="imp-h" data-i18n="impLayoutHdr">Already have a sheet layout DXF?</div>
+      <div class="imp-cards">
+        <button type="button" class="imp-card" onclick="document.getElementById('rl-in').click()"
+          data-i18n-title="rlTip" title="Sheets already laid out in CAD: keep every part where it is, name the parts and print labels. No nesting.">
+          <svg class="imp-ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="2.5" width="17" height="19" rx="1.5"/><rect x="6" y="5" width="6" height="8"/><rect x="13.5" y="5" width="4.5" height="5"/><rect x="6" y="15" width="12" height="4"/></svg>
+          <span class="imp-tx"><b data-i18n="rlCardT">Use the layout as is</b><small data-i18n="rlCardS">Parts stay in place · name them · print labels</small></span>
+        </button>
+        <button type="button" class="imp-card" onclick="document.getElementById('exdxf-in').click()"
+          data-i18n-title="exTip" title="Already have a cutting layout as a DXF? Pull the nested parts back out of it so they can be re-optimised.">
+          <svg class="imp-ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="7" width="9" height="13" rx="1"/><rect x="13" y="3" width="8.5" height="6" rx="1"/><path d="M14 14h6m-2.5-2.5L20 14l-2.5 2.5"/></svg>
+          <span class="imp-tx"><b data-i18n="exCardT">Re-nest the parts</b><small data-i18n="exCardS">Take the parts out and nest them again</small></span>
+        </button>
+      </div>
+      <div class="imp-tools">
+        <button type="button" class="imp-tool" onclick="document.getElementById('dxfview-in').click()"
+          data-i18n-title="dvTip" title="Open a DXF and look at it: layers, entity counts, and what the extractor reads as a part, a cut-out or noise.">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6"/><path d="M15 15l5.5 5.5"/></svg><span data-i18n="dvShort">Inspect DXF</span></button>
+        <button type="button" class="imp-tool" onclick="downloadPartsTemplate()"
+          data-i18n-title="tplTip" title="Download a small CSV you can fill in — just name, size and quantity. Far simpler than a full SWOOD report.">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5v11m-4.5-4.5L12 14.5 16.5 10M4.5 17v3h15v-3"/></svg><span data-i18n="tplShort">CSV template</span></button>
+      </div>
       <input type="file" id="exdxf-in" accept=".dxf,.DXF" style="display:none" onchange="extractLayoutPick(this)">
-      <span style="color:#c9ccd3"> · </span>
-      <a href="#" onclick="event.preventDefault();document.getElementById('rl-in').click()" data-i18n="rlLink"
-         title="Sheets already laid out in CAD: keep every part where it is, name the parts and print labels. No nesting."
-         style="font-size:11px;color:#2f54eb;text-decoration:none;border-bottom:1px dotted #2f54eb;cursor:pointer">📋 Ready sheet layout DXF</a>
       <input type="file" id="rl-in" accept=".dxf,.DXF" multiple style="display:none" onchange="readyLayoutPick(this)">
-      <span style="color:#c9ccd3"> · </span>
-      <a href="#" onclick="event.preventDefault();document.getElementById('dxfview-in').click()" data-i18n="dvLink"
-         title="Open a DXF and look at it: layers, entity counts, and what the extractor reads as a part, a cut-out or noise."
-         style="font-size:11px;color:#2f54eb;text-decoration:none;border-bottom:1px dotted #2f54eb;cursor:pointer">🔍 Inspect DXF</a>
       <input type="file" id="dxfview-in" accept=".dxf,.DXF" style="display:none" onchange="dxfViewerPick(this)">
     </div>
-    <div style="margin-top:5px;text-align:center">
-      <a href="#" onclick="event.preventDefault();downloadPartsTemplate()" data-i18n="tplLink"
-         data-i18n-title="tplTip" title="Download a small CSV you can fill in — just name, size and quantity. Far simpler than a full SWOOD report."
-         style="font-size:11px;color:#2f54eb;text-decoration:none;border-bottom:1px dotted #2f54eb;cursor:pointer">⤓ Parts list template (CSV)</a>
-    </div>
-    <div id="ist" style="font-size:11px;margin-top:4px;min-height:14px"></div>
   </div>
   <div class="add-card">
     <div class="add-hd"><span class="add-ico">➕</span><span data-i18n="addManual">Add part manually</span></div>
@@ -1660,6 +1722,17 @@ var I18N={
     printPdf:'🖨 Print PDF',
     printPdfTip:'Open printable layout (Save as PDF in print dialog)',
     coverTitle:'Nesting report',
+    ppPlan:'Cutting plan',
+    ppSheet:'Sheet',
+    ppMachine:'Machine',
+    ppSaw:'Saw',
+    ppPartsPerSheet:'Parts / sheet',
+    ppPartsTotal:'Parts total',
+    ppPartsWord:'parts',
+    ppTotal:'Total to cut',
+    ppSameSheets:'Identical sheets',
+    ppLegendMerged:'saw line on merged strips',
+    ppLegendOnLine:'on-line cut (part stays whole)',
     generatedOn:'Generated on',
     materialsHdr:'Materials',
     material:'Material',
@@ -1833,6 +1906,16 @@ var I18N={
     dvExtract:'⤢ Extract parts from this file',
     dvEmpty:'No entities found in that DXF.',
     exLink:'⤢ Extract parts from a layout DXF',
+    impLayoutHdr:'Already have a sheet layout DXF?',
+    rlCardT:'Use the layout as is',
+    rlCardS:'Parts stay in place · name them · print labels',
+    exCardT:'Re-nest the parts',
+    exCardS:'Take the parts out and nest them again',
+    dvShort:'Inspect DXF',
+    tplShort:'CSV template',
+    rlTip:'Sheets already laid out in CAD: keep every part where it is, name the parts and print labels. No nesting.',
+    exTip:'Pull the parts out of a cutting-layout DXF so they can be nested again.',
+    dvTip:'Open a DXF and look at it: layers, entity counts, and what is read as a part, a cut-out or noise.',
     rlLink:'📋 Ready sheet layout DXF',
     rlTitle:'Ready sheet layout — name the parts',
     rlIntro:'{s} sheet(s), {n} part(s). Every part stays exactly where it is in the drawing — nothing is re-nested.',
@@ -1926,6 +2009,17 @@ var I18N={
     printPdf:'🖨 Spausdinti PDF',
     printPdfTip:'Atidaryti spausdinimui paruoštą išdėstymą (spausdinimo dialoge pasirinkite „Išsaugoti kaip PDF“)',
     coverTitle:'Pjovimo ataskaita',
+    ppPlan:'Pjovimo planas',
+    ppSheet:'Plokštė',
+    ppMachine:'Staklės',
+    ppSaw:'Pjūklas',
+    ppPartsPerSheet:'Det. plokštėje',
+    ppPartsTotal:'Det. iš viso',
+    ppPartsWord:'det.',
+    ppTotal:'Iš viso pjauti',
+    ppSameSheets:'Vienodos plokštės',
+    ppLegendMerged:'pjūvio linija sujungtose juostose',
+    ppLegendOnLine:'pjūvis ant linijos (detalė vientisa)',
     generatedOn:'Sugeneruota',
     materialsHdr:'Medžiagos',
     material:'Medžiaga',
@@ -2093,6 +2187,16 @@ var I18N={
     dvExtract:'⤢ Išskirti detales iš šio failo',
     dvEmpty:'Šiame DXF elementų nerasta.',
     exLink:'⤢ Išskirti detales iš išdėstymo DXF',
+    impLayoutHdr:'Turite paruoštą lapo išdėstymą (DXF)?',
+    rlCardT:'Naudoti išdėstymą kaip yra',
+    rlCardS:'Detalės lieka vietoje · pavadinkite · spausdinkite etiketes',
+    exCardT:'Išdėstyti detales iš naujo',
+    exCardS:'Išimti detales ir sudėlioti jas iš naujo',
+    dvShort:'Peržiūrėti DXF',
+    tplShort:'CSV šablonas',
+    rlTip:'Lapai jau išdėstyti CAD programoje: detalės lieka vietoje, jas pavadinate ir spausdinate etiketes. Be perdėliojimo.',
+    exTip:'Išimti detales iš pjovimo išdėstymo DXF, kad jas būtų galima išdėstyti iš naujo.',
+    dvTip:'Atidaryti DXF ir pažiūrėti: sluoksniai, objektų skaičius ir kas atpažįstama kaip detalė, išpjova ar triukšmas.',
     rlLink:'📋 Paruoštas lapo išdėstymas DXF',
     rlTitle:'Paruoštas lapo išdėstymas — pavadinkite detales',
     rlIntro:'{s} lap. ({n} det.). Kiekviena detalė lieka tiksliai ten, kur yra brėžinyje — niekas neperdėliojama.',
@@ -12394,7 +12498,7 @@ function printSheetSVG(lay,widthMm){
     // behind them so they stay readable against any part color. Font size is
     // proportional to the smaller part dimension but with a higher floor/ceiling
     // so dims stay legible when printed at A4 size.
-    var dimFs=Math.max(18,Math.min(32,Math.min(pw,ph)/5));
+    var dimFs=Math.max(18,Math.min(38,Math.min(pw,ph)/5));
     var dimMargin=5;
     var lDimText=pw+''; // length (horizontal dimension)
     var wDimText=ph+''; // width (vertical dimension)
@@ -12416,18 +12520,64 @@ function printSheetSVG(lay,widthMm){
       svg+='<rect x="'+wrX+'" y="'+wrY+'" width="'+wrW+'" height="'+wrH+'" fill="#ffffff" fill-opacity="0.92" stroke="#1b1e26" stroke-width="0.3" rx="1.5"/>';
       svg+='<text x="'+wx+'" y="'+cy+'" text-anchor="middle" dominant-baseline="middle" font-size="'+dimFs+'" font-family="monospace" font-weight="700" fill="#1b1e26" transform="rotate(-90 '+wx+' '+cy+')">'+wDimText+'</text>';
     }
-    // Centered name — drawn AFTER the dimension pills so it overlaps cleanly if ever needed.
-    // Skip for merged strips: they get per-piece labels + cut lines instead (below).
+    // Number badge + name — drawn AFTER the dimension pills. A black badge with a
+    // white number reads from across the workshop and survives a mono printer; the
+    // name sits under it, or runs along the part when the part is tall and narrow.
     if(!isMergedStrip){
-      svg+='<g fill="#5A554A" font-family="sans-serif">';
-      if(showName){
-        svg+='<text x="'+cx+'" y="'+cy+'" text-anchor="middle" dominant-baseline="middle" font-size="'+fs.toFixed(1)+'">'+esc(displayName)+'</text>';
-      } else {
-        var idxFs=Math.min(innerW*0.7,innerH*0.8,22);
-        idxFs=Math.max(9,idxFs);
-        svg+='<text x="'+cx+'" y="'+cy+'" text-anchor="middle" dominant-baseline="middle" font-size="'+idxFs.toFixed(1)+'" fill="#8A8578">#'+labelIdx+'</text>';
+      var nm=layName(p.part)+rotMark, nmLen=Math.max(1,nm.length);
+      // Solid-material anchor (sheet coords, y-down) for shaped parts; rectangles use the centre.
+      var lx=cx, ly=cy, runH=[ax,ax+pw], runV=[ay,ay+ph], clear=Math.min(pw,ph)/2;
+      if(hasShape || p.nestPoly){
+        var oRing, hRings;
+        if(p.nestPoly){
+          oRing=p.nestPoly.map(function(q){ return [ax+q.x, ay+q.y]; });
+          hRings=(p.nestHoles||[]).map(function(hh){ return hh.map(function(q){ return [ax+q.x, ay+q.y]; }); });
+        } else {
+          oRing=p.part.shape.map(function(q){ var t=shapePtInBBox(p.part,p.rot,q.x,q.y); return [ax+t[0], ay+ph-t[1]]; });
+          hRings=(p.part.holes||[]).map(function(hh){ return hh.map(function(q){ var t=shapePtInBBox(p.part,p.rot,q.x,q.y); return [ax+t[0], ay+ph-t[1]]; }); });
+        }
+        var anc=_ppLabelAnchor(oRing,hRings);
+        if(anc){ lx=anc.x; ly=anc.y; clear=anc.d; runH=anc.h; runV=anc.v; }
       }
-      svg+='</g>';
+      var freeW=Math.max(1,runH[1]-runH[0]), freeH=Math.max(1,runV[1]-runV[0]);
+      var midY=(runV[0]+runV[1])/2;
+      var R=Math.max(14,Math.min(48,Math.min(pw,ph)*0.16));
+      R=Math.min(R, Math.max(8,clear*0.8));
+      var CW=0.6, GAP=R*0.35, M=8;
+      var nfsH=Math.min(42,(freeW-2*M)/(nmLen*CW), (freeH-2*M)*0.22);
+      var nfsV=Math.min(42,(freeH-2*M-2*R-GAP)/(nmLen*CW), (freeW-M)/1.25);
+      var badge=function(bx,by){
+        return '<circle cx="'+bx.toFixed(1)+'" cy="'+by.toFixed(1)+'" r="'+R.toFixed(1)+'" fill="#1b1e26"/>'
+          +'<text x="'+bx.toFixed(1)+'" y="'+by.toFixed(1)+'" dy="0.36em" text-anchor="middle" font-family="Arial,sans-serif" font-weight="700" font-size="'+(R*(labelIdx>9?1.0:1.2)).toFixed(1)+'" fill="#fff">'+labelIdx+'</text>';
+      };
+      var blockH=2*R+GAP+nfsH;
+      var mode=(nfsH>=13 && freeH>=blockH+2*M) ? 'h' : ((freeH>freeW && nfsV>=13) ? 'v' : 'b');
+      var segA=runV[0]+M, segB=runV[1]-M;
+      if(mode==='v'){
+        // Running along a tall narrow part: keep clear of the width pill at the top
+        // and the length pill at the part's middle — use whichever side of the
+        // length pill has more room, shrinking the text if it has to.
+        if(pw>=40 && ph>=30) segA=Math.max(segA, ay+dimFs*1.9+dimMargin);
+        var wpx0=ax+dimMargin, wpx1=ax+2*dimFs+dimMargin+dimFs*0.55;
+        if(ph>=40 && pw>=30 && lx-nfsV*0.7<wpx1 && lx+nfsV*0.7>wpx0){
+          var ex0=cy-wDimW/2-8, ex1=cy+wDimW/2+8;
+          if(ex0-segA >= segB-ex1) segB=Math.min(segB,ex0); else segA=Math.max(segA,ex1);
+        }
+        nfsV=Math.min(nfsV, (segB-segA-2*R-GAP)/(nmLen*CW));
+        if(nfsV<10) mode='b';
+      }
+      if(mode==='h'){
+        // Centre the badge+name block on the anchor, kept inside the free vertical run.
+        var top=Math.max(runV[0]+M, Math.min(ly-blockH/2, runV[1]-M-blockH));
+        svg+=badge(lx,top+R);
+        svg+='<text x="'+lx.toFixed(1)+'" y="'+(top+2*R+GAP+nfsH*0.82).toFixed(1)+'" text-anchor="middle" font-family="Arial,sans-serif" font-weight="700" font-size="'+nfsH.toFixed(1)+'" fill="#1b1e26">'+esc(nm)+'</text>';
+      } else if(mode==='v'){
+        var tl=nmLen*CW*nfsV, top2=(segA+segB)/2-(2*R+GAP+tl)/2, ty=top2+2*R+GAP+tl/2;
+        svg+=badge(lx,top2+R);
+        svg+='<text x="'+lx.toFixed(1)+'" y="'+ty.toFixed(1)+'" dy="0.35em" text-anchor="middle" font-family="Arial,sans-serif" font-weight="700" font-size="'+nfsV.toFixed(1)+'" fill="#1b1e26" transform="rotate(-90 '+lx.toFixed(1)+' '+ty.toFixed(1)+')">'+esc(nm)+'</text>';
+      } else {
+        svg+=badge(lx,ly);
+      }
     }
     // ── MERGED STRIP: saw-cut guides for the workshop ─────────────────
     // Dashed cut lines where the operator saws the strip apart, a ✂ at each
@@ -12520,16 +12670,95 @@ function printSheetSVG(lay,widthMm){
   svg+='</svg>';
   return svg;
 }
+// Sheet count wording — "PJAUTI" is always Lithuanian on the print (workshop
+// convention); the unit follows the UI language, with correct LT plural forms.
+function _ppSheetsWord(n){
+  if(_lang==='lt'){
+    var a=n%10, b=n%100;
+    if(a===1 && b!==11) return 'plokštė';
+    if(a===0 || (b>=10 && b<=20)) return 'plokščių';
+    return 'plokštės';
+  }
+  return n===1?'sheet':'sheets';
+}
+function _ppCutBadge(n, size){
+  return '<div class="pj'+(size?' pj-'+size:'')+'"><span class="pj-l">PJAUTI</span>'
+    +'<span class="pj-n">'+n+'</span><span class="pj-u">'+_ppSheetsWord(n)+'</span></div>';
+}
+// Outline-only miniature of a sheet for the cutting-plan table.
+function _ppThumbSVG(lay, wMm){
+  var sw=lay.sw, sh=lay.sh, trim=lay.trim||0;
+  var s='<svg width="'+wMm+'mm" height="'+(wMm*sh/sw).toFixed(1)+'mm" viewBox="0 0 '+sw+' '+sh+'" xmlns="http://www.w3.org/2000/svg">'
+    +'<rect x="0" y="0" width="'+sw+'" height="'+sh+'" fill="#fff" stroke="#1b1e26" stroke-width="'+(sw/90).toFixed(1)+'"/>';
+  (lay.placements||[]).forEach(function(p){
+    var ax=trim+p.x, ay=trim+p.y, pts;
+    if(p.nestPoly&&p.nestPoly.length>2) pts=p.nestPoly.map(function(q){ return [ax+q.x, ay+q.y]; });
+    else if(p.part&&p.part.shape&&p.part.shape.length>2) pts=p.part.shape.map(function(q){ var t=shapePtInBBox(p.part,p.rot,q.x,q.y); return [ax+t[0], ay+p.ph-t[1]]; });
+    else pts=[[ax,ay],[ax+p.pw,ay],[ax+p.pw,ay+p.ph],[ax,ay+p.ph]];
+    s+='<polygon points="'+pts.map(function(q){ return q[0].toFixed(0)+','+q[1].toFixed(0); }).join(' ')+'" fill="#e4e7ec" stroke="#1b1e26" stroke-width="'+(sw/220).toFixed(1)+'"/>';
+  });
+  return s+'</svg>';
+}
+// Where to put a part's number on the printed sheet: the point inside the part
+// (outline minus its cut-outs) farthest from every edge — so an L-shape or a
+// panel full of slots gets its label on solid material, not in a gap. Also
+// returns the free horizontal/vertical run through that point, for sizing text.
+function _ppLabelAnchor(outer, holes){
+  var edges=[];
+  [outer].concat(holes||[]).forEach(function(r){
+    for(var i=0;i<r.length;i++){ var a=r[i], b=r[(i+1)%r.length]; edges.push([a[0],a[1],b[0],b[1]]); }
+  });
+  function inside(x,y){
+    if(!_pointInPoly(x,y,outer.map(function(q){return {x:q[0],y:q[1]};}))) return false;
+    for(var h=0;h<(holes||[]).length;h++){ if(_pointInPoly(x,y,holes[h].map(function(q){return {x:q[0],y:q[1]};}))) return false; }
+    return true;
+  }
+  function dist(x,y){
+    var m=Infinity;
+    for(var i=0;i<edges.length;i++){
+      var e=edges[i], dx=e[2]-e[0], dy=e[3]-e[1], L2=dx*dx+dy*dy;
+      var tt=L2?Math.max(0,Math.min(1,((x-e[0])*dx+(y-e[1])*dy)/L2)):0;
+      var d=Math.hypot(x-(e[0]+tt*dx), y-(e[1]+tt*dy)); if(d<m) m=d;
+    }
+    return m;
+  }
+  var minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+  outer.forEach(function(q){ if(q[0]<minX)minX=q[0]; if(q[0]>maxX)maxX=q[0]; if(q[1]<minY)minY=q[1]; if(q[1]>maxY)maxY=q[1]; });
+  var best=null, bd=-1, x0=minX, y0=minY, w=maxX-minX, h=maxY-minY, N=20;
+  for(var pass=0;pass<3;pass++){
+    for(var i=0;i<=N;i++) for(var j=0;j<=N;j++){
+      var x=x0+w*i/N, y=y0+h*j/N;
+      if(!inside(x,y)) continue;
+      var d=dist(x,y); if(d>bd){ bd=d; best=[x,y]; }
+    }
+    if(!best) break;
+    w/=N/3; h/=N/3; x0=best[0]-w/2; y0=best[1]-h/2;   // zoom in around the best point
+  }
+  if(!best) return null;
+  // Free run through the anchor, horizontally and vertically.
+  function run(horizontal){
+    var lo=-Infinity, hi=Infinity, c=horizontal?best[0]:best[1];
+    edges.forEach(function(e){
+      var a=horizontal?[e[0],e[1],e[2],e[3]]:[e[1],e[0],e[3],e[2]];   // swap axes for vertical
+      var k=horizontal?best[1]:best[0];
+      if((a[1]>k)===(a[3]>k)) return;
+      var v=a[0]+(k-a[1])*(a[2]-a[0])/(a[3]-a[1]);
+      if(v<c && v>lo) lo=v; if(v>=c && v<hi) hi=v;
+    });
+    return [lo,hi];
+  }
+  return {x:best[0], y:best[1], d:bd, h:run(true), v:run(false)};
+}
+function _ppPartName(part){
+  var shown=layName(part), orig=part.origName||'';
+  return '<b>'+esc(shown)+'</b>'+(orig&&orig!==shown?'<span class="pp-orig">'+esc(orig)+'</span>':'');
+}
 function buildPrintView(){
   var root=document.getElementById('print-root');
   var proj=currentProjectName||t('untitled');
-  var today=new Date();
-  var dateStr=today.toISOString().slice(0,10);
-  // Brand line now reads "<Project> — Nesting" instead of the company name.
-  // If the project is unnamed, just show "Nesting" so we don't print "Untitled — Nesting".
-  var hasProjName = !!(currentProjectName && currentProjectName.trim());
-  var brand = hasProjName ? (currentProjectName + ' — Nesting') : 'Nesting';
-  // Pre-render branding
+  var dateStr=new Date().toISOString().slice(0,10);
+  var hasProjName=!!(currentProjectName && currentProjectName.trim());
+  var brand=hasProjName ? (currentProjectName+' — Nesting') : 'Nesting';
   var logoImg=document.querySelector('.hdr img');
   var logoSrc=logoImg?logoImg.src:'';
   function header(subtitle){
@@ -12537,142 +12766,126 @@ function buildPrintView(){
       +(logoSrc?'<img src="'+logoSrc+'" alt="">':'')
       +'<div class="pp-brand">'+esc(brand)+'</div>'
       +'<div class="pp-title">'+esc(subtitle)+'</div>'
-      // proj is already in the brand line, so the meta only shows the date —
-      // otherwise the project name would appear twice on every page.
       +'<div class="pp-meta">'+dateStr+'</div>'
       +'</div>';
   }
   function footer(pageNo,total){
     return '<div class="footer"><span>'+esc(proj)+' · '+dateStr+'</span><span>'+t('page')+' '+pageNo+' / '+total+'</span></div>';
   }
-  // ── Precompute data used on cover & summary ──
-  var totSheets=layouts.length;
+  function machineLabel(l){ return l.machine==='saw'?'🪚 '+t('ppSaw'):l.machine==='cnc'?'🤖 CNC':'—'; }
+
+  // ── Unique sheet patterns and how many of each to cut ──
+  var dups=computeLayoutDupGroups();
+  var plan=[];   // [{idx, lay, copies, same:[sheet numbers]}]
+  layouts.forEach(function(lay,i){
+    var sig=dups.sigs[i];
+    if(dups.firstIdx[sig]!==i) return;
+    var same=[]; layouts.forEach(function(l2,j){ if(dups.sigs[j]===sig) same.push(j+1); });
+    plan.push({idx:i, lay:lay, copies:dups.countBy[sig], same:same});
+  });
+  var toCut=plan.reduce(function(n,r){ return n+r.copies; },0);
   var totParts=layouts.reduce(function(n,l){return n+(l.placements||[]).length;},0);
   var totBoardArea=layouts.reduce(function(a,l){return a+l.uw*l.uh;},0);
-  var totUsedArea=layouts.reduce(function(a,l){return a+(l.placements||[]).reduce(function(b,p){return b+p.pw*p.ph;},0);},0);
+  var totUsedArea=layouts.reduce(function(a,l){return a+(l.placements||[]).reduce(function(b,p){return b+_placementUsedArea(p);},0);},0);
   var totalEff=totBoardArea?Math.round(totUsedArea/totBoardArea*100):0;
   var totalWaste=((totBoardArea-totUsedArea)/1e6).toFixed(2);
-  // By-material summary
-  var byMat={};
+  var byMat={}, matOrder=[];
   layouts.forEach(function(l){
-    var mat=l.matName||'?';
-    if(!byMat[mat])byMat[mat]={sheets:0,parts:0,used:0,total:0,color:l.matColor||'#667085'};
-    byMat[mat].sheets++;
-    byMat[mat].parts+=(l.placements||[]).length;
-    byMat[mat].used+=(l.placements||[]).reduce(function(b,p){return b+p.pw*p.ph;},0);
-    byMat[mat].total+=l.uw*l.uh;
+    var k=l.matName||'?';
+    if(!byMat[k]){ byMat[k]={sheets:0, sizes:{}, color:l.matColor||'#667085'}; matOrder.push(k); }
+    byMat[k].sheets++; byMat[k].sizes[l.sw+' × '+l.sh]=1;
   });
   var kerf=parseInt((document.getElementById('kerf')||{}).value||0)||0;
+  var kerfCnc=parseInt((document.getElementById('kerf-cnc')||{}).value||0)||kerf;
   var trim=parseInt((document.getElementById('trim')||{}).value||0)||0;
-  // Total pages = cover + N unique sheets + summary
-  var dupsForTotal = computeLayoutDupGroups();
-  var uniqueSheetCount = 0;
-  layouts.forEach(function(l, i){
-    if(dupsForTotal.firstIdx[dupsForTotal.sigs[i]] === i) uniqueSheetCount++;
-  });
-  var totalPages=1+uniqueSheetCount+1;
-  var pageNo=1;
-  var html='';
-  // ── COVER PAGE ──
-  html+='<div class="pp">'+header(t('coverTitle'));
-  html+='<h1 style="margin-top:24px;text-align:center;font-size:28px">'+esc(proj)+'</h1>';
-  html+='<div style="text-align:center;color:#667085;font-size:13px;margin-bottom:18px">'+t('generatedOn')+' '+dateStr+'</div>';
-  html+='<div class="summary-grid">'
-    +'<div class="box"><div class="v">'+totSheets+'</div><div class="l">'+t('statSheets')+'</div></div>'
-    +'<div class="box"><div class="v">'+totParts+'</div><div class="l">'+t('statParts')+'</div></div>'
-    +'<div class="box"><div class="v">'+totalEff+'%</div><div class="l">'+t('statEfficiency')+'</div></div>'
-    +'<div class="box"><div class="v">'+totalWaste+'</div><div class="l">'+t('statWaste')+'</div></div>'
+  var totalPages=1+plan.length+1, pageNo=1, html='';
+
+  // ══ COVER — what to cut ══
+  html+='<div class="pp pp-cover">'+header(t('coverTitle'));
+  html+='<div class="pp-cover-top">'
+    +'<div class="pp-proj"><div class="pp-proj-name">'+esc(proj)+'</div>'
+    +'<div class="pp-proj-sub">'+t('generatedOn')+' '+dateStr+'</div>'
+    +'<div class="pp-mats">'+matOrder.map(function(k){
+        var m=byMat[k];
+        return '<div class="pp-mat"><span class="dot" style="background:'+m.color+'"></span><b>'+esc(k)+'</b>'
+          +'<span class="pp-mat-size">'+Object.keys(m.sizes).join(', ')+' mm</span>'
+          +'<span class="pp-mat-n">'+m.sheets+' '+_ppSheetsWord(m.sheets)+'</span></div>';
+      }).join('')+'</div></div>'
+    +_ppCutBadge(toCut,'xl')
     +'</div>';
-  // Materials table
-  html+='<h2>'+t('materialsHdr')+'</h2>';
-  html+='<table class="ppt"><thead><tr>'
-    +'<th></th><th>'+t('material')+'</th><th class="num">'+t('sheetsCol')+'</th>'
-    +'<th class="num">'+t('partsCol')+'</th><th class="num">'+t('effCol')+'</th>'
-    +'<th class="num">'+t('wasteCol')+' m²</th>'
+  html+='<h2>'+t('ppPlan')+'</h2>';
+  html+='<table class="ppt pp-plan"><thead><tr>'
+    +'<th>'+t('ppSheet')+'</th><th></th><th>'+t('material')+'</th><th>'+t('ppMachine')+'</th>'
+    +'<th class="num">'+t('ppPartsPerSheet')+'</th><th class="num pj-col">PJAUTI</th><th class="num">'+t('ppPartsTotal')+'</th>'
     +'</tr></thead><tbody>';
-  Object.keys(byMat).forEach(function(mat){
-    var b=byMat[mat];
-    var eff=b.total?Math.round(b.used/b.total*100):0;
-    var waste=((b.total-b.used)/1e6).toFixed(2);
+  plan.forEach(function(r){
+    var n=(r.lay.placements||[]).length;
     html+='<tr>'
-      +'<td><span style="display:inline-block;width:10px;height:10px;background:'+b.color+';border-radius:50%"></span></td>'
-      +'<td>'+esc(mat)+'</td>'
-      +'<td class="num">'+b.sheets+'</td>'
-      +'<td class="num">'+b.parts+'</td>'
-      +'<td class="num">'+eff+'%</td>'
-      +'<td class="num">'+waste+'</td>'
+      +'<td><b class="pp-sheetno">'+(r.idx+1)+'</b>'+(r.same.length>1?'<div class="pp-same">= '+r.same.join(', ')+'</div>':'')+'</td>'
+      +'<td class="pp-thumb">'+_ppThumbSVG(r.lay,13)+'</td>'
+      +'<td><span class="dot" style="background:'+(r.lay.matColor||'#667085')+'"></span>'+esc(r.lay.matName||'?')
+        +'<div class="pp-sub">'+r.lay.sw+' × '+r.lay.sh+' mm</div></td>'
+      +'<td>'+machineLabel(r.lay)+'</td>'
+      +'<td class="num">'+n+'</td>'
+      +'<td class="num pj-col"><span class="pj-cell">× '+r.copies+'</span></td>'
+      +'<td class="num">'+(n*r.copies)+'</td>'
       +'</tr>';
   });
+  html+='<tr class="pp-total"><td colspan="5">'+t('ppTotal')+'</td><td class="num pj-col"><span class="pj-cell">'+toCut+'</span></td><td class="num">'+totParts+'</td></tr>';
   html+='</tbody></table>';
-  // Cut settings
-  html+='<h2>'+t('settingsHdr')+'</h2>';
-  html+='<div style="display:flex;gap:16px;font-size:11px">'
-    +'<div><b>'+t('sawKerf')+':</b> '+kerf+' mm</div>'
-    +'<div><b>'+t('boardTrim')+':</b> '+trim+' mm</div>'
+  html+='<div class="pp-stats">'
+    +'<div><span>'+t('statParts')+'</span><b>'+totParts+'</b></div>'
+    +'<div><span>'+t('statEfficiency')+'</span><b>'+totalEff+'%</b></div>'
+    +'<div><span>'+t('statWaste')+'</span><b>'+totalWaste+' m²</b></div>'
+    +'<div><span>'+t('sawKerf')+'</span><b>'+kerf+' mm'+(kerfCnc!==kerf?' · CNC '+kerfCnc+' mm':'')+'</b></div>'
+    +'<div><span>'+t('boardTrim')+'</span><b>'+trim+' mm</b></div>'
     +'</div>';
-  // Legend for the sheet pages
-  html+='<h2>'+t('legendHdr')+'</h2>';
-  html+='<div style="font-size:10px;line-height:1.6;color:#3F3B31">'
-    +'<div>■ '+t('legendColor')+'</div>'
-    +'<div>#N — '+t('legendIndex')+'</div>'
-    +'<div>↻ — '+t('legendRot')+'</div>'
-    +'<div>━━━ '+t('legendTrim')+'</div>'
-    +'<div>┄┄┄ '+t('legendBBox')+'</div>'
-    +'<div style="color:#7A2E12">✂ ┄┄ saw line on 🔗 merged strips — cut apart into the marked pieces</div>'
-    +'<div>↑ — '+t('legendGrain')+'</div>'
+  html+='<div class="pp-legend"><b>'+t('legendHdr')+':</b> '
+    +'<span><i class="lg-badge">3</i> '+t('legendIndex')+'</span>'
+    +'<span>↻ '+t('legendRot')+'</span>'
+    +'<span>┄┄ '+t('legendBBox')+'</span>'
+    +'<span style="color:#7A2E12">✂ ┄┄ '+t('ppLegendMerged')+'</span>'
+    +'<span style="color:#d63adf">━ '+t('ppLegendOnLine')+'</span>'
     +'</div>';
   html+=footer(pageNo++,totalPages)+'</div>';
-  // ── ONE PORTRAIT PAGE PER UNIQUE SHEET (duplicates collapsed with ×N) ──
-  // The diagram now takes the lion's share of the page (up to 155mm tall).
-  // Specs are presented as a compact 2-column grid below it, then the parts
-  // table fills the remaining ~55-65mm with density tiering for >10 parts.
-  var pdfDups = computeLayoutDupGroups();
-  layouts.forEach(function(lay,i){
-    if(pdfDups.firstIdx[pdfDups.sigs[i]] !== i) return;
-    var placements=(lay.placements||[]).slice();
-    var usedA=placements.reduce(function(n,p){return n+p.pw*p.ph;},0);
+
+  // ══ ONE PAGE PER UNIQUE SHEET ══
+  plan.forEach(function(r){
+    var lay=r.lay, placements=(lay.placements||[]).slice();
+    var usedA=placements.reduce(function(n,p){return n+_placementUsedArea(p);},0);
     var eff=lay.uw*lay.uh?Math.round(usedA/(lay.uw*lay.uh)*100):0;
-    var matLabel=esc(lay.matName||'?');
-    var dupCount = pdfDups.countBy[pdfDups.sigs[i]];
-    // Density tiers tuned for the new bigger-diagram layout. Thresholds bumped
-    // up slightly since the table has less vertical room than before.
-    var densityCls = placements.length <= 10 ? ''
-                   : placements.length <= 20 ? 'dense'
-                   : placements.length <= 35 ? 'ultra-dense'
-                   : 'nano-dense';
-    html+='<div class="pp sheet-page '+densityCls+'">'+header(t('sheetPageTitle',{n:i+1,total:layouts.length}));
-    var copiesNote = dupCount>1
-      ? ' <span style="background:#2f54eb;color:#fff;border-radius:4px;padding:2px 8px;font-size:14px;margin-left:6px">CUT × '+dupCount+'</span>'
-      : '';
-    html+='<h1 style="margin-top:4px;font-size:16px"><span style="display:inline-block;width:12px;height:12px;background:'+lay.matColor+';border-radius:50%;vertical-align:middle;margin-right:6px"></span>'+matLabel+' — '+t('sheetLabel',{n:i+1})+copiesNote+'</h1>';
-    // The diagram — rendered at 190mm wide (full content width). CSS max-height
-    // caps it so the aspect ratio is preserved while filling whichever
-    // dimension is smaller.
-    html+='<div class="pp-sheet-svg">'+printSheetSVG(lay,190)+'</div>';
-    // Compact 2-column specs grid — fits twice as much info in half the height.
-    html+='<div class="sheet-specs">'
-      +'<div class="row"><span>'+t('boardSize')+'</span><b>'+lay.sw+' × '+lay.sh+' mm</b></div>'
-      +'<div class="row"><span>'+t('usableArea')+'</span><b>'+lay.uw+' × '+lay.uh+' mm</b></div>'
-      +'<div class="row"><span>'+t('partsOnSheet')+'</span><b>'+placements.length+'</b></div>'
-      +'<div class="row"><span>'+t('statEfficiency')+'</span><b>'+eff+'%</b></div>'
-      +(lay.trim?'<div class="row"><span>'+t('withTrim')+'</span><b>'+lay.trim+' mm</b></div>':'')
-      +(lay.machine ? '<div class="row"><span>Machine</span><b>'+(lay.machine==='saw'?'🪚 Saw':'🤖 CNC')+' · kerf '+lay.kerf+'mm</b></div>' : '')
-      +(dupCount>1?'<div class="row" style="color:#2f54eb"><span>📐 Copies</span><b>×'+dupCount+' (total '+(placements.length*dupCount)+')</b></div>':'')
-      +(lay.grainLocked?'<div class="row"><span>'+t('grainLock')+'</span><b>'+t('locked')+' ↑</b></div>':'')
-      +(lay.trimWarning?'<div class="row" style="color:#B84040;grid-column:1/-1"><span>⚠ '+t('trimWarn')+'</span></div>':'')
+    var densityCls=placements.length<=6?'roomy':placements.length<=10?'':placements.length<=20?'dense':placements.length<=35?'ultra-dense':'nano-dense';
+    html+='<div class="pp sheet-page '+densityCls+'">'+header(t('sheetPageTitle',{n:r.idx+1,total:layouts.length}));
+    html+='<div class="pp-sheet-top">'
+      +'<div class="pp-sheet-id">'
+        +'<div class="sid-n">'+t('sheetLabel',{n:r.idx+1})+'</div>'
+        +'<div class="sid-mat"><span class="dot" style="background:'+(lay.matColor||'#667085')+'"></span>'+esc(lay.matName||'?')+'</div>'
+        +'<div class="sid-meta">'
+          +'<span>'+lay.sw+' × '+lay.sh+' mm</span>'
+          +'<span>'+machineLabel(lay)+(typeof lay.kerf==='number'?' · kerf '+lay.kerf+' mm':'')+'</span>'
+          +'<span>'+placements.length+' '+t('ppPartsWord')+'</span>'
+          +'<span>'+eff+'%</span>'
+          +(lay.trim?'<span>'+t('withTrim')+' '+lay.trim+' mm</span>':'')
+          +(lay.grainLocked?'<span>'+t('grainLock')+' ↑</span>':'')
+        +'</div>'
+        +(r.same.length>1?'<div class="sid-same">'+t('ppSameSheets')+': '+r.same.join(', ')+'</div>':'')
+        +(lay.trimWarning?'<div class="sid-warn">⚠ '+t('trimWarn')+'</div>':'')
+      +'</div>'
+      +_ppCutBadge(r.copies,'lg')
       +'</div>';
-    // Parts table — fills whatever vertical space is left.
+    html+='<div class="pp-sheet-svg">'+printSheetSVG(lay,190)+'</div>';
     html+='<div class="pp-parts-wrap"><table class="ppt"><thead><tr>'
       +'<th class="num">#</th><th>'+t('name')+'</th>'
       +'<th class="num">'+t('lengthMm')+'</th><th class="num">'+t('widthMm')+'</th>'
-      +'<th class="num">'+t('thickCol')+'</th><th class="num">'+t('posCol')+'</th>'
-      +'<th class="num">'+t('rotCol')+'</th><th>'+t('edgesCol')+'</th>'
+      +'<th class="num">'+t('thickCol')+'</th>'
+      +(r.copies>1?'<th class="num">'+t('ppPartsTotal')+'</th>':'')
+      +'<th class="num">'+t('rotCol')+'</th><th>'+t('edgesCol')+'</th><th class="num">'+t('posCol')+'</th>'
       +'</tr></thead><tbody>';
     placements.forEach(function(p,idx){
       var eb=p.part.eb||{};
       var ebStr=[eb.eb1,eb.eb2,eb.eb3,eb.eb4].filter(Boolean).join(' / ')||'—';
       var isM=!!(p.part&&p.part.__merged&&p.part.__mergedShorts);
-      var nameCell=esc(p.part.origName);
+      var nameCell=_ppPartName(p.part);
       if(isM){
         var cutList=p.part.__mergedShorts.map(function(v){return Math.round(v);}).join(' | ');
         var dir=(p.part.__mergedMode==='length')?'across width':'along length';
@@ -12680,29 +12893,29 @@ function buildPrintView(){
           +'<div style="font-size:8px;color:#7A2E12">✂ saw '+dir+': '+esc(cutList)+' mm</div>';
       }
       html+='<tr'+(isM?' style="background:#FBF1E4"':'')+'>'
-        +'<td class="num">'+(idx+1)+'</td>'
+        +'<td class="num"><i class="lg-badge">'+(idx+1)+'</i></td>'
         +'<td>'+nameCell+'</td>'
-        +'<td class="num">'+p.pw+'</td>'
-        +'<td class="num">'+p.ph+'</td>'
+        +'<td class="num b">'+p.pw+'</td>'
+        +'<td class="num b">'+p.ph+'</td>'
         +'<td class="num">'+(p.part.thick||18)+'</td>'
-        +'<td class="num">'+p.x+','+p.y+'</td>'
-        +'<td class="num">'+(p.rot?'90°':'—')+'</td>'
-        +'<td style="font-size:9px">'+esc(ebStr)+'</td>'
+        +(r.copies>1?'<td class="num">× '+r.copies+'</td>':'')
+        +'<td class="num">'+(p.rot?(p.nestAngle&&Math.round(p.nestAngle)%90!==0?Math.round(p.nestAngle)+'°':'↻ 90°'):'—')+'</td>'
+        +'<td class="pp-eb">'+esc(ebStr)+'</td>'
+        +'<td class="num pp-pos">'+Math.round(p.x)+', '+Math.round(p.y)+'</td>'
         +'</tr>';
     });
     html+='</tbody></table></div>';
     html+=footer(pageNo++,totalPages)+'</div>';
   });
-  // ── SUMMARY / ALL-PARTS INDEX PAGE ──
+
+  // ══ ALL PARTS ══
   html+='<div class="pp">'+header(t('summaryTitle'));
-  html+='<h1 style="margin-top:8px;font-size:18px">'+t('summaryHdr')+'</h1>';
-  // Grouped totals by (origName, material, L × W)
-  var grp={};
-  var order=[];
+  html+='<div class="pp-sum-top"><h1>'+t('summaryHdr')+'</h1>'+_ppCutBadge(toCut,'sm')+'</div>';
+  var grp={}, order=[];
   layouts.forEach(function(l){
     (l.placements||[]).forEach(function(p){
       var key=p.part.origName+'|'+p.part.mat+'|'+p.pw+'x'+p.ph;
-      if(!grp[key]){grp[key]={name:p.part.origName,mat:p.part.mat,L:p.pw,W:p.ph,qty:0,thick:p.part.thick||18,color:l.matColor};order.push(key);}
+      if(!grp[key]){ grp[key]={part:p.part, mat:p.part.mat, L:p.pw, W:p.ph, qty:0, thick:p.part.thick||18, color:l.matColor}; order.push(key); }
       grp[key].qty++;
     });
   });
@@ -12714,58 +12927,15 @@ function buildPrintView(){
     +'</tr></thead><tbody>';
   var sumQty=0, sumArea=0;
   order.forEach(function(k){
-    var g=grp[k];
-    var area=g.L*g.W*g.qty/1e6;
+    var g=grp[k], area=g.L*g.W*g.qty/1e6;
     sumQty+=g.qty; sumArea+=area;
-    html+='<tr>'
-      +'<td>'+esc(g.name)+'</td>'
-      +'<td><span style="display:inline-block;width:8px;height:8px;background:'+g.color+';border-radius:50%;margin-right:4px"></span>'+esc(g.mat)+'</td>'
-      +'<td class="num">'+g.L+'</td>'
-      +'<td class="num">'+g.W+'</td>'
-      +'<td class="num">'+g.thick+'</td>'
-      +'<td class="num">×'+g.qty+'</td>'
-      +'<td class="num">'+area.toFixed(3)+'</td>'
-      +'</tr>';
+    html+='<tr><td>'+_ppPartName(g.part)+'</td>'
+      +'<td><span class="dot" style="background:'+g.color+'"></span>'+esc(g.mat)+'</td>'
+      +'<td class="num b">'+g.L+'</td><td class="num b">'+g.W+'</td><td class="num">'+g.thick+'</td>'
+      +'<td class="num b">× '+g.qty+'</td><td class="num">'+area.toFixed(3)+'</td></tr>';
   });
-  html+='<tr style="font-weight:700;background:#e9edf3"><td colspan="5">'+t('totalRow')+'</td><td class="num">×'+sumQty+'</td><td class="num">'+sumArea.toFixed(3)+'</td></tr>';
+  html+='<tr class="pp-total"><td colspan="5">'+t('totalRow')+'</td><td class="num">× '+sumQty+'</td><td class="num">'+sumArea.toFixed(3)+'</td></tr>';
   html+='</tbody></table>';
-
-  // ── Sheet plan: which sheets are unique vs duplicated ──
-  var planDups = computeLayoutDupGroups();
-  var planRows = [];
-  layouts.forEach(function(lay, i){
-    if(planDups.firstIdx[planDups.sigs[i]] !== i) return;
-    var copies = planDups.countBy[planDups.sigs[i]];
-    var partsCount = (lay.placements||[]).length;
-    planRows.push({idx:i, copies:copies, lay:lay, partsCount:partsCount});
-  });
-  // Show plan only if there's at least one duplicated sheet (saves space otherwise)
-  var hasDups = planRows.some(function(r){return r.copies>1;});
-  if(hasDups){
-    html+='<h2 style="margin-top:16px">📐 Sheet plan</h2>';
-    html+='<table class="ppt"><thead><tr>'
-      +'<th class="num">Sheet #</th><th>Material</th><th>Machine</th>'
-      +'<th class="num">Parts/sheet</th><th class="num">Cut copies</th><th class="num">Total parts</th>'
-      +'</tr></thead><tbody>';
-    var totalSheetsToCut = 0;
-    planRows.forEach(function(r){
-      var copyBadge = r.copies>1
-        ? '<b style="color:#2f54eb">×'+r.copies+'</b>'
-        : '×1';
-      var mach = r.lay.machine==='saw' ? '🪚 Saw' : r.lay.machine==='cnc' ? '🤖 CNC' : '—';
-      totalSheetsToCut += r.copies;
-      html+='<tr>'
-        +'<td class="num">'+(r.idx+1)+'</td>'
-        +'<td><span style="display:inline-block;width:8px;height:8px;background:'+r.lay.matColor+';border-radius:50%;margin-right:4px"></span>'+esc(r.lay.matName||'?')+'</td>'
-        +'<td>'+mach+'</td>'
-        +'<td class="num">'+r.partsCount+'</td>'
-        +'<td class="num">'+copyBadge+'</td>'
-        +'<td class="num">'+(r.partsCount*r.copies)+'</td>'
-        +'</tr>';
-    });
-    html+='<tr style="font-weight:700;background:#e9edf3"><td colspan="4">'+planRows.length+' unique pattern(s) → '+totalSheetsToCut+' sheets to cut total</td><td class="num"></td><td class="num"></td></tr>';
-    html+='</tbody></table>';
-  }
   html+='<div class="note" style="margin-top:14px">'+t('summaryNote')+'</div>';
   html+=footer(pageNo++,totalPages)+'</div>';
   root.innerHTML=html;

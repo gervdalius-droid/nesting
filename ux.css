@@ -16,3 +16,25 @@ button,input,select{font:inherit}button,a,input,select,summary{touch-action:mani
 #saveStatus:empty{display:none}.ux-step{min-width:0}.ux-step>span:first-child{flex-shrink:0}
 
 .sec-add-board{background:var(--soft)!important;color:var(--accent)!important;border:1px solid #c9ded2!important}.btn:not(.bp):not(.br),.bdl,.rot-btn{color:var(--ink)!important;border-color:#d5dfe7!important}.ux-disclosure .add-hd{display:none}.ux-panel #dropz{margin-bottom:10px}.ux-panel #ist:empty{display:none}.ux-disclosure .add-card{border:0;padding:0}.ux-panel .sec[data-i18n=importFile]{margin-bottom:8px}.ux-steps{flex-shrink:0}
+/* Import area: drop zone, status line, sheet-layout options, small tools */
+.ux-panel #dropz{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:20px 12px;border:1.5px dashed #b9c9c1;border-radius:12px;background:#fbfdfc;transition:border-color .15s,background .15s}
+.ux-panel #dropz:hover,.ux-panel #dropz.ov{border-color:var(--accent);background:var(--soft)}
+.ux-panel #dropz br{display:none}
+.ux-panel #dropz .drop-ico{width:28px;height:28px;fill:none;stroke:var(--accent);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;margin-bottom:6px}
+.ux-panel #dropz [data-i18n=dropHint]{font-weight:600;color:var(--ink);font-size:13px}
+.ux-panel #dropz [data-i18n=dropSub]{font-size:11px!important;opacity:1!important;color:var(--muted)}
+.ux-panel #ist{margin:0 0 12px!important;padding:8px 10px;border-radius:8px;background:#f5f7f9;border-left:3px solid currentColor;font-weight:600;line-height:1.35}
+.imp-opts{border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:12px;background:#fff}
+.imp-h{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px}
+.imp-cards{display:grid;grid-template-columns:1fr;gap:8px}
+.imp-card{display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:#fbfcfd;color:var(--ink);cursor:pointer;transition:border-color .15s,background .15s,box-shadow .15s}
+.imp-card:hover{border-color:var(--accent);background:var(--soft);box-shadow:0 1px 0 rgba(35,103,79,.08)}
+.imp-card .imp-ico{width:30px;height:30px;flex-shrink:0;padding:5px;border-radius:8px;background:var(--soft);fill:none;stroke:var(--accent);stroke-width:1.6;stroke-linejoin:round;stroke-linecap:round;box-sizing:border-box}
+.imp-tx{display:flex;flex-direction:column;min-width:0}
+.imp-tx b{font-size:13px;font-weight:650}
+.imp-tx small{font-size:11px;color:var(--muted);margin-top:2px;line-height:1.3}
+.imp-tools{display:flex;gap:6px;margin-top:10px;padding-top:10px;border-top:1px solid var(--line)}
+.imp-tool{flex:1;display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:7px 8px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink);font-size:12px;cursor:pointer}
+.imp-tool:hover{border-color:var(--accent);color:var(--accent)}
+.imp-tool svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+
