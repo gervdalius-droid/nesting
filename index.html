@@ -1733,6 +1733,7 @@ var I18N={
     ppSameSheets:'Identical sheets',
     ppLegendMerged:'saw line on merged strips',
     ppLegendOnLine:'on-line cut (part stays whole)',
+    ppLegendOrigin:'sheet origin; tall sheets are drawn turned 90° so they read across the page',
     generatedOn:'Generated on',
     materialsHdr:'Materials',
     material:'Material',
@@ -2020,6 +2021,7 @@ var I18N={
     ppSameSheets:'Vienodos plokštės',
     ppLegendMerged:'pjūvio linija sujungtose juostose',
     ppLegendOnLine:'pjūvis ant linijos (detalė vientisa)',
+    ppLegendOrigin:'plokštės nulinis taškas; aukštos plokštės nubraižytos pasuktos 90°, kad tilptų per lapo plotį',
     generatedOn:'Sugeneruota',
     materialsHdr:'Medžiagos',
     material:'Medžiaga',
@@ -12415,7 +12417,45 @@ function openPrintView(){
   },150);
 }
 // SVG-based sheet drawer for print — scales to a fixed width in mm
-function printSheetSVG(lay,widthMm){
+// Print view of a sheet: a tall sheet (e.g. 1220 × 2440) is turned 90° clockwise
+// so its long side runs across the page. Geometry is rotated into a landscape
+// copy of the layout; the drawing code then renders it as usual, so names and
+// dimensions stay upright. The sheet origin (0,0) is marked on the print.
+function _ppViewLayout(lay){
+  if(!(lay && lay.sh>lay.sw)) return lay;
+  var H=lay.sh, tr=lay.trim||0;
+  function R(q){ return [H-q[1], q[0]]; }            // (x,y) y-down → turned 90° CW
+  var v={};
+  Object.keys(lay).forEach(function(k){ v[k]=lay[k]; });
+  v.sw=lay.sh; v.sh=lay.sw; v.uw=lay.uh; v.uh=lay.uw; v.__viewFlip=true;
+  v.placements=(lay.placements||[]).map(function(p){
+    var ax=tr+p.x, ay=tr+p.y, outer, holes=[], shaped=true;
+    if(p.nestPoly && p.nestPoly.length>2){
+      outer=p.nestPoly.map(function(q){ return [ax+q.x, ay+q.y]; });
+      holes=(p.nestHoles||[]).map(function(h){ return h.map(function(q){ return [ax+q.x, ay+q.y]; }); });
+    } else if(p.part && p.part.shape && p.part.shape.length>=3){
+      var tp=function(q){ var t=shapePtInBBox(p.part,p.rot,q.x,q.y); return [ax+t[0], ay+p.ph-t[1]]; };
+      outer=p.part.shape.map(tp);
+      holes=(p.part.holes||[]).map(function(h){ return h.map(tp); });
+    } else {
+      shaped=false;
+      outer=[[ax,ay],[ax+p.pw,ay],[ax+p.pw,ay+p.ph],[ax,ay+p.ph]];
+    }
+    outer=outer.map(R); holes=holes.map(function(h){ return h.map(R); });
+    var mnX=Infinity, mnY=Infinity;
+    outer.forEach(function(q){ if(q[0]<mnX) mnX=q[0]; if(q[1]<mnY) mnY=q[1]; });
+    var np={ part:p.part, x:mnX-tr, y:mnY-tr, pw:p.ph, ph:p.pw, rot:p.rot, color:p.color,
+             nestAngle:p.nestAngle, __viewFlip:true };
+    if(shaped){
+      np.nestPoly=outer.map(function(q){ return {x:q[0]-mnX, y:q[1]-mnY}; });
+      np.nestHoles=holes.map(function(h){ return h.map(function(q){ return {x:q[0]-mnX, y:q[1]-mnY}; }); });
+    }
+    return np;
+  });
+  return v;
+}
+function printSheetSVG(lay,widthMm){ return _printSheetSVGRaw(_ppViewLayout(lay), widthMm); }
+function _printSheetSVGRaw(lay,widthMm){
   var sw=lay.sw, sh=lay.sh, trim=lay.trim||0;
   var sc=widthMm/sw;
   // Leave margin around the sheet inside the viewBox for board-dimension callouts.
@@ -12439,33 +12479,31 @@ function printSheetSVG(lay,widthMm){
     // A merged strip needs internal saw-cut guides so the operator knows where
     // to cut it apart in the workshop (the strip prints as one rectangle).
     var isMergedStrip = !!(p.part && p.part.__merged && p.part.__mergedShorts && p.part.__mergedShorts.length>1);
-    var hasShape=!!(p.part&&p.part.shape&&p.part.shape.length>=3);
+    var hasNest=!!(p.nestPoly&&p.nestPoly.length>2);
+    var hasShape=hasNest || !!(p.part&&p.part.shape&&p.part.shape.length>=3);
     if(hasShape){
-      // Build polygon points (outline + holes as separate subpaths)
-      var part=p.part;
-      function localToPlaced(lx,ly){
-        var t=shapePtInBBox(part,p.rot,lx,ly);
-        // t is in y-up mm; convert to sheet y-down
-        return [ax+t[0], ay+ph-t[1]];
+      // Outline + holes as subpaths. A placement that carries its own outline
+      // (true-shape nest, or a turned print view) is drawn from it exactly.
+      var part=p.part, rings;
+      if(hasNest){
+        rings=[p.nestPoly].concat(p.nestHoles||[]).map(function(r){ return r.map(function(q){ return [ax+q.x, ay+q.y]; }); });
+      } else {
+        var localToPlaced=function(lx,ly){ var t=shapePtInBBox(part,p.rot,lx,ly); return [ax+t[0], ay+ph-t[1]]; };
+        rings=[part.shape].concat(part.holes||[]).map(function(r){ return r.map(function(q){ return localToPlaced(q.x,q.y); }); });
       }
       var d='';
-      part.shape.forEach(function(pt,i){
-        var xy=localToPlaced(pt.x,pt.y);
-        d+=(i?'L':'M')+xy[0].toFixed(1)+' '+xy[1].toFixed(1);
-      });
-      d+='Z';
-      (part.holes||[]).forEach(function(h){
-        h.forEach(function(pt,i){
-          var xy=localToPlaced(pt.x,pt.y);
-          d+=(i?'L':'M')+xy[0].toFixed(1)+' '+xy[1].toFixed(1);
-        });
+      rings.forEach(function(r){
+        r.forEach(function(xy,i){ d+=(i?'L':'M')+xy[0].toFixed(1)+' '+xy[1].toFixed(1); });
         d+='Z';
       });
       svg+='<path d="'+d+'" fill="'+p.color+'33" stroke="#1b1e26" stroke-width="1.2" fill-rule="evenodd"/>';
-      (part.marks||[]).forEach(function(m){
-        svg+='<polyline points="'+m.map(function(pt){ var xy=localToPlaced(pt.x,pt.y); return xy[0].toFixed(1)+','+xy[1].toFixed(1); }).join(' ')
-          +'" fill="none" stroke="#d63adf" stroke-width="1.6"/>';
-      });
+      if(part.marks&&part.marks.length){
+        var mf=_markPlacer(p);
+        part.marks.forEach(function(m){
+          svg+='<polyline points="'+m.map(function(q){ var t=mf(q); return (ax+t[0]).toFixed(1)+','+(ay+t[1]).toFixed(1); }).join(' ')
+            +'" fill="none" stroke="#d63adf" stroke-width="1.6"/>';
+        });
+      }
       // Dashed bbox so operator sees nesting footprint
       svg+='<rect x="'+ax+'" y="'+ay+'" width="'+pw+'" height="'+ph+'" fill="none" stroke="#667085" stroke-width=".6" stroke-dasharray="8 4"/>';
     } else {
@@ -12566,11 +12604,33 @@ function printSheetSVG(lay,widthMm){
         nfsV=Math.min(nfsV, (segB-segA-2*R-GAP)/(nmLen*CW));
         if(nfsV<10) mode='b';
       }
+      // Long flat part (a strip lying across the sheet): number and name side by
+      // side on one line, placed clear of the length and width pills.
+      var nfsR=Math.min(42,(freeH-2*M)*0.75);
+      var Rr=Math.max(6,Math.min(Math.max(R,nfsR*0.7),(freeH-6)/2));
+      var rowW=2*Rr+GAP+nmLen*CW*nfsR, rowX=0;
+      var rowBetter=(mode==='b') || (mode==='h' && freeW>=3*freeH && nfsR>nfsH*1.3);
+      if(rowBetter && nfsR>=12 && freeW>=rowW+2*M){
+        mode='row';
+        rowX=Math.max(runH[0]+M, Math.min(lx-rowW/2, runH[1]-M-rowW));
+        if(ph>=40 && pw>=30) rowX=Math.max(rowX, ax+dimMargin+dimFs*1.2+8);           // after the width pill
+        if(pw>=40 && ph>=30){                                                         // beside the length pill
+          var py0=ay+dimMargin+dimFs*0.25-2, py1=ay+dimMargin+dimFs*1.35+2;
+          var px0=cx-lDimW/2-8, px1=cx+lDimW/2+8;
+          if(ly+Rr>py0 && ly-Rr<py1 && rowX<px1 && rowX+rowW>px0){
+            rowX=(px0-rowW>=runH[0]+M) ? px0-rowW : px1;
+          }
+        }
+      }
       if(mode==='h'){
         // Centre the badge+name block on the anchor, kept inside the free vertical run.
         var top=Math.max(runV[0]+M, Math.min(ly-blockH/2, runV[1]-M-blockH));
         svg+=badge(lx,top+R);
         svg+='<text x="'+lx.toFixed(1)+'" y="'+(top+2*R+GAP+nfsH*0.82).toFixed(1)+'" text-anchor="middle" font-family="Arial,sans-serif" font-weight="700" font-size="'+nfsH.toFixed(1)+'" fill="#1b1e26">'+esc(nm)+'</text>';
+      } else if(mode==='row'){
+        R=Rr;
+        svg+=badge(rowX+Rr,ly);
+        svg+='<text x="'+(rowX+2*Rr+GAP).toFixed(1)+'" y="'+ly.toFixed(1)+'" dy="0.35em" text-anchor="start" font-family="Arial,sans-serif" font-weight="700" font-size="'+nfsR.toFixed(1)+'" fill="#1b1e26">'+esc(nm)+'</text>';
       } else if(mode==='v'){
         var tl=nmLen*CW*nfsV, top2=(segA+segB)/2-(2*R+GAP+tl)/2, ty=top2+2*R+GAP+tl/2;
         svg+=badge(lx,top2+R);
@@ -12588,11 +12648,16 @@ function printSheetSVG(lay,widthMm){
       var msShorts=p.part.__mergedShorts, msKerf=p.part.__mergedKerf||0;
       var msAxisW=(p.part.__mergedAxis!=='l');
       var msHorizontal=(msAxisW!==!!p.rot);     // cut-line orientation on the sheet
+      if(p.__viewFlip) msHorizontal=!msHorizontal; // turned print view
       var cuts=[], centers=[], off=0;
       for(var mi=0; mi<msShorts.length; mi++){
         var segStart=off; off+=msShorts[mi];
         centers.push((segStart+off)/2);
         if(mi<msShorts.length-1){ cuts.push(off+msKerf/2); off+=msKerf; }
+      }
+      // Turning 90° clockwise reverses the order of pieces that were stacked top to bottom.
+      if(p.__viewFlip && !msHorizontal){
+        cuts=cuts.map(function(c){ return pw-c; }); centers=centers.map(function(c){ return pw-c; });
       }
       // Cut lines
       cuts.forEach(function(cp){
@@ -12622,12 +12687,25 @@ function printSheetSVG(lay,widthMm){
     }
     // Grain arrow if this sheet is grain-locked
     if(lay.grainLocked){
-      var ay1=ay+8, ay2=ay+Math.min(28,ph/3);
       var ag='#667085';
-      svg+='<g stroke="'+ag+'" stroke-width="1" fill="'+ag+'"><line x1="'+(ax+6)+'" y1="'+ay1+'" x2="'+(ax+6)+'" y2="'+ay2+'"/><polygon points="'+(ax+3)+','+ay2+' '+(ax+9)+','+ay2+' '+(ax+6)+','+(ay2+5)+'"/></g>';
+      if(lay.__viewFlip){
+        var gx1=ax+8, gx2=ax+Math.min(28,pw/3);
+        svg+='<g stroke="'+ag+'" stroke-width="1" fill="'+ag+'"><line x1="'+gx1+'" y1="'+(ay+6)+'" x2="'+gx2+'" y2="'+(ay+6)+'"/><polygon points="'+gx2+','+(ay+3)+' '+gx2+','+(ay+9)+' '+(gx2+5)+','+(ay+6)+'"/></g>';
+      } else {
+        var ay1=ay+8, ay2=ay+Math.min(28,ph/3);
+        svg+='<g stroke="'+ag+'" stroke-width="1" fill="'+ag+'"><line x1="'+(ax+6)+'" y1="'+ay1+'" x2="'+(ax+6)+'" y2="'+ay2+'"/><polygon points="'+(ax+3)+','+ay2+' '+(ax+9)+','+ay2+' '+(ax+6)+','+(ay2+5)+'"/></g>';
+      }
     }
     labelIdx++;
   });
+  // Sheet origin (0,0 of the drawing / machine): bottom-left normally, top-left
+  // when the sheet is printed turned. Marked outside the corner, so the operator
+  // can lay the board the same way round.
+  {
+    var oy=lay.__viewFlip?0:sh, dirY=lay.__viewFlip?-1:1, oL=Math.max(40,Math.min(sw,sh)*0.04), oFs=Math.max(20,Math.min(sw,sh)*0.018);
+    svg+='<path d="M'+(-oL*0.15)+' '+(oy+dirY*oL*0.15)+'L'+(-oL*0.15)+' '+(oy-dirY*oL)+'M'+(-oL*0.15)+' '+(oy+dirY*oL*0.15)+'L'+oL+' '+(oy+dirY*oL*0.15)+'" stroke="#B84040" stroke-width="3" fill="none"/>';
+    svg+='<text x="'+(-oL*0.25)+'" y="'+(oy+dirY*oL*0.15+(dirY>0?oFs*0.95:-oFs*0.35))+'" text-anchor="end" font-size="'+oFs.toFixed(1)+'" font-weight="700" font-family="sans-serif" fill="#B84040">0,0</text>';
+  }
   // Board dimension callouts — drawn in the margin OUTSIDE the board
   // (engineering-drawing convention: extension lines + dimension line + arrows + label).
   var bdFs=Math.max(24,Math.min(sw,sh)*0.022);
@@ -12675,9 +12753,9 @@ function printSheetSVG(lay,widthMm){
 function _ppSheetsWord(n){
   if(_lang==='lt'){
     var a=n%10, b=n%100;
-    if(a===1 && b!==11) return 'plokštė';
+    if(a===1 && b!==11) return 'plokštę';
     if(a===0 || (b>=10 && b<=20)) return 'plokščių';
-    return 'plokštės';
+    return 'plokštes';
   }
   return n===1?'sheet':'sheets';
 }
@@ -12687,6 +12765,7 @@ function _ppCutBadge(n, size){
 }
 // Outline-only miniature of a sheet for the cutting-plan table.
 function _ppThumbSVG(lay, wMm){
+  lay=_ppViewLayout(lay);
   var sw=lay.sw, sh=lay.sh, trim=lay.trim||0;
   var s='<svg width="'+wMm+'mm" height="'+(wMm*sh/sw).toFixed(1)+'mm" viewBox="0 0 '+sw+' '+sh+'" xmlns="http://www.w3.org/2000/svg">'
     +'<rect x="0" y="0" width="'+sw+'" height="'+sh+'" fill="#fff" stroke="#1b1e26" stroke-width="'+(sw/90).toFixed(1)+'"/>';
@@ -12846,6 +12925,7 @@ function buildPrintView(){
     +'<span>┄┄ '+t('legendBBox')+'</span>'
     +'<span style="color:#7A2E12">✂ ┄┄ '+t('ppLegendMerged')+'</span>'
     +'<span style="color:#d63adf">━ '+t('ppLegendOnLine')+'</span>'
+    +'<span style="color:#B84040">⌐ 0,0 — '+t('ppLegendOrigin')+'</span>'
     +'</div>';
   html+=footer(pageNo++,totalPages)+'</div>';
 
