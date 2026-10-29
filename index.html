@@ -4590,7 +4590,10 @@ function extractLayoutParts(text, opts){
   opts=opts||{};
   var minSide=opts.minSide!=null?opts.minSide:20;      // mm — below this it is annotation, not a part
   var allEnts=opts.ents||parseDXFText(text);
-  var cutEnts=allEnts.filter(function(e){ return !_isMarkLayer(e.layer); });
+  // Engraved/pencil text and other label layers are not cut geometry: the closed
+  // loops of letters like D, O, B were read as through-holes (and would have
+  // been exported as holes to cut) once the size filter was set low.
+  var cutEnts=allEnts.filter(function(e){ return !_isMarkLayer(e.layer) && !_rlIsLabelLayer(e.layer); });
   var markEnts=allEnts.filter(function(e){ return _isMarkLayer(e.layer); });
   var pr={ents:allEnts, polys:entitiesToPolygons(cutEnts).filter(function(p){return p.closed&&p.pts.length>=3;})};
   var polys=pr.polys.map(function(p){
@@ -10274,7 +10277,9 @@ function _cutoutRiders(partsList, uw, uh, kerf, grainLocked){
   });
   if(!pockets.length) return {rest:partsList, map:map};
   pockets.sort(function(a,b){ return b.W*b.H-a.W*a.H; });
-  var hostIds={}; hosts.forEach(function(h){ hostIds[h.id]=1; });
+  // Only a part with an opening big enough to use is a host. A part whose holes
+  // are all small (drill holes, a cable hole) can still ride inside another.
+  var hostIds={}; pockets.forEach(function(pk){ hostIds[pk.host.id]=1; });
   pockets.forEach(function(pk){
     var cands=partsList.filter(function(p){
       return !riderIds[p.id] && !hostIds[p.id] && !p.groupId && !p.__merged && p.l<=pk.W && p.w<=pk.H;
