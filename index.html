@@ -233,6 +233,43 @@ input[type=color]{padding:2px 3px;height:27px;cursor:pointer}
 .pli-print.pending{color:#d2d7df;background:transparent}
 .pli-print.partial{color:#8a6d1a;background:#F5EEDC}
 /* Rotation lock indicator */
+.plist-tools{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:6px}.plist-tools .btn{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pli-eb{flex-shrink:0;cursor:pointer;padding:1px;border-radius:3px;line-height:0;opacity:.9}
+.pli-eb:hover{background:#e8edff;opacity:1}
+.pw-eb-cell{display:flex;align-items:center;gap:5px;cursor:pointer;border:1px solid transparent;border-radius:5px;padding:2px 3px;min-width:0}
+.pw-eb-cell:hover{border-color:#c9d3f5;background:#f3f6ff}
+.pw-eb-cell span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10px;color:#667085}
+.pm-eb{display:flex;align-items:center;gap:8px;width:100%;margin-bottom:8px;padding:6px 8px;border:1px solid #dce3ea;border-radius:7px;background:#fff;cursor:pointer;font:inherit;font-size:11px;color:#344054;text-align:left}
+.pm-eb:hover{border-color:#9fb0e8;background:#f6f8ff}
+.pm-eb .pm-eb-l{color:#667085}.pm-eb #pm-eb-sum{margin-left:auto;color:#2f54eb;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ebp{position:fixed;z-index:10050;width:268px;background:#fff;border:1px solid #d9dee6;border-radius:11px;box-shadow:0 12px 34px rgba(16,24,40,.18);padding:12px 14px;font-size:12px;color:#1d2939}
+.ebp-hd,.mat-hd{display:flex;align-items:center;justify-content:space-between;font-size:13px}
+.ebp-x{border:0;background:transparent;cursor:pointer;color:#667085;font-size:13px;padding:2px 4px;border-radius:5px}.ebp-x:hover{background:#f2f4f7}
+.ebp-sub{color:#475467;font-size:11px;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ebp-hint{color:#98a2b3;font-size:10.5px;margin-top:2px}
+.ebp-fig{display:flex;justify-content:center;margin:6px 0 4px}
+.ebp-edge{cursor:pointer}.ebp-edge .vis{stroke:#c5ccd6;stroke-width:2;stroke-linecap:square;transition:stroke .12s}
+.ebp-edge:hover .vis{stroke:#8ea2e8;stroke-width:4}
+.ebp-edge.on .vis{stroke:#2f54eb;stroke-width:6}
+.ebp-edge text{font-size:10px;fill:#98a2b3;font-family:Arial,sans-serif;pointer-events:none}
+.ebp-edge.on text{fill:#2f54eb;font-weight:700}
+.ebp-row{display:flex;align-items:center;gap:8px;margin-top:4px}.ebp-row label{font-size:11px;color:#667085;white-space:nowrap}.ebp-row input{flex:1;min-width:0;min-height:30px;padding:4px 8px;font-size:12px}
+.ebp-presets{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-top:8px}
+.ebp-presets button{border:1px solid #dce3ea;background:#fff;border-radius:6px;padding:5px 0;font-size:11px;cursor:pointer;color:#344054}.ebp-presets button:hover{border-color:#2f54eb;color:#2f54eb}
+.ebp-foot{display:flex;align-items:center;justify-content:space-between;margin-top:10px}.ebp-total{font-size:11px;color:#667085}
+.mat-ov{position:fixed;inset:0;z-index:10040;background:rgba(16,24,40,.35);display:flex;align-items:center;justify-content:center;padding:16px}
+.mat-box{background:#fff;border-radius:12px;width:min(460px,100%);max-height:min(640px,92vh);display:flex;flex-direction:column;padding:16px 18px;box-shadow:0 18px 50px rgba(16,24,40,.25);font-size:12px;color:#1d2939}
+.mat-help{color:#667085;font-size:11px;line-height:1.5;margin:4px 0 12px}
+.mat-all{margin-bottom:10px}.mat-all label{display:block;font-size:11px;font-weight:600;color:#344054;margin-bottom:4px}
+.mat-line{display:flex;gap:6px}.mat-line input{flex:1;min-width:0}
+.mat-sec{font-size:11px;font-weight:600;color:#344054;margin:6px 0 4px;padding-top:10px;border-top:1px solid #eef0f3}
+.mat-list{overflow:auto;min-height:0;flex:1;border:1px solid #eef0f3;border-radius:8px;padding:4px}
+.mat-row{display:flex;align-items:center;gap:6px;padding:3px 4px}.mat-row:nth-child(odd){background:#f9fafb;border-radius:5px}
+.mat-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500}
+.mat-n{font-family:monospace;color:#2f54eb;font-size:11px;width:36px;text-align:right}
+.mat-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+.mat-row input{width:170px;min-height:28px;padding:3px 7px;font-size:11.5px}
+.mat-foot{display:flex;justify-content:flex-end;margin-top:12px}
 .pli-rot{font-size:11px;flex-shrink:0;cursor:pointer;opacity:.6;padding:0 2px;user-select:none;line-height:1}
 .pli-rot:hover{opacity:1}
 .pli-rot.auto{color:#667085;opacity:.55}
@@ -655,6 +692,7 @@ body.print-mode{background:#fff}
       <div><label class="fl" data-i18n="widthMm">W (mm)</label><input id="pw2" type="number" placeholder="200" onkeydown="if(event.key==='Enter')addManual()"></div>
       <div><label class="fl" data-i18n="qty">Qty</label><input id="pq" type="number" value="1" min="1" onkeydown="if(event.key==='Enter')addManual()"></div>
     </div>
+    <button type="button" class="pm-eb" onclick="openEdgePickerManual(this)"><span id="pm-eb-glyph"></span><span class="pm-eb-l" data-i18n="ebEdges">Edgebanding</span><span id="pm-eb-sum"></span></button>
     <button class="btn-add-prom" onclick="addManual()"><span style="font-size:15px">＋</span> <span data-i18n="addPart">Add part</span></button>
   </div>
   <div>
@@ -675,6 +713,10 @@ body.print-mode{background:#fff}
     </div>
     <div id="plist" style="flex:1;min-height:0;overflow-y:auto;border:1px solid #e6e8ed;border-radius:6px;background:#eceef2;padding:3px">
       <div id="pempty" data-i18n="noParts" style="font-size:11px;color:#667085;text-align:center;padding:14px 8px">No parts yet — add one above<br>or import a file</div>
+    </div>
+    <div class="plist-tools">
+      <button type="button" class="btn bs" onclick="openMaterialAssign()" data-i18n="matAllBtn" title="Set the material of all parts at once — or per part name">🎨 Material for all parts</button>
+      <button type="button" class="btn bs" onclick="ebAllParts(this)" data-i18n="ebAllBtn" title="Choose the banded edges for every part at once. To band one part, click the small rectangle on its row.">▭ Edges for all parts</button>
     </div>
   </div>
   <!-- Version selector — appears when at least one layout snapshot exists.
@@ -883,6 +925,8 @@ body.print-mode{background:#fff}
       </select>
       <button class="btn bs" onclick="pwApplyEdgeband()">Apply</button>
     </label>
+    <button class="btn bs" onclick="pwEdgePickerSel(this)" data-i18n="ebEdgesBtn" title="Pick exactly which edges are banded — on the ticked parts, or on every part when nothing is ticked" style="color:#2f54eb;border-color:#2f54eb">▭ Edges…</button>
+    <button class="btn bs" onclick="openMaterialAssign()" data-i18n="matBtn" title="Set the material of every part, the ticked parts, or all parts with the same name">🎨 Material</button>
     <input type="file" id="pw-dxf-in" accept=".dxf,.DXF" multiple style="display:none" onchange="pwAssignDXFFiles(this)">
     <div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap">
       <span style="font-size:11px;color:#667085">Rotation:</span>
@@ -1875,6 +1919,29 @@ var I18N={
     confirmDeleteProject:'Delete project "{name}"? This cannot be undone.',
     enterValidNumber:'Enter a valid number',
     lwLocked:'Length/width come from the DXF outline for shaped parts. Use "▭ Remove shape" in the Parts Manager to go back to a plain rectangle, or assign a different DXF.',
+    ebpTitle:'Edgebanding',
+    ebpHint:'Click an edge to band it — click again to remove.',
+    ebpBand:'Edgeband',
+    ebpAll:'All 4',ebpLong:'Long',ebpShort:'Short',ebpNone:'None',ebpDone:'Done',
+    ebpTotal:'{m} m of edgeband',
+    ebpManual:'New part (manual)',
+    ebpParts:'{n} parts',
+    ebpNoneShort:'no edges',
+    ebpRowTip:'Edgebanding — click to choose the edges',
+    ebEdges:'Edgebanding',
+    ebEdgesBtn:'▭ Edges…',
+    matBtn:'🎨 Material',
+    matTitle:'Assign material',
+    matHint:'Pick one of your boards or type a new name — a board is created for it. Thickness follows the board when it has one.',
+    matAll:'All parts ({n})',
+    matSel:'Ticked parts ({n})',
+    matByName:'Or by part name',
+    matApply:'Apply',matApplyAll:'Apply to all',
+    matMixed:'mixed — pick one',
+    matPh:'Type or pick a material',
+    matDone:'✓ Material {m} set on {n} part(s)',
+    matAllBtn:'🎨 Material for all parts',
+    ebAllBtn:'▭ Edges for all parts',
     ebNoParts:'Add some parts first.',
     ebPrompt:'Edgeband to apply to every part, on all four sides:',
     ebApplied:'✓ Edgebanded {n} part(s) — {m} m total',
@@ -2157,6 +2224,29 @@ var I18N={
     confirmDeleteProject:'Ištrinti projektą „{name}"? Veiksmas negrįžtamas.',
     enterValidNumber:'Įveskite teisingą skaičių',
     lwLocked:'Detalėms su forma ilgis ir plotis imami iš DXF kontūro. Norėdami grąžinti paprastą stačiakampį, spauskite „▭ Pašalinti formą" detalių valdyme, arba priskirkite kitą DXF.',
+    ebpTitle:'Briaunų klijavimas',
+    ebpHint:'Spustelėkite briauną, kad ją klijuotumėte — dar kartą, kad nuimtumėte.',
+    ebpBand:'Briaunelė',
+    ebpAll:'Visos 4',ebpLong:'Ilgosios',ebpShort:'Trumposios',ebpNone:'Jokių',ebpDone:'Gerai',
+    ebpTotal:'{m} m briaunelės',
+    ebpManual:'Nauja detalė (rankinė)',
+    ebpParts:'Detalių: {n}',
+    ebpNoneShort:'be briaunų',
+    ebpRowTip:'Briaunos — spustelėkite ir pasirinkite',
+    ebEdges:'Briaunos',
+    ebEdgesBtn:'▭ Briaunos…',
+    matBtn:'🎨 Medžiaga',
+    matTitle:'Priskirti medžiagą',
+    matHint:'Pasirinkite vieną iš savo plokščių arba įrašykite naują pavadinimą — plokštė bus sukurta. Storis paimamas iš plokštės, jei jis nurodytas.',
+    matAll:'Visos detalės ({n})',
+    matSel:'Pažymėtos detalės ({n})',
+    matByName:'Arba pagal detalės pavadinimą',
+    matApply:'Taikyti',matApplyAll:'Taikyti visoms',
+    matMixed:'skirtingos — pasirinkite',
+    matPh:'Įrašykite arba pasirinkite',
+    matDone:'✓ Medžiaga {m} priskirta: {n} det.',
+    matAllBtn:'🎨 Medžiaga visoms',
+    ebAllBtn:'▭ Briaunos visoms',
     ebNoParts:'Pirma pridėkite detalių.',
     ebPrompt:'Kokią briauną klijuoti visoms detalėms iš visų keturių pusių:',
     ebApplied:'✓ Užklijuota briauna {n} detalei(-ėms) — iš viso {m} m',
@@ -2314,6 +2404,7 @@ function setLanguage(lang){
   translateAll();
   // Rerender dynamic bits that use t() for labels
   try{renderBoards();renderParts();renderGroups();}catch(e){}
+  try{_ebpRefreshManual();}catch(e){}
   // Refresh export list if visible (file labels, etc don't change but refresh anyway)
   // Refresh history panel if open
   if(document.getElementById('hist-overlay')&&document.getElementById('hist-overlay').classList.contains('open'))renderHistory();
@@ -5546,7 +5637,7 @@ function addManual(){
   var l=parseInt(document.getElementById('pl').value),w=parseInt(document.getElementById('pw2').value),q=parseInt(document.getElementById('pq').value)||1;
   if(!l||!w){alert(t('enterLW'));document.getElementById('pl').focus();return;}
   if(!boards.find(function(b){return b.mat===mat;}))ensureBoard(mat);
-  for(var i=0;i<q;i++)parts.push({id:Date.now()+i,name:name+'_'+(i+1),origName:name,l:l,w:w,mat:mat,thick:ND.thickness||18,eb:{eb1:'',eb2:'',eb3:'',eb4:''},op1:'',op2:'',hasCNC:false});
+  for(var i=0;i<q;i++)parts.push({id:Date.now()+i,name:name+'_'+(i+1),origName:name,l:l,w:w,mat:mat,thick:ND.thickness||18,eb:Object.assign({eb1:'',eb2:'',eb3:'',eb4:''},_manualEb),op1:'',op2:'',hasCNC:false});
   // flash the group that was just added
   _flashAddKey=name+'|'+mat+'|'+l+'x'+w;
   // clear inputs for next entry, keep material & qty=1 for quick repeat
@@ -5733,6 +5824,7 @@ function renderParts(){
       +printTag
       +rotIcon
       +machIcon
+      +'<span class="pli-eb" title="'+esc(t('ebpRowTip')+' — '+ebSummary(groupParts[0].eb))+'" onclick="openEdgePickerIds(this,\''+_ebIdsAttr(g.partIds.map(String))+'\',event)">'+ebGlyphSVG(groupParts[0].eb,20,13)+'</span>'
       +shapeTag
       +mergedTag
       +'<span class="pli-name">'+nameHtml+'</span>'
@@ -6012,7 +6104,7 @@ function renderPartsWindow(){
       +'<td style="font-family:monospace;font-size:10px;color:#667085" data-id="'+sid+'-area">'+((p.l*p.w)/1e6).toFixed(4)+'</td>'
       +'<td><input class="pw-edit pw-edit-num pw-edit-t" data-id="'+sid+'" type="number" min="1" value="'+p.thick+'" onchange="pwEditField(\''+sid+'\',\'thick\',this.value)"></td>'
       +'<td style="max-width:140px">'+dot+matSel+'</td>'
-      +'<td style="font-size:10px;color:#667085;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(ebStr)+'">'+esc(ebStr.substring(0,18))+'</td>'
+      +'<td style="max-width:160px"><div class="pw-eb-cell" title="'+esc(t('ebpRowTip')+' — '+ebStr)+'" onclick="openEdgePickerIds(this,\''+_ebIdsAttr(parts.filter(function(x){return partGroupKey(x)===partGroupKey(p);}).map(function(x){return String(x.id);}))+'\',event)">'+ebGlyphSVG(eb,22,14)+'<span>'+esc(ebSummary(eb))+'</span></div></td>'
       +'<td>'+qrStr+'</td>'
       +'<td>'+grpStr+'</td>'
       +'<td><button class="btn bs br" style="padding:1px 5px;font-size:10px" onclick="pwDelete(\''+sid+'\')">×</button></td>'
@@ -6235,6 +6327,9 @@ function rotateShape90(o){
 }
 
 function swapPartDims(p){
+  // Turning the part 90° moves its edges with it: the width edges become the
+  // length edges and the other way round.
+  if(p.eb){ var e=p.eb; p.eb={eb1:e.eb3||'',eb2:e.eb4||'',eb3:e.eb2||'',eb4:e.eb1||''}; }
   if(p.shape && p.shape.length){
     // Rotate outline, holes AND the source entities together. The DXF export is
     // built from outlineEnts when present, so rotating only the polygon would
@@ -6367,6 +6462,262 @@ function quoteApplyEdgebandAll(){
   var n=applyEdgeband(parts.slice(),name,'all');
   if(document.getElementById('pw-overlay').classList.contains('open')) renderPartsWindow();
   alert(t('ebApplied',{n:n,m:totalEdgebandM().toFixed(1)}));
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// EDGEBANDING — choose the edges of each part
+// eb1 / eb2 are the two length edges (top / bottom when the part lies with its
+// length horizontal), eb3 / eb4 the two width edges (left / right) — the same
+// order the reportlist label prints them in. Any part row (side list, Parts
+// Manager, the manual form) opens one picker: click an edge to band it.
+// ═══════════════════════════════════════════════════════════════════════════
+var EB_KEYS=['eb1','eb2','eb3','eb4'];
+var _manualEb={eb1:'',eb2:'',eb3:'',eb4:''};
+var _ebp=null;   // {targets:[parts] | null (manual form), title, sub}
+
+// Small glyph: a rectangle with the banded edges drawn thick.
+function ebGlyphSVG(eb, w, h){
+  eb=eb||{}; w=w||22; h=h||14;
+  var on='#2f54eb', off='#c5ccd6', x0=2.5, y0=2.5, x1=w-2.5, y1=h-2.5;
+  function ln(xa,ya,xb,yb,k){ var b=!!eb[k]; return '<line x1="'+xa+'" y1="'+ya+'" x2="'+xb+'" y2="'+yb+'" stroke="'+(b?on:off)+'" stroke-width="'+(b?2.6:1.2)+'" stroke-linecap="square"/>'; }
+  return '<svg width="'+w+'" height="'+h+'" viewBox="0 0 '+w+' '+h+'" aria-hidden="true" style="display:block">'
+    +'<rect x="'+x0+'" y="'+y0+'" width="'+(x1-x0)+'" height="'+(y1-y0)+'" fill="#f4f6f9"/>'
+    +ln(x0,y0,x1,y0,'eb1')+ln(x0,y1,x1,y1,'eb2')+ln(x0,y0,x0,y1,'eb3')+ln(x1,y0,x1,y1,'eb4')+'</svg>';
+}
+function ebSummary(eb){
+  eb=eb||{}; var n=EB_KEYS.filter(function(k){return eb[k];}).length;
+  if(!n) return t('ebpNoneShort');
+  var names=EB_KEYS.map(function(k){return eb[k];}).filter(Boolean).filter(function(v,i,a){return a.indexOf(v)===i;});
+  return n+'× '+names.join(', ');
+}
+function _ebIdsAttr(ids){ return esc(ids.join(',')); }
+function _ebPartsFromIds(str){
+  var want={}; String(str||'').split(',').forEach(function(s){ if(s) want[s]=true; });
+  return parts.filter(function(p){ return want[String(p.id)]; });
+}
+// Open from a row: ids = comma-separated part ids (a whole group of identical parts)
+function openEdgePickerIds(anchor, idsStr, ev){
+  if(ev){ ev.stopPropagation(); ev.preventDefault(); }
+  var ts=_ebPartsFromIds(idsStr);
+  if(!ts.length) return;
+  openEdgePicker(anchor, ts);
+}
+// Parts Manager bulk: ticked parts, or every part when nothing is ticked
+function pwEdgePickerSel(anchor){
+  var sel=parts.filter(function(p){ return pwSel.has(String(p.id)); });
+  var ts=sel.length?sel:parts.slice();
+  if(!ts.length){ alert(t('ebNoParts')); return; }
+  openEdgePicker(anchor, ts);
+}
+function ebAllParts(anchor){ if(!parts.length){ alert(t('ebNoParts')); return; } openEdgePicker(anchor, parts.slice()); }
+function openEdgePickerManual(anchor){ openEdgePicker(anchor, null); }
+
+function _ebpState(){
+  // A side counts as banded only when every target has it.
+  if(!_ebp.targets) return Object.assign({}, _manualEb);
+  var st={};
+  EB_KEYS.forEach(function(k){
+    var all=_ebp.targets.every(function(p){ return p.eb && p.eb[k]; });
+    st[k]=all ? (_ebp.targets[0].eb[k]) : '';
+  });
+  return st;
+}
+function _ebpDims(){
+  if(!_ebp.targets){
+    var l=parseInt((document.getElementById('pl')||{}).value,10)||0, w=parseInt((document.getElementById('pw2')||{}).value,10)||0;
+    return {l:l,w:w};
+  }
+  var p0=_ebp.targets[0], same=_ebp.targets.every(function(p){ return p.l===p0.l && p.w===p0.w; });
+  return same ? {l:p0.l,w:p0.w} : {l:0,w:0};
+}
+function _ebpName(){
+  var v=((document.getElementById('ebp-name')||{}).value||'').trim();
+  return v||EB_DEFAULT_NAME;
+}
+function _ebpSet(map){
+  // map: {eb1:'name'|'' ...} — only the keys given are changed
+  if(!_ebp.targets){ Object.keys(map).forEach(function(k){ _manualEb[k]=map[k]; }); _ebpRefreshManual(); }
+  else {
+    _ebp.targets.forEach(function(p){
+      if(!p.eb) p.eb={eb1:'',eb2:'',eb3:'',eb4:''};
+      Object.keys(map).forEach(function(k){ p.eb[k]=map[k]; });
+    });
+    renderParts();
+    if(document.getElementById('pw-overlay').classList.contains('open')) renderPartsWindow();
+    try{ renderQuote(); }catch(e){}
+    try{ scheduleSave(); }catch(e){}
+  }
+  _ebpRender();
+}
+function ebpToggle(k){
+  var st=_ebpState(), m={}; m[k]=st[k]?'':_ebpName(); _ebpSet(m);
+}
+function ebpPreset(which){
+  var n=_ebpName(), m;
+  if(which==='all') m={eb1:n,eb2:n,eb3:n,eb4:n};
+  else if(which==='long') m={eb1:n,eb2:n,eb3:'',eb4:''};
+  else if(which==='short') m={eb1:'',eb2:'',eb3:n,eb4:n};
+  else m={eb1:'',eb2:'',eb3:'',eb4:''};
+  _ebpSet(m);
+}
+// Renaming the edgeband re-labels the sides already banded.
+function ebpRename(){
+  var st=_ebpState(), n=_ebpName(), m={};
+  EB_KEYS.forEach(function(k){ if(st[k]) m[k]=n; });
+  try{ localStorage.setItem('ebLastName', n); }catch(e){}
+  if(Object.keys(m).length) _ebpSet(m);
+}
+function _ebpRefreshManual(){
+  var g=document.getElementById('pm-eb-glyph'); if(g) g.innerHTML=ebGlyphSVG(_manualEb,26,16);
+  var s=document.getElementById('pm-eb-sum'); if(s) s.textContent=ebSummary(_manualEb);
+}
+function _ebpRender(){
+  var box=document.getElementById('ebp'); if(!box||!_ebp) return;
+  var st=_ebpState(), d=_ebpDims();
+  // figure: the part to scale (aspect clamped so thin strips stay clickable)
+  var FW=236, FH=128, pad=34;
+  var ar=d.l&&d.w ? d.l/d.w : 1.6; ar=Math.max(0.5, Math.min(2.6, ar));
+  var rw=FW-2*pad, rh=rw/ar; if(rh>FH-2*pad){ rh=FH-2*pad; rw=rh*ar; }
+  var x0=(FW-rw)/2, y0=(FH-rh)/2, x1=x0+rw, y1=y0+rh;
+  function edge(k,xa,ya,xb,yb,lx,ly,len,vert){
+    var b=!!st[k];
+    var lbl=vert ? (len?len+' mm':'') : (len?len+' mm':'')+(b?' · '+st[k]:'');
+    return '<g class="ebp-edge'+(b?' on':'')+'" onclick="ebpToggle(\''+k+'\')">'
+      +'<line x1="'+xa+'" y1="'+ya+'" x2="'+xb+'" y2="'+yb+'" stroke="transparent" stroke-width="18"/>'
+      +'<line class="vis" x1="'+xa+'" y1="'+ya+'" x2="'+xb+'" y2="'+yb+'"/>'
+      +'<text x="'+lx+'" y="'+ly+'" text-anchor="middle" dominant-baseline="central"'+(vert?' transform="rotate(-90 '+lx+' '+ly+')"':'')+'>'+esc(lbl)+'</text></g>';
+  }
+  var fig='<svg width="'+FW+'" height="'+FH+'" viewBox="0 0 '+FW+' '+FH+'">'
+    +'<rect x="'+x0+'" y="'+y0+'" width="'+rw+'" height="'+rh+'" fill="#f4f6f9" stroke="none"/>'
+    +edge('eb1',x0,y0,x1,y0,FW/2,y0-12,d.l,false)
+    +edge('eb2',x0,y1,x1,y1,FW/2,y1+12,d.l,false)
+    +edge('eb3',x0,y0,x0,y1,x0-12,FH/2,d.w,true)
+    +edge('eb4',x1,y0,x1,y1,x1+12,FH/2,d.w,true)
+    +'</svg>';
+  box.querySelector('.ebp-fig').innerHTML=fig;
+  var mm=0;
+  if(_ebp.targets) _ebp.targets.forEach(function(p){ mm+=partEdgebandMm(p); });
+  else { var q=parseInt((document.getElementById('pq')||{}).value,10)||1; mm=partEdgebandMm({l:d.l,w:d.w,eb:_manualEb})*q; }
+  box.querySelector('.ebp-total').textContent=t('ebpTotal',{m:(mm/1000).toFixed(2)});
+}
+function openEdgePicker(anchor, targets){
+  closeEdgePicker();
+  _ebp={targets:targets};
+  var names={}; names[EB_DEFAULT_NAME]=1;
+  parts.forEach(function(p){ EB_KEYS.forEach(function(k){ if(p.eb&&p.eb[k]) names[p.eb[k]]=1; }); });
+  var st=_ebpState(), cur=EB_KEYS.map(function(k){return st[k];}).filter(Boolean)[0];
+  var last=''; try{ last=localStorage.getItem('ebLastName')||''; }catch(e){}
+  var sub;
+  if(!targets) sub=t('ebpManual');
+  else {
+    var p0=targets[0], same=targets.every(function(p){ return (p.origName||'')===(p0.origName||'') && p.l===p0.l && p.w===p0.w; });
+    sub=same ? (p0.origName||p0.name||'')+' · '+p0.l+'×'+p0.w+' · ×'+targets.length : t('ebpParts',{n:targets.length});
+  }
+  var box=document.createElement('div');
+  box.id='ebp'; box.className='ebp';
+  box.innerHTML='<div class="ebp-hd"><b>'+esc(t('ebpTitle'))+'</b><button type="button" class="ebp-x" onclick="closeEdgePicker()" aria-label="Close">✕</button></div>'
+    +'<div class="ebp-sub">'+esc(sub)+'</div>'
+    +'<div class="ebp-hint">'+esc(t('ebpHint'))+'</div>'
+    +'<div class="ebp-fig"></div>'
+    +'<div class="ebp-row"><label for="ebp-name">'+esc(t('ebpBand'))+'</label><input id="ebp-name" list="ebp-names" value="'+esc(cur||last||EB_DEFAULT_NAME)+'" onchange="ebpRename()">'
+    +'<datalist id="ebp-names">'+Object.keys(names).map(function(n){return '<option value="'+esc(n)+'">';}).join('')+'</datalist></div>'
+    +'<div class="ebp-presets"><button type="button" onclick="ebpPreset(\'all\')">'+esc(t('ebpAll'))+'</button><button type="button" onclick="ebpPreset(\'long\')">'+esc(t('ebpLong'))+'</button><button type="button" onclick="ebpPreset(\'short\')">'+esc(t('ebpShort'))+'</button><button type="button" onclick="ebpPreset(\'none\')">'+esc(t('ebpNone'))+'</button></div>'
+    +'<div class="ebp-foot"><span class="ebp-total"></span><button type="button" class="btn bs bp" onclick="closeEdgePicker()">'+esc(t('ebpDone'))+'</button></div>';
+  document.body.appendChild(box);
+  _ebpRender();
+  // place next to the anchor, kept inside the window
+  var r=anchor&&anchor.getBoundingClientRect ? anchor.getBoundingClientRect() : {left:innerWidth/2-140,right:innerWidth/2,top:120,bottom:120};
+  var bw=box.offsetWidth, bh=box.offsetHeight;
+  var x=r.right+8; if(x+bw>innerWidth-8) x=Math.max(8, r.left-bw-8);
+  var y=Math.min(Math.max(8, r.top-30), innerHeight-bh-8);
+  box.style.left=x+'px'; box.style.top=Math.max(8,y)+'px';
+  setTimeout(function(){ document.addEventListener('mousedown',_ebpOutside,true); document.addEventListener('keydown',_ebpKey,true); },0);
+}
+function _ebpOutside(e){ var b=document.getElementById('ebp'); if(b && !b.contains(e.target)) closeEdgePicker(); }
+function _ebpKey(e){ if(e.key==='Escape') closeEdgePicker(); }
+function closeEdgePicker(){
+  var b=document.getElementById('ebp');
+  if(b){ var inp=b.querySelector('#ebp-name'); if(inp && _ebp){ var st=_ebpState(); var n=_ebpName(); if(EB_KEYS.some(function(k){return st[k]&&st[k]!==n;})) ebpRename(); } b.remove(); }
+  _ebp=null;
+  document.removeEventListener('mousedown',_ebpOutside,true);
+  document.removeEventListener('keydown',_ebpKey,true);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// MATERIAL — assign in one go
+// Every part, the ticked ones, or all parts sharing a name (all "Fasadas" →
+// one board, all "Karkasai" → another). Typing a new name creates its board.
+// ═══════════════════════════════════════════════════════════════════════════
+function assignMaterial(targets, mat){
+  mat=normalizeMat(mat);
+  if(!mat||!targets.length) return 0;
+  var b=boards.find(function(x){return x.mat===mat;})||ensureBoard(mat);
+  var th=b&&parseInt(b.thickness,10);
+  targets.forEach(function(p){ p.mat=mat; if(th>0) p.thick=th; });
+  renderParts();
+  if(document.getElementById('pw-overlay').classList.contains('open')) renderPartsWindow();
+  try{ renderBoards(); refreshSel(); }catch(e){}
+  try{ renderQuote(); }catch(e){}
+  try{ scheduleSave(); }catch(e){}
+  var st=document.getElementById('ist');
+  if(st){ st.style.color='#2f54eb'; st.textContent=t('matDone',{m:mat,n:targets.length}); }
+  return targets.length;
+}
+function _matNames(){
+  var s={}; boards.forEach(function(b){ if(b.mat) s[b.mat]=1; }); parts.forEach(function(p){ if(p.mat) s[p.mat]=1; });
+  return Object.keys(s).sort();
+}
+function openMaterialAssign(){
+  if(!parts.length){ alert(t('ebNoParts')); return; }
+  closeMaterialAssign();
+  var mats=_matNames();
+  var dl='<datalist id="mat-names">'+mats.map(function(m){return '<option value="'+esc(m)+'">';}).join('')+'</datalist>';
+  // most common material is the starting suggestion
+  var cnt={}; parts.forEach(function(p){ cnt[p.mat]=(cnt[p.mat]||0)+1; });
+  var top=Object.keys(cnt).sort(function(a,b){return cnt[b]-cnt[a];})[0]||'';
+  var nSel=parts.filter(function(p){ return pwSel.has(String(p.id)); }).length;
+  // one row per part name
+  var byName={}, order=[];
+  parts.forEach(function(p){ var k=p.origName||p.name||'?'; if(!byName[k]){ byName[k]=[]; order.push(k); } byName[k].push(p); });
+  order.sort(function(a,b){ return a.localeCompare(b); });
+  var rows=order.map(function(k,i){
+    var ps=byName[k], ms=ps.map(function(p){return p.mat;}).filter(function(v,j,a){return a.indexOf(v)===j;});
+    var bd=ms.length===1?matchBoard(ms[0]):null;
+    return '<div class="mat-row"><span class="mat-name" title="'+esc(k)+'">'+esc(k)+'</span><span class="mat-n">×'+ps.length+'</span>'
+      +'<span class="mat-dot" style="background:'+(bd?bd.color:'#d2d7df')+'"></span>'
+      +'<input list="mat-names" data-name="'+esc(k)+'" value="'+esc(ms.length===1?ms[0]:'')+'" placeholder="'+esc(ms.length>1?t('matMixed'):t('matPh'))+'" onchange="matApplyName(this)"></div>';
+  }).join('');
+  var ov=document.createElement('div');
+  ov.id='mat-ov'; ov.className='mat-ov';
+  ov.onclick=function(e){ if(e.target===ov) closeMaterialAssign(); };
+  ov.innerHTML='<div class="mat-box" role="dialog" aria-label="'+esc(t('matTitle'))+'">'
+    +'<div class="mat-hd"><b>'+esc(t('matTitle'))+'</b><button type="button" class="ebp-x" onclick="closeMaterialAssign()" aria-label="Close">✕</button></div>'
+    +'<div class="mat-help">'+esc(t('matHint'))+'</div>'+dl
+    +'<div class="mat-all"><label>'+esc(t('matAll',{n:parts.length}))+'</label>'
+      +'<div class="mat-line"><input id="mat-all-in" list="mat-names" value="'+esc(top)+'" placeholder="'+esc(t('matPh'))+'" onkeydown="if(event.key===\'Enter\')matApplyAll()"><button type="button" class="btn bs bp" onclick="matApplyAll()">'+esc(t('matApplyAll'))+'</button></div></div>'
+    +(nSel?'<div class="mat-all"><label>'+esc(t('matSel',{n:nSel}))+'</label><div class="mat-line"><input id="mat-sel-in" list="mat-names" placeholder="'+esc(t('matPh'))+'"><button type="button" class="btn bs" onclick="matApplySel()">'+esc(t('matApply'))+'</button></div></div>':'')
+    +'<div class="mat-sec">'+esc(t('matByName'))+'</div><div class="mat-list">'+rows+'</div>'
+    +'<div class="mat-foot"><button type="button" class="btn bs bp" onclick="closeMaterialAssign()">'+esc(t('ebpDone'))+'</button></div></div>';
+  document.body.appendChild(ov);
+  var a=document.getElementById('mat-all-in'); if(a){ a.focus(); a.select(); }
+}
+if(document.readyState!=='loading') setTimeout(_ebpRefreshManual,0); else document.addEventListener('DOMContentLoaded',_ebpRefreshManual);
+function closeMaterialAssign(){ var o=document.getElementById('mat-ov'); if(o) o.remove(); }
+function _matRefreshDialog(){ if(document.getElementById('mat-ov')){ var y=document.querySelector('#mat-ov .mat-list').scrollTop; openMaterialAssign(); var l=document.querySelector('#mat-ov .mat-list'); if(l) l.scrollTop=y; } }
+function matApplyAll(){
+  var v=(document.getElementById('mat-all-in')||{}).value||'';
+  if(!normalizeMat(v)){ document.getElementById('mat-all-in').focus(); return; }
+  assignMaterial(parts.slice(), v); _matRefreshDialog();
+}
+function matApplySel(){
+  var v=(document.getElementById('mat-sel-in')||{}).value||'';
+  if(!normalizeMat(v)) return;
+  assignMaterial(parts.filter(function(p){ return pwSel.has(String(p.id)); }), v); _matRefreshDialog();
+}
+function matApplyName(inp){
+  var k=inp.getAttribute('data-name'), v=inp.value;
+  if(!normalizeMat(v)) return;
+  assignMaterial(parts.filter(function(p){ return (p.origName||p.name||'?')===k; }), v); _matRefreshDialog();
 }
 
 function pwAssignDXFPick(){
