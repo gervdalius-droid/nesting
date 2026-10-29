@@ -14012,93 +14012,96 @@ function _labelShapePath(part, rot, shX, shY, ph, scale){
   return d;
 }
 
-function buildSimpleLabel(p, lay){
-  var part = p.part;
-  var pw = Math.round(p.pw || part.l || 100);
-  var ph = Math.round(p.ph || part.w || 100);
-  var thick = part.thick || 18;
-  var name = part.origName || '';
-  var mat = part.mat || '';
-  var idx = 1;
-  if (lay && lay.placements) {
-    var i = lay.placements.indexOf(p);
-    if (i >= 0) idx = i + 1;
+// ── Reportlist-style label for parts without a reportlist (DXF, manual, CSV) ──
+// Same grid as the SWOOD/reportlist label (see .lbl-outer): 1OP | op id | 2OP
+// header; QR · left edgeband · top edgeband / panel picture / bottom edgeband ·
+// right edgeband · QR; size + short name; material + full name. Drawn as one
+// 792 × 400 SVG (99 × 50 mm at 203 dpi) in pure black and white so it survives
+// the 1-bit conversion for the thermal printer. Without a CNC program the first
+// QR carries the part name, as the old simple label did, so scanning still works.
+function _reportStyleLabelSVG(p, lay){
+  var part=p.part, W=792, H=400;
+  var pw=Math.round(p.pw||part.l||100), ph=Math.round(p.ph||part.w||100), thick=part.thick||18;
+  var eb=part.eb||{}, op1=part.op1||'', op2=part.op2||'';
+  var full=part.origName||part.name||'', sn=full.split('_').slice(0,3).join('_');
+  var idx=1;
+  if(lay && lay.placements){ var i0=lay.placements.indexOf(p); if(i0>=0) idx=i0+1; }
+  // grid (proportions of the reportlist label)
+  var C=[0,152,194,598,640,792];                       // QR | EBL | panel | EBR | QR
+  var R=[0,41,78,129,180,231,282,319,363,400];         // header | eb-top | panel ×4 | eb-bot | dims | mat
+  var LW=1.6;
+  function fitFs(txt, w, base){ var n=Math.max(1,String(txt).length); return Math.max(9, Math.min(base, (w-10)/(n*0.58))); }
+  function text(x,y,txt,fs,opt){
+    opt=opt||{};
+    return '<text x="'+x.toFixed(1)+'" y="'+y.toFixed(1)+'" font-family="Arial,Helvetica,sans-serif" font-size="'+fs.toFixed(1)+'"'
+      +' font-weight="'+(opt.normal?'400':'700')+'" fill="#000" text-anchor="'+(opt.anchor||'middle')+'" dominant-baseline="central"'
+      +(opt.underline?' text-decoration="underline"':'')+(opt.rot?' transform="rotate('+opt.rot+' '+x.toFixed(1)+' '+y.toFixed(1)+')"':'')+'>'+esc(String(txt))+'</text>';
   }
-  var qrData = name || ('part-' + idx);
-
-  // SVG designed in landscape 792 × 400 coord space.
-  var W = 792, H = 400;
-
-  // QR area reserved in bottom-right. Bigger QR per user feedback.
-  var qrSize = 130;
-  var qrX = W - qrSize - 14;
-  var qrY = H - qrSize - 14;
-
-  // Shape area (leave room for QR at right, material text at bottom)
-  var SA_X = 50, SA_Y = 30;
-  var SA_W = W - SA_X - qrSize - 30;       // stop before QR
-  var SA_H = H - SA_Y - 50;                 // stop before bottom text row
-  var scale = Math.min(SA_W / pw, SA_H / ph);
-  var shW = Math.round(pw * scale);
-  var shH = Math.round(ph * scale);
-  var shX = SA_X + Math.round((SA_W - shW) / 2);
-  var shY = SA_Y + Math.round((SA_H - shH) / 2);
-
-  // Build shape path — prefer actual DXF outline when available
-  var shapePath = '';
-  if (part.shape && part.shape.length >= 3) {
-    shapePath = _labelShapePath(part, p.rot, shX, shY, ph, scale);
-  }
-
-  var qrSvg = qrToSVG(qrData, qrSize) || '';
-
-  var svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 '+W+' '+H+'" style="width:100%;height:100%;background:#fff;display:block">';
-  // Outer border
-  svg += '<rect x="3" y="3" width="'+(W-6)+'" height="'+(H-6)+'" fill="none" stroke="#000" stroke-width="3"/>';
-
-  // Part shape — real DXF outline if present, else rectangle
-  if (shapePath) {
-    svg += '<path d="'+shapePath+'" fill="#D4DDE8" stroke="#000" stroke-width="2" fill-rule="evenodd"/>';
-  } else {
-    svg += '<rect x="'+shX+'" y="'+shY+'" width="'+shW+'" height="'+shH+'" fill="#D4DDE8" stroke="#000" stroke-width="2"/>';
-  }
-
-  // Dimension badges — straddle the bbox edges of the shape's bounding box
-  function badge(cx, cy, text){
-    var bw = Math.max(52, String(text).length * 14 + 16);
-    var bh = 26;
-    var x = cx - bw/2, y = cy - bh/2;
-    var out = '<rect x="'+x+'" y="'+y+'" width="'+bw+'" height="'+bh+'" fill="#000"/>';
-    out += '<text x="'+cx+'" y="'+(cy+7)+'" text-anchor="middle" font-family="Arial,sans-serif" font-size="20" font-weight="bold" fill="#fff">'+esc(String(text))+'</text>';
+  function cell(x0,y0,x1,y1){ return '<rect x="'+x0+'" y="'+y0+'" width="'+(x1-x0)+'" height="'+(y1-y0)+'" fill="#fff" stroke="#000" stroke-width="'+LW+'"/>'; }
+  var s='<svg xmlns="http://www.w3.org/2000/svg" width="'+W+'" height="'+H+'" viewBox="0 0 '+W+' '+H+'" style="background:#fff">';
+  s+='<rect width="'+W+'" height="'+H+'" fill="#fff"/>';
+  // Row 1 — 1OP | op id | 2OP
+  s+=cell(C[0],R[0],C[1],R[1])+text((C[0]+C[1])/2,(R[0]+R[1])/2,'1OP',20);
+  s+=cell(C[1],R[0],C[4],R[1])+text(C[1]+8,(R[0]+R[1])/2,op1||'–',fitFs(op1||'–',C[4]-C[1],17),{anchor:'start'});
+  s+=cell(C[4],R[0],C[5],R[1])+text((C[4]+C[5])/2,(R[0]+R[1])/2,'2OP',20);
+  // QR cells (rows 2–7)
+  function qrCell(x0,x1,data,empty){
+    var out=cell(x0,R[1],x1,R[7]);
+    var cw=x1-x0, chh=R[7]-R[1], q=Math.min(cw,chh)-12;
+    if(data){
+      var qs=qrToSVG(data, q)||'';
+      out+='<g transform="translate('+(x0+(cw-q)/2).toFixed(1)+','+(R[1]+(chh-q)/2).toFixed(1)+')">'+qs+'</g>';
+    } else {
+      out+=text((x0+x1)/2,(R[1]+R[7])/2-12,empty[0],15)+text((x0+x1)/2,(R[1]+R[7])/2+12,empty[1],15);
+    }
+    // corner mark of the reportlist label (top-right of the QR cell)
+    out+='<path d="M'+(x1-22)+' '+R[1]+'L'+x1+' '+R[1]+'L'+x1+' '+(R[1]+22)+'Z" fill="#000"/>';
     return out;
   }
-  svg += badge(shX + shW/2, shY, pw);          // top
-  svg += badge(shX + shW/2, shY + shH, pw);    // bottom
-  svg += badge(shX, shY + shH/2, ph);          // left
-  svg += badge(shX + shW, shY + shH/2, ph);    // right
-
-  // #N centered in shape (approx — for non-rectangular shapes, visual center
-  // of bbox is fine since the shape is drawn over the bbox anyway)
-  var centerX = shX + shW/2, centerY = shY + shH/2;
-  if (shW >= 160 && shH >= 70) {
-    svg += '<text x="'+centerX+'" y="'+(centerY-4)+'" text-anchor="middle" font-family="Arial,sans-serif" font-size="34" font-weight="bold" fill="#000">#'+idx+'</text>';
-    svg += '<text x="'+centerX+'" y="'+(centerY+24)+'" text-anchor="middle" font-family="Arial,sans-serif" font-size="18" font-weight="normal" fill="#000">'+esc(name)+'</text>';
-  } else {
-    svg += '<text x="'+centerX+'" y="'+(centerY+10)+'" text-anchor="middle" font-family="Arial,sans-serif" font-size="26" font-weight="bold" fill="#000">#'+idx+'</text>';
+  s+=qrCell(C[0],C[1], op1||full, ['NO','CNC']);
+  s+=qrCell(C[4],C[5], op2, ['2OP','–']);
+  // Edgebands: left / right run along the width (vertical text), top / bottom along the length
+  s+=cell(C[1],R[1],C[2],R[7])+(eb.eb3?text((C[1]+C[2])/2,(R[1]+R[7])/2,eb.eb3,fitFs(eb.eb3,R[7]-R[1],15),{rot:-90,underline:true}):'');
+  s+=cell(C[3],R[1],C[4],R[7])+(eb.eb4?text((C[3]+C[4])/2,(R[1]+R[7])/2,eb.eb4,fitFs(eb.eb4,R[7]-R[1],15),{rot:-90,underline:true}):'');
+  s+=cell(C[2],R[1],C[3],R[2])+(eb.eb1?text((C[2]+C[3])/2,(R[1]+R[2])/2,eb.eb1,fitFs(eb.eb1,C[3]-C[2],15),{underline:true}):'');
+  s+=cell(C[2],R[6],C[3],R[7])+(eb.eb2?text((C[2]+C[3])/2,(R[6]+R[7])/2,eb.eb2,fitFs(eb.eb2,C[3]-C[2],15),{underline:true}):'');
+  // Panel picture (rows 3–6): the part as placed on the sheet, its number on the right
+  s+=cell(C[2],R[2],C[3],R[6]);
+  var idxW=74, M=12, aw=(C[3]-C[2])-idxW-2*M, ah=(R[6]-R[2])-2*M;
+  var sc=Math.min(aw/Math.max(1,pw), ah/Math.max(1,ph));
+  var dw=pw*sc, dh=ph*sc, ox=C[2]+M+(aw-dw)/2, oy=R[2]+M+(ah-dh)/2;
+  var rings=null;
+  if(p.nestPoly && p.nestPoly.length>2){
+    rings=[p.nestPoly].concat(p.nestHoles||[]).map(function(r){ return r.map(function(q){ return [ox+q.x*sc, oy+q.y*sc]; }); });
+  } else if(part.shape && part.shape.length>=3){
+    rings=[part.shape].concat(part.holes||[]).map(function(r){ return r.map(function(q){ var t=shapePtInBBox(part,p.rot,q.x,q.y); return [ox+t[0]*sc, oy+(ph-t[1])*sc]; }); });
   }
+  if(rings){
+    var d='';
+    rings.forEach(function(r){ r.forEach(function(q,k){ d+=(k?'L':'M')+q[0].toFixed(1)+' '+q[1].toFixed(1); }); d+='Z'; });
+    s+='<path d="'+d+'" fill="#fff" stroke="#000" stroke-width="2.4" fill-rule="evenodd"/>';
+  } else {
+    s+='<rect x="'+ox.toFixed(1)+'" y="'+oy.toFixed(1)+'" width="'+dw.toFixed(1)+'" height="'+dh.toFixed(1)+'" fill="#fff" stroke="#000" stroke-width="2.4"/>';
+    var bar=Math.max(3, dh*0.05);
+    s+='<rect x="'+ox.toFixed(1)+'" y="'+(oy+dh-bar).toFixed(1)+'" width="'+dw.toFixed(1)+'" height="'+bar.toFixed(1)+'" fill="#000"/>';
+  }
+  s+=text(C[3]-idxW/2-4,(R[2]+R[6])/2,idx,Math.min(64,(R[6]-R[2])*0.42));
+  // Row 8 — size | short name ; Row 9 — material | full name
+  var dims=pw+'.0x'+ph+'.0x'+thick+'.0';
+  s+=cell(C[0],R[7],C[2],R[8])+text(C[0]+8,(R[7]+R[8])/2,dims,fitFs(dims,C[2]-C[0],19),{anchor:'start'});
+  s+=cell(C[2],R[7],C[5],R[8])+text((C[2]+C[5])/2,(R[7]+R[8])/2,sn,fitFs(sn,C[5]-C[2],20));
+  var mat='MAT: '+(part.mat||'');
+  s+=cell(C[0],R[8],C[2],R[9])+text(C[0]+8,(R[8]+R[9])/2,mat,fitFs(mat,C[2]-C[0],15),{anchor:'start'});
+  s+=cell(C[2],R[8],C[5],R[9])+text(C[2]+8,(R[8]+R[9])/2,full,fitFs(full,C[5]-C[2],13),{anchor:'start',normal:true});
+  s+='<rect x="1" y="1" width="'+(W-2)+'" height="'+(H-2)+'" fill="none" stroke="#000" stroke-width="2.5"/>';
+  return s+'</svg>';
+}
 
-  // QR code (bigger) in bottom-right
-  svg += '<g transform="translate('+qrX+','+qrY+')">'+qrSvg+'</g>';
-
-  // Material text bottom-left (normal weight)
-  svg += '<text x="18" y="'+(H-14)+'" font-family="Arial,sans-serif" font-size="17" font-weight="normal" fill="#000">MAT: '+esc(mat)+'</text>';
-  // Small dims text bottom-center (normal weight)
-  svg += '<text x="'+(W/2 - 60)+'" y="'+(H-14)+'" text-anchor="middle" font-family="Arial,sans-serif" font-size="14" font-weight="normal" fill="#000">'+pw+'x'+ph+'x'+thick+'</text>';
-
-  svg += '</svg>';
+function buildSimpleLabel(p, lay){
+  // Preview of a label for a part without a reportlist — same design as the reportlist label.
   var lp = document.getElementById('lprev');
   lp.classList.add('simple');
-  lp.innerHTML = svg;
+  lp.innerHTML = _reportStyleLabelSVG(p, lay).replace('<svg ','<svg style="width:100%;height:100%;display:block" ');
 }
 
 
@@ -14126,72 +14129,8 @@ function buildSimpleLabel(p, lay){
 // but returned as a standalone SVG document suitable for rasterization).
 // ═══════════════════════════════════════════════════════════════
 function buildSimpleLabelSVG(p, lay){
-  var part = p.part;
-  var pw = Math.round(p.pw || part.l || 100);
-  var ph = Math.round(p.ph || part.w || 100);
-  var thick = part.thick || 18;
-  var name = part.origName || '';
-  var mat = part.mat || '';
-  var idx = 1;
-  if (lay && lay.placements) {
-    var i = lay.placements.indexOf(p);
-    if (i >= 0) idx = i + 1;
-  }
-  var qrData = name || ('part-' + idx);
-
-  var W = 792, H = 400;
-  var qrSize = 130;
-  var qrX = W - qrSize - 14;
-  var qrY = H - qrSize - 14;
-  var SA_X = 50, SA_Y = 30;
-  var SA_W = W - SA_X - qrSize - 30;
-  var SA_H = H - SA_Y - 50;
-  var scale = Math.min(SA_W / pw, SA_H / ph);
-  var shW = Math.round(pw * scale);
-  var shH = Math.round(ph * scale);
-  var shX = SA_X + Math.round((SA_W - shW) / 2);
-  var shY = SA_Y + Math.round((SA_H - shH) / 2);
-
-  var shapePath = '';
-  if (part.shape && part.shape.length >= 3) {
-    shapePath = _labelShapePath(part, p.rot, shX, shY, ph, scale);
-  }
-
-  var qrSvgInner = qrToSVG(qrData, qrSize) || '';
-
-  // Note: for PRINT we don't want the shape fill (use white interior so it
-  // doesn't waste ink/thermal media). Just draw outline.
-  var s = '<svg xmlns="http://www.w3.org/2000/svg" width="'+W+'" height="'+H+'" viewBox="0 0 '+W+' '+H+'" style="background:#fff">';
-  s += '<rect width="'+W+'" height="'+H+'" fill="#fff"/>';
-  s += '<rect x="3" y="3" width="'+(W-6)+'" height="'+(H-6)+'" fill="none" stroke="#000" stroke-width="3"/>';
-  if (shapePath) {
-    s += '<path d="'+shapePath+'" fill="#fff" stroke="#000" stroke-width="2" fill-rule="evenodd"/>';
-  } else {
-    s += '<rect x="'+shX+'" y="'+shY+'" width="'+shW+'" height="'+shH+'" fill="#fff" stroke="#000" stroke-width="2"/>';
-  }
-  function badge(cx, cy, text){
-    var bw = Math.max(52, String(text).length * 14 + 16);
-    var bh = 26;
-    var x = cx - bw/2, y = cy - bh/2;
-    return '<rect x="'+x+'" y="'+y+'" width="'+bw+'" height="'+bh+'" fill="#000"/>'
-      + '<text x="'+cx+'" y="'+(cy+7)+'" text-anchor="middle" font-family="Arial,sans-serif" font-size="20" font-weight="bold" fill="#fff">'+esc(String(text))+'</text>';
-  }
-  s += badge(shX + shW/2, shY, pw);
-  s += badge(shX + shW/2, shY + shH, pw);
-  s += badge(shX, shY + shH/2, ph);
-  s += badge(shX + shW, shY + shH/2, ph);
-  var cx = shX + shW/2, cy = shY + shH/2;
-  if (shW >= 160 && shH >= 70) {
-    s += '<text x="'+cx+'" y="'+(cy-4)+'" text-anchor="middle" font-family="Arial,sans-serif" font-size="34" font-weight="bold" fill="#000">#'+idx+'</text>';
-    s += '<text x="'+cx+'" y="'+(cy+24)+'" text-anchor="middle" font-family="Arial,sans-serif" font-size="18" font-weight="normal" fill="#000">'+esc(name)+'</text>';
-  } else {
-    s += '<text x="'+cx+'" y="'+(cy+10)+'" text-anchor="middle" font-family="Arial,sans-serif" font-size="26" font-weight="bold" fill="#000">#'+idx+'</text>';
-  }
-  s += '<g transform="translate('+qrX+','+qrY+')">'+qrSvgInner+'</g>';
-  s += '<text x="18" y="'+(H-14)+'" font-family="Arial,sans-serif" font-size="17" font-weight="normal" fill="#000">MAT: '+esc(mat)+'</text>';
-  s += '<text x="'+(W/2 - 60)+'" y="'+(H-14)+'" text-anchor="middle" font-family="Arial,sans-serif" font-size="14" font-weight="normal" fill="#000">'+pw+'x'+ph+'x'+thick+'</text>';
-  s += '</svg>';
-  return s;
+  // Printed label for a part without a reportlist: the reportlist design (see above).
+  return _reportStyleLabelSVG(p, lay);
 }
 
 // ═══════════════════════════════════════════════════════════════
