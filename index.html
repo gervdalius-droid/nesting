@@ -2006,7 +2006,7 @@ var I18N={
     exImported:'✓ {n} part(s) imported from the layout',
     exPreviewNote:'blue = detected part · amber = cut-out · pink = on-line cut (part stays whole)',
     tplLink:'⤓ Parts list template (CSV)',
-    tplTip:'Download a small CSV you can fill in — just name, size and quantity. Far simpler than a full SWOOD report.',
+    tplTip:'Download a CSV in the workshop sheet format: ILGIS, Plotis, Kiekis and how many sides are laminated along the length and the width (0, 1 or 2). Name, material and edgeband type are optional.',
     tplDone:'✓ Template downloaded — fill it in and drop it back here',
     dxfAssignTitle:'Assign DXF shapes to parts',
     dxfAssignSetLW:'Take L/W from the DXF outline',
@@ -2311,7 +2311,7 @@ var I18N={
     exImported:'✓ importuota {n} detalė(-ių) iš išdėstymo',
     exPreviewNote:'mėlyna = rasta detalė · geltona = išpjova · rožinė = pjūvis ant linijos (detalė vientisa)',
     tplLink:'⤓ Detalių sąrašo šablonas (CSV)',
-    tplTip:'Atsisiųskite paprastą CSV — tereikia pavadinimo, matmenų ir kiekio. Daug paprasčiau nei pilna SWOOD ataskaita.',
+    tplTip:'Atsisiųskite CSV dirbtuvės lentelės formatu: ILGIS, Plotis, Kiekis ir kiek pusių laminuota per ilgį ir per plotį (0, 1 arba 2). Pavadinimas, medžiaga ir briaunos tipas — nebūtini.',
     tplDone:'✓ Šablonas atsisiųstas — užpildykite ir įkelkite atgal čia',
     dxfAssignTitle:'Priskirti DXF formas detalėms',
     dxfAssignSetLW:'Imti ilgį/plotį iš DXF kontūro',
@@ -5347,8 +5347,16 @@ async function processDXFFiles(files){
 // ═══════════════════════════════════════════════════════════════
 function parseCSV(text){
   text=text.replace(/^\uFEFF/,'').replace(/\r\n/g,'\n').replace(/\r/g,'\n');
-  var lines=text.split('\n').filter(function(l){return l.length>0;});
+  var lines=text.split('\n').filter(function(l){return l.replace(/[;,\t|\s"]/g,'').length>0;});
   if(!lines.length)return {rows:[],headers:[],sep:','};
+  // The header row is the first line naming both a length and a width column —
+  // an Excel sheet saved as CSV often has a title or empty rows above it.
+  var hi=0;
+  for(var li=0;li<Math.min(lines.length,25);li++){
+    var nl=_csvNorm(lines[li]);
+    if(/(ilgis|length)/.test(nl)&&/(plotis|width)/.test(nl)){ hi=li; break; }
+  }
+  lines=lines.slice(hi);
   // Detect separator: whichever produces most fields in the header
   var cands=[';',',','\t','|'],sep=',',best=0;
   cands.forEach(function(c){var n=lines[0].split(c).length;if(n>best){best=n;sep=c;}});
@@ -5386,28 +5394,33 @@ function parseCSV(text){
 // (ASCII, no diacritics — normalisation strips punctuation but not accents).
 // Semicolon-separated with a UTF-8 BOM so Excel opens it correctly in one click.
 function downloadPartsTemplate(){
-  var lt = (_lang==='lt');
-  var cols = lt
-    ? ['Pavadinimas','Ilgis','Plotis','Kiekis','Medziaga','Storis','Briauna L1','Briauna L2','Briauna W1','Briauna W2','Note 1']
-    : ['Name','Length','Width','Quantity','Material','Thickness','Edging Length 1','Edging Length 2','Edging Width 1','Edging Width 2','Note 1'];
-  // Rows are prefixed EXAMPLE_ so an accidental import of the untouched file is obvious.
+  // Same columns, in the same order, as the workshop sheet: ILGIS · Plotis ·
+  // Kiekis · Laminuota pusių per ilgį · per plotį (0, 1 or 2 sides each). The
+  // columns after it are optional — empty name → "Plokštė L×W", empty material →
+  // chosen in the import window.
+  var cols = ['ILGIS (mm)','Plotis (mm)','Kiekis','Laminuota pusių per ilgį','Laminuota pusių per plotį',
+              'Pavadinimas','Medžiaga','Storis','Briaunos tipas'];
   var rows = [
-    ['EXAMPLE_FRONT','1307','409','2','MDF 18mm','18','ABS 2mm','ABS 2mm','ABS 2mm','ABS 2mm',''],
-    ['EXAMPLE_SIDE', '1292','350','4','MDF 18mm','18','ABS 1mm','ABS 1mm','','',''],
-    ['EXAMPLE_SHELF','464', '339','6','MDF 18mm','18','ABS 1mm','','','','CNC']
+    ['2800','600','4','2','2','','','',''],
+    ['1292','350','4','1','0','SONAS','LMDP 18 balta','18','ABS 1mm'],
+    ['464', '339','6','1','2','LENTYNA','LMDP 18 balta','18','ABS 1mm']
   ];
   var esc=function(v){ v=String(v==null?'':v); return /[";\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v; };
   var csv=[cols.map(esc).join(';')].concat(rows.map(function(r){return r.map(esc).join(';');})).join('\r\n')+'\r\n';
-  downloadBlob(lt?'detaliu-sarasas-sablonas.csv':'parts-list-template.csv',
-               new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'}));
+  downloadBlob(_lang==='lt'?'detaliu-sarasas-sablonas.csv':'parts-list-template.csv',
+               new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'}));
   var st=document.getElementById('ist');
   if(st){ st.style.color='#2f54eb'; st.textContent=t('tplDone'); }
 }
 
+// Lower-case, accents removed (ų→u, į→i, ž→z), only letters and digits kept.
+function _csvNorm(s){
+  return String(s==null?'':s).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]/g,'');
+}
 function _csvFindCol(headers,keywords){
-  var norm=headers.map(function(h){return h.toLowerCase().replace(/[^a-z0-9]/g,'');});
+  var norm=headers.map(_csvNorm);
   for(var k=0;k<keywords.length;k++){
-    var kw=keywords[k].toLowerCase().replace(/[^a-z0-9]/g,'');
+    var kw=_csvNorm(keywords[k]);
     var idx=norm.indexOf(kw);
     if(idx>=0)return headers[idx];
     for(var i=0;i<norm.length;i++){if(norm[i].indexOf(kw)===0)return headers[i];}
@@ -5418,7 +5431,9 @@ async function processCSVFile(f){
   var st=document.getElementById('ist');
   st.style.color='#667085';st.textContent='Reading CSV…';
   try{
-    var text=await f.text();
+    var buf=await f.arrayBuffer();
+    var text=new TextDecoder('utf-8').decode(buf);
+    if(text.indexOf('\uFFFD')>=0){ try{ text=new TextDecoder('windows-1257').decode(buf); }catch(e){} }
     var parsed=parseCSV(text);
     if(!parsed.rows.length)throw new Error('CSV is empty');
     var H=parsed.headers;
@@ -5436,6 +5451,12 @@ async function processCSVFile(f){
     var hRot=_csvFindCol(H,['Can Rotate','Rotate']);
     var hOp1=_csvFindCol(H,['Note 1','Op1','QR']);
     var hThick=_csvFindCol(H,['Thickness','Storis']);
+    // Workshop sheet format: how many sides are laminated along the length / the
+    // width (0, 1 or 2) instead of naming each edge. Optional edgeband type column.
+    var _lamCol=function(re){ for(var i=0;i<H.length;i++){ var n=_csvNorm(H[i]); if(/^(laminuota|banded|edged)/.test(n)&&re.test(n)) return H[i]; } return null; };
+    var hLamL=_lamCol(/(ilg|long)/);
+    var hLamW=_lamCol(/(plot|short)/);
+    var hEBT=_csvFindCol(H,['Briaunos tipas','Laminato tipas','Edgeband type']);
     if(!hL||!hW){
       throw new Error('CSV missing Length/Width columns. Need at least: Name, Length, Width, Quantity, Material.');
     }
@@ -5443,11 +5464,12 @@ async function processCSVFile(f){
     var preview=[];
     var skipped=0;
     parsed.rows.forEach(function(r){
-      var L=parseInt(r[hL],10);
-      var W=parseInt(r[hW],10);
+      var num=function(v){ return parseInt(String(v==null?'':v).replace(/\s/g,''),10); };
+      var L=num(r[hL]);
+      var W=num(r[hW]);
       if(!L||!W){skipped++;return;}
-      var Q=parseInt(r[hQ],10)||1;
-      var name=(r[hN]||'').trim()||('PART_'+(preview.length+1));
+      var Q=num(r[hQ])||1;
+      var name=(hN&&(r[hN]||'').trim())||('Plokštė '+L+'×'+W);
       var mat=(r[hM]||'').trim();
       var thick=hThick?(parseInt(r[hThick],10)||18):18;
       var eb={
@@ -5456,6 +5478,13 @@ async function processCSVFile(f){
         eb3:(hEB3&&r[hEB3]||'').substring(0,16),
         eb4:(hEB4&&r[hEB4]||'').substring(0,16)
       };
+      // Side counts: per ilgį → the long edges (eb1, eb2), per plotį → the short (eb3, eb4)
+      if(hLamL||hLamW){
+        var ebName=((hEBT&&r[hEBT])||'').trim().substring(0,16)||'PVC';
+        var nl=Math.max(0,Math.min(2,num(hLamL?r[hLamL]:0)||0)), nw=Math.max(0,Math.min(2,num(hLamW?r[hLamW]:0)||0));
+        if(!eb.eb1&&!eb.eb2){ if(nl>=1) eb.eb1=ebName; if(nl>=2) eb.eb2=ebName; }
+        if(!eb.eb3&&!eb.eb4){ if(nw>=1) eb.eb3=ebName; if(nw>=2) eb.eb4=ebName; }
+      }
       var grpName=(hGrp&&(r[hGrp]||'').trim())||'';
       var op1=(hOp1&&(r[hOp1]||'').trim())||'';
       preview.push({name:name,l:L,w:W,qty:Q,mat:mat,thick:thick,eb:eb,grpName:grpName,op1:op1});
