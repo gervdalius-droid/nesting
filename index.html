@@ -1961,11 +1961,13 @@ var I18N={
     ncMore:'Tool & program settings',
     ncTno:'Tool no.',ncFeed:'Feed',ncPlunge:'Plunge/ramp feed',ncRamp:'Ramp °',ncLead:'Lead-in mm',ncSafe:'Safe Z +',ncBelow:'Below bottom mm',
     ncZTop:'Material Z (empty = part thickness)',ncPark:'Park X',ncReset:'Reset tools',
-    ncHow:'Z zero = machine bed. Each profile: 5 mm lead-in arc + 30° ramp along the edge, full depth in one pass. Outside clockwise, holes anticlockwise. Small parts first, holes before outlines.',
+    ncHow:'Z zero = machine bed. Each profile: 5 mm lead-in arc + 30° ramp along the edge, full depth in one pass (small parts: see the rule above). Outside clockwise, holes anticlockwise. Small parts first, holes before outlines.',
     ncNoCnc:'No CNC sheets — set the machine to CNC to get .nc programs.',
     ncKerfWarn:'tool Ø{d} is wider than the kerf {k} mm — neighbouring parts would be cut into',
     ncKerfWarnAll:'Tool Ø{d} mm is wider than the kerf on sheet {s} — nest again with a bigger kerf or pick the smaller tool.',
     ncHoleSkip:'{n} hole(s) smaller than the Ø{d} tool were left out',
+    ncMultiMin:'Passes if a side < mm',ncMultiN:'Passes',
+    ncMultiRule:'Parts with a side under {m} mm are cut in {n} equal depth passes (18 mm → 9 + 9); others in one pass.',
     ncTightWarn:'{n} place(s) where parts are closer than the Ø{d} tool — it would cut into the neighbour (e.g. {ex})',
     ncZip:'CNC programs (.nc) as ZIP',
     matAllBtn:'🎨 Material for all parts',
@@ -2285,6 +2287,8 @@ var I18N={
     ncKerfWarn:'freza Ø{d} platesnė už tarpą {k} mm — būtų įpjautos gretimos detalės',
     ncKerfWarnAll:'Freza Ø{d} mm platesnė už tarpą plokštėje {s} — išdėstykite iš naujo su didesniu tarpu arba rinkitės mažesnę frezą.',
     ncHoleSkip:'{n} skylė(s) mažesnės už Ø{d} frezą praleistos',
+    ncMultiMin:'Keli praėjimai, jei kraštinė < mm',ncMultiN:'Praėjimai',
+    ncMultiRule:'Detalės, kurių kraštinė mažesnė nei {m} mm, pjaunamos per {n} vienodus gylio praėjimus (18 mm → 9 + 9); kitos – vienu.',
     ncTightWarn:'{n} vieta(-os), kur detalės arčiau nei Ø{d} freza — ji įpjautų gretimą detalę (pvz. {ex})',
     ncZip:'CNC programos (.nc) ZIP',
     matAllBtn:'🎨 Medžiaga visoms',
@@ -14216,7 +14220,7 @@ var NC_TOOLS_DEFAULT={
   karbidas:{name:'Karbidas',        t:7, dia:6,  s:18000, feed:4000, plunge:2000}
 };
 var NC_DEFAULT={tool:'leitz', tools:JSON.parse(JSON.stringify(NC_TOOLS_DEFAULT)),
-  ramp:30, lead:5, safe:20, clear:10, below:0, parkX:3000, parkY:0, zTop:''};
+  ramp:30, lead:5, safe:20, clear:10, below:0, parkX:3000, parkY:0, zTop:'', multiMin:200, multiPasses:2};
 var NC=(function(){
   try{ var s=JSON.parse(localStorage.getItem('ncSettings')||'null'); if(s&&s.tools){
     var o=JSON.parse(JSON.stringify(NC_DEFAULT));
@@ -14281,7 +14285,9 @@ function _ncWalk(pl, dist){
 function _ncLen(pl){ var s=0; for(var i=1;i<pl.length;i++) s+=Math.hypot(pl[i][0]-pl[i-1][0],pl[i][1]-pl[i-1][1]); return s; }
 
 // One profile → G-code lines. path: points to cut (closed rings repeat the start).
-function _ncProfile(out, path, closed, z){
+function _ncProfile(out, path, closed, z, levels){
+  // levels: depths to cut to, top → bottom (e.g. [9, 0] = two passes of 9 mm).
+  levels=(levels&&levels.length)?levels:[z.cut];
   var tl=ncTool(), tanA=Math.tan((NC.ramp||30)*Math.PI/180), LEAD=+NC.lead||0, R=100;
   var p0=path[0], p1=path[1];
   var dl=Math.hypot(p1[0]-p0[0],p1[1]-p0[1])||1, dir=[(p1[0]-p0[0])/dl,(p1[1]-p0[1])/dl], nrm=[-dir[1],dir[0]];
@@ -14292,28 +14298,32 @@ function _ncProfile(out, path, closed, z){
     for(var k=6;k>=0;k--){ var a=th*k/6, al=R*Math.sin(a), off=R*(1-Math.cos(a));
       lead.push([p0[0]-dir[0]*al+nrm[0]*off, p0[1]-dir[1]*al+nrm[1]*off]); }
   } else lead=[p0];
-  var leadLen=_ncLen(lead);
-  // ramp: lead-in → along the path → back → back out the lead-in, descending at the ramp angle
-  var D=z.top-z.cut, rampTot=D/tanA - 2*leadLen;
-  var pathLen=_ncLen(path), maxLeg=Math.max(1, closed ? pathLen*0.45 : pathLen*0.95);
-  var nPairs=rampTot>0 ? Math.ceil((rampTot/2)/maxLeg) : 0, leg=nPairs ? rampTot/(2*nPairs) : 0;
-  var seq=[];   // [x,y] points of the ramp, in order
-  seq=seq.concat(lead.slice(1));
-  var fw=leg>0?_ncWalk(path, leg):[p0];
-  for(var n=0;n<nPairs;n++){ seq=seq.concat(fw.slice(1)); seq=seq.concat(fw.slice(0,-1).reverse()); }
-  seq=seq.concat(lead.slice(0,-1).reverse());
+  var leadLen=_ncLen(lead), pathLen=_ncLen(path), maxLeg=Math.max(1, closed ? pathLen*0.45 : pathLen*0.95);
   var s0=lead[0];
   out.g0(s0[0],s0[1],z.safe); out.g0(s0[0],s0[1],z.clear); out.g1(s0[0],s0[1],z.top,tl.plunge);
-  // descend linearly with distance
-  var tot=0, prev=s0; seq.forEach(function(q){ tot+=Math.hypot(q[0]-prev[0],q[1]-prev[1]); prev=q; });
-  var run=0; prev=s0;
-  seq.forEach(function(q,i){ run+=Math.hypot(q[0]-prev[0],q[1]-prev[1]); prev=q;
-    var zz=(i===seq.length-1)?z.cut:z.top-(tot>0?D*run/tot:D); out.g1(q[0],q[1],zz); });
-  if(!seq.length) out.g1(s0[0],s0[1],z.cut);
-  // full-depth pass
-  var first=true;
-  lead.slice(1).forEach(function(q){ out.g1(q[0],q[1],z.cut, first?tl.feed:null); first=false; });
-  path.slice(1).forEach(function(q){ out.g1(q[0],q[1],z.cut, first?tl.feed:null); first=false; });
+  var zNow=z.top;
+  levels.forEach(function(zl, li){
+    if(li>0){
+      // back to the lead-in start along the cut already made, at the current depth
+      var back = closed ? lead.slice(0,-1).reverse() : path.slice(0,-1).reverse();
+      back.forEach(function(q){ out.g1(q[0],q[1],zNow,tl.plunge); });
+    }
+    // ramp: lead-in → along the path → back → back out the lead-in, descending at the ramp angle
+    var D=zNow-zl, rampTot=D/tanA - 2*leadLen;
+    var nPairs=rampTot>0 ? Math.ceil((rampTot/2)/maxLeg) : 0, leg=nPairs ? rampTot/(2*nPairs) : 0;
+    var seq=lead.slice(1), fw=leg>0?_ncWalk(path, leg):[p0];
+    for(var n=0;n<nPairs;n++){ seq=seq.concat(fw.slice(1)); seq=seq.concat(fw.slice(0,-1).reverse()); }
+    seq=seq.concat(lead.slice(0,-1).reverse());
+    var tot=0, prev=s0; seq.forEach(function(q){ tot+=Math.hypot(q[0]-prev[0],q[1]-prev[1]); prev=q; });
+    var run=0; prev=s0;
+    seq.forEach(function(q,i){ run+=Math.hypot(q[0]-prev[0],q[1]-prev[1]); prev=q;
+      var zz=(i===seq.length-1)?zl:zNow-(tot>0?D*run/tot:D); out.g1(q[0],q[1],zz,tl.plunge); });
+    if(!seq.length) out.g1(s0[0],s0[1],zl,tl.plunge);
+    // pass at this depth
+    lead.slice(1).forEach(function(q){ out.g1(q[0],q[1],zl,tl.feed); });
+    path.slice(1).forEach(function(q){ out.g1(q[0],q[1],zl,tl.feed); });
+    zNow=zl;
+  });
   var e=path[path.length-1]; out.g0(e[0],e[1],z.safe);
 }
 
@@ -14338,21 +14348,28 @@ function makeNC(lay){
   var items=lay.placements.map(function(p){ var g=_ncPlacementGeom(lay,p); return {p:p, g:g, a:Math.abs(_ncArea(g.outer))}; })
     .sort(function(a,b){ return a.a-b.a; });
   var skipped=0;
+  var nMulti=0;
   items.forEach(function(it){
     var name=(it.p.part&&(it.p.part.origName||it.p.part.name))||'';
+    // Small parts (a side under the limit) are cut in equal depth passes so they
+    // stay held down: 18 mm in 2 passes = 9 + 9.
+    var levels=[z.cut], np=Math.max(1, Math.round(+NC.multiPasses||1));
+    if(+NC.multiMin>0 && np>1 && Math.min(it.p.pw, it.p.ph) < +NC.multiMin){
+      levels=[]; for(var k=1;k<=np;k++) levels.push(z.top-(z.top-z.cut)*k/np); nMulti++;
+    }
     // on-line cuts: tool centred on the line
-    it.g.marks.forEach(function(m){ if(m.length>=2) _ncProfile(out, m, false, z); });
+    it.g.marks.forEach(function(m){ if(m.length>=2) _ncProfile(out, m, false, z, levels); });
     // holes: tool inside, anticlockwise
     it.g.holes.forEach(function(h){
       var off=_ncOffset(h, -r);
       if(!off.length){ skipped++; return; }
-      off.forEach(function(o){ if(_ncArea(o)<0) o.reverse(); _ncProfile(out, _ncStartMidLongest(o), true, z); });
+      off.forEach(function(o){ if(_ncArea(o)<0) o.reverse(); _ncProfile(out, _ncStartMidLongest(o), true, z, levels); });
     });
     // outline: tool outside, clockwise
     var oo=_ncOffset(it.g.outer, r).sort(function(a,b){ return Math.abs(_ncArea(b))-Math.abs(_ncArea(a)); })[0];
     if(!oo){ notes.push(name+': no outline'); return; }
     if(_ncArea(oo)>0) oo.reverse();
-    _ncProfile(out, _ncStartMidLongest(oo), true, z);
+    _ncProfile(out, _ncStartMidLongest(oo), true, z, levels);
   });
   if(skipped) notes.push(t('ncHoleSkip',{n:skipped,d:2*r}));
   n+=10; L.push('N'+n+'X'+num(+NC.parkX||0)+'Y'+num(+NC.parkY||0)+'Z'+num(z.safe));
@@ -14379,10 +14396,12 @@ function ncRenderBox(){
     +'<div class="nc-tools">'+Object.keys(NC.tools).map(function(k){ var x=NC.tools[k];
         return '<button type="button" class="nc-tool'+(k===NC.tool?' on':'')+'" onclick="ncSetTool(\''+k+'\')"><b>'+esc(x.name)+'</b><span>Ø'+x.dia+' · T'+x.t+' · F'+x.feed+'</span></button>'; }).join('')+'</div>'
     +'<div class="nc-row">'+fld(t('ncDia'),tk+'dia',tl.dia,52)+'<span class="nc-hint">'+esc(t('ncDiaHint'))+'</span></div>'
+    +((+NC.multiMin>0 && +NC.multiPasses>1)?'<div class="nc-hint" style="color:#475467;margin-top:3px">'+esc(t('ncMultiRule',{m:NC.multiMin,n:NC.multiPasses}))+'</div>':'')
     +(warn.length?'<div class="nc-warn">⚠ '+esc(t('ncKerfWarnAll',{d:tl.dia,s:warn.join(', ')}))+'</div>':'')
     +'<details'+(open?' open':'')+'><summary>'+esc(t('ncMore'))+'</summary><div class="nc-grid">'
       +fld(t('ncTno'),tk+'t',tl.t,40)+fld('S',tk+'s',tl.s,60)+fld(t('ncFeed'),tk+'feed',tl.feed)+fld(t('ncPlunge'),tk+'plunge',tl.plunge)
       +fld(t('ncRamp'),'ramp',NC.ramp,40)+fld(t('ncLead'),'lead',NC.lead,40)+fld(t('ncSafe'),'safe',NC.safe,40)+fld(t('ncBelow'),'below',NC.below,40)
+      +fld(t('ncMultiMin'),'multiMin',NC.multiMin,48)+fld(t('ncMultiN'),'multiPasses',NC.multiPasses,36)
       +fld(t('ncZTop'),'zTop',NC.zTop,48)+fld(t('ncPark'),'parkX',NC.parkX,52)+fld('Y','parkY',NC.parkY,44)
       +'<button type="button" class="btn bs" onclick="ncResetTools()" style="font-size:10px">'+esc(t('ncReset'))+'</button>'
     +'</div><div class="nc-hint" style="margin-top:4px">'+esc(t('ncHow'))+'</div></details>'
