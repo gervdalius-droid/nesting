@@ -234,6 +234,19 @@ input[type=color]{padding:2px 3px;height:27px;cursor:pointer}
 .pli-print.partial{color:#8a6d1a;background:#F5EEDC}
 /* Rotation lock indicator */
 .plist-tools{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:6px}.plist-tools .btn{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nc-box{border:1px solid #d6def5;background:#f8faff;border-radius:8px;padding:8px 10px;margin-bottom:8px;font-size:11px;color:#344054}
+.nc-box:empty{display:none}
+.nc-hd{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin-bottom:6px}.nc-hd b{font-size:12px;color:#1d2939}.nc-sub{color:#667085;font-size:10.5px}
+.nc-tools{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px}
+.nc-tool{display:flex;flex-direction:column;align-items:flex-start;gap:1px;border:1px solid #d0d5dd;background:#fff;border-radius:7px;padding:6px 8px;cursor:pointer;font:inherit;text-align:left;color:#344054}
+.nc-tool b{font-size:11.5px}.nc-tool span{font-size:10px;color:#667085;font-family:monospace}
+.nc-tool.on{border-color:#2f54eb;background:#eef2ff;box-shadow:0 0 0 1px #2f54eb inset}.nc-tool.on b{color:#2f54eb}
+.nc-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.nc-f{display:inline-flex;align-items:center;gap:4px;font-size:10.5px;color:#475467}.nc-f input{min-height:24px;padding:2px 5px;font-size:11px}
+.nc-hint{font-size:10px;color:#98a2b3;line-height:1.4}
+.nc-warn{margin-top:5px;font-size:10.5px;color:#b42318;background:#fef3f2;border:1px solid #fecdca;border-radius:5px;padding:4px 6px}
+.nc-box details{margin-top:6px}.nc-box summary{cursor:pointer;font-size:10.5px;color:#2f54eb}
+.nc-grid{display:flex;flex-wrap:wrap;gap:6px 10px;margin-top:6px;align-items:center}
 .pli-eb{flex-shrink:0;cursor:pointer;padding:1px;border-radius:3px;line-height:0;opacity:.9}
 .pli-eb:hover{background:#e8edff;opacity:1}
 .pw-eb-cell{display:flex;align-items:center;gap:5px;cursor:pointer;border:1px solid transparent;border-radius:5px;padding:2px 3px;min-width:0}
@@ -816,6 +829,7 @@ body.print-mode{background:#fff}
       <div class="sec" data-i18n="exportHdr" style="margin:0">Export — parts only · vCarve DXF</div>
       <button class="btn bs" onclick="openPrintView()" data-i18n-title="printPdfTip" title="Open printable layout (Save as PDF in print dialog)" style="font-size:10px;padding:3px 8px;color:#2f54eb;border-color:#2f54eb"><span data-i18n="printPdf">🖨 Print PDF</span></button>
     </div>
+    <div id="nc-box" class="nc-box"></div>
     <div id="erows"></div>
   </div>
   <div id="tabs" class="tabs"></div>
@@ -1940,6 +1954,20 @@ var I18N={
     matMixed:'mixed — pick one',
     matPh:'Type or pick a material',
     matDone:'✓ Material {m} set on {n} part(s)',
+    ncTitle:'🤖 CNC programs (.nc)',
+    ncSub:'Same G-code as your VCarve files — ready for the machine, one per CNC sheet.',
+    ncDia:'Tool Ø, mm',
+    ncDiaHint:'Enter the real diameter after sharpening — the path is offset by half of it.',
+    ncMore:'Tool & program settings',
+    ncTno:'Tool no.',ncFeed:'Feed',ncPlunge:'Plunge/ramp feed',ncRamp:'Ramp °',ncLead:'Lead-in mm',ncSafe:'Safe Z +',ncBelow:'Below bottom mm',
+    ncZTop:'Material Z (empty = part thickness)',ncPark:'Park X',ncReset:'Reset tools',
+    ncHow:'Z zero = machine bed. Each profile: 5 mm lead-in arc + 30° ramp along the edge, full depth in one pass. Outside clockwise, holes anticlockwise. Small parts first, holes before outlines.',
+    ncNoCnc:'No CNC sheets — set the machine to CNC to get .nc programs.',
+    ncKerfWarn:'tool Ø{d} is wider than the kerf {k} mm — neighbouring parts would be cut into',
+    ncKerfWarnAll:'Tool Ø{d} mm is wider than the kerf on sheet {s} — nest again with a bigger kerf or pick the smaller tool.',
+    ncHoleSkip:'{n} hole(s) smaller than the Ø{d} tool were left out',
+    ncTightWarn:'{n} place(s) where parts are closer than the Ø{d} tool — it would cut into the neighbour (e.g. {ex})',
+    ncZip:'CNC programs (.nc) as ZIP',
     matAllBtn:'🎨 Material for all parts',
     ebAllBtn:'▭ Edges for all parts',
     ebNoParts:'Add some parts first.',
@@ -2245,6 +2273,20 @@ var I18N={
     matMixed:'skirtingos — pasirinkite',
     matPh:'Įrašykite arba pasirinkite',
     matDone:'✓ Medžiaga {m} priskirta: {n} det.',
+    ncTitle:'🤖 CNC programos (.nc)',
+    ncSub:'Toks pat G-kodas kaip jūsų VCarve failai — iškart į staklę, po vieną kiekvienai CNC plokštei.',
+    ncDia:'Freza Ø, mm',
+    ncDiaHint:'Įrašykite tikrą skersmenį po galandimo — kelias atitraukiamas per pusę jo.',
+    ncMore:'Frezos ir programos nustatymai',
+    ncTno:'Įrankio nr.',ncFeed:'Pastūma',ncPlunge:'Įleidimo pastūma',ncRamp:'Rampa °',ncLead:'Įvažiavimas mm',ncSafe:'Saugus Z +',ncBelow:'Žemiau dugno mm',
+    ncZTop:'Medžiagos Z (tuščia = detalės storis)',ncPark:'Parkavimas X',ncReset:'Atstatyti frezas',
+    ncHow:'Z nulis = staklės stalas. Kiekvienas kontūras: 5 mm įvažiavimo lankas + 30° rampa palei kraštą, visas gylis vienu praėjimu. Išorė pagal laikrodžio rodyklę, skylės prieš. Mažos detalės pirmos, skylės prieš kontūrą.',
+    ncNoCnc:'Nėra CNC plokščių — nustatykite staklę CNC, kad gautumėte .nc programas.',
+    ncKerfWarn:'freza Ø{d} platesnė už tarpą {k} mm — būtų įpjautos gretimos detalės',
+    ncKerfWarnAll:'Freza Ø{d} mm platesnė už tarpą plokštėje {s} — išdėstykite iš naujo su didesniu tarpu arba rinkitės mažesnę frezą.',
+    ncHoleSkip:'{n} skylė(s) mažesnės už Ø{d} frezą praleistos',
+    ncTightWarn:'{n} vieta(-os), kur detalės arčiau nei Ø{d} freza — ji įpjautų gretimą detalę (pvz. {ex})',
+    ncZip:'CNC programos (.nc) ZIP',
     matAllBtn:'🎨 Medžiaga visoms',
     ebAllBtn:'▭ Briaunos visoms',
     ebNoParts:'Pirma pridėkite detalių.',
@@ -13750,8 +13792,8 @@ function scheduleExportRebuild(){
 }
 // Pairs of parts on one sheet that are closer than the sheet's kerf, measured on
 // the geometry the DXF writes (outline and cut-outs, so riders count too).
-function _sheetGapIssues(l){
-  var k=(typeof l.kerf==='number')?l.kerf:0;
+function _sheetGapIssues(l, minGap){
+  var k=(minGap!=null)?minGap:((typeof l.kerf==='number')?l.kerf:0);
   if(!(k>0)||!l.placements||l.placements.length<2) return [];
   var R=l.placements.map(function(p){
     var x=p.x, y=p.y, rings;
@@ -13801,6 +13843,20 @@ function buildExport(){
     var fname = prefix+'sheet_'+(i+1)+'_'+matSlug+(dupCount>1?'_x'+dupCount:'')+'.dxf';
     files.push({name:fname, text:makeDXF(l,i)});
   });
+  // CNC programs (.nc) — one per unique CNC sheet, with the chosen tool
+  var ncNotes=[];
+  try{
+    ncRenderBox();
+    layouts.forEach(function(l,i){
+      if(l.machine==='saw') return;
+      if(dups.firstIdx[dups.sigs[i]] !== i) return;
+      var dupCount=dups.countBy[dups.sigs[i]];
+      var matSlug=l.matName.replace(/[^a-z0-9]/gi,'_').substring(0,18);
+      var r=makeNC(l);
+      r.notes.forEach(function(m){ ncNotes.push('#'+(i+1)+': '+m); });
+      files.push({name:'CNC_sheet_'+(i+1)+'_'+matSlug+(dupCount>1?'_x'+dupCount:'')+'_'+ncToolSlug()+'.nc', text:r.text, nc:true});
+    });
+  }catch(e){ console.error('NC export failed',e); ncNotes.push('G-code: '+e.message); }
   files.push({name:'cut_report.csv',text:makeCSV()});
 
   // Kerf used per machine, and any parts closer together than their sheet's kerf
@@ -13813,9 +13869,28 @@ function buildExport(){
     var box=document.createElement('div');
     box.style.cssText='font-size:11px;padding:6px 8px;margin-bottom:6px;border-radius:6px;'+(issues.length?'background:#fff4f2;border:1px solid #f1c0b6;color:#9a3412':'background:#f6f8fa;border:1px solid #e6e8ed;color:#475467');
     box.innerHTML='Kerf: '+Object.keys(byM).map(function(m){ return m+' '+Object.keys(byM[m]).join(' / ')+' mm'; }).join(' · ')
-      +(issues.length?'<br>⚠ '+issues.length+' gap(s) smaller than the kerf: '+esc(issues.slice(0,4).join('; '))+(issues.length>4?' …':''):'');
+      +(issues.length?'<br>⚠ '+issues.length+' gap(s) smaller than the kerf: '+esc(issues.slice(0,4).join('; '))+(issues.length>4?' …':''):'')
+      +(ncNotes.length?'<br>⚠ '+esc(ncNotes.slice(0,4).join('; '))+(ncNotes.length>4?' …':''):'');
+    if(ncNotes.length && !issues.length) box.style.cssText='font-size:11px;padding:6px 8px;margin-bottom:6px;border-radius:6px;background:#fffaeb;border:1px solid #f5d38b;color:#93370d';
     rows.appendChild(box);
   })();
+
+  // CNC programs only, as one ZIP
+  var ncFiles=files.filter(function(f){ return f.nc; });
+  if(ncFiles.length){
+    var ncRow=document.createElement('div'); ncRow.className='er';
+    ncRow.style.cssText='background:#f3f6ff;border:1px solid #2f54eb33;border-radius:6px;padding:6px 8px;margin-bottom:4px';
+    var ncNm=document.createElement('div'); ncNm.className='en';
+    ncNm.innerHTML='<strong>🤖 '+esc(t('ncZip'))+'</strong> <span style="color:#667085;font-weight:normal">('+ncFiles.length+' · '+esc(ncTool().name)+' Ø'+ncTool().dia+')</span>';
+    var ncSz=document.createElement('div'); ncSz.className='ez'; ncSz.textContent=Math.round(ncFiles.reduce(function(n,f){return n+f.text.length;},0)/1024)+'kb';
+    var ncBtn=document.createElement('button'); ncBtn.className='bdl'; ncBtn.style.cssText='background:#2f54eb;color:#fff;border-color:#2f54eb';
+    ncBtn.textContent='⬇ .nc ZIP';
+    ncBtn.onclick=function(){
+      var nm=(currentProjectName||'nesting').replace(/[^A-Za-z0-9_\-]/g,'_').substring(0,40)||'nesting';
+      downloadBlob(nm+'_'+ncToolSlug()+'_nc.zip', makeZip(ncFiles));
+    };
+    ncRow.appendChild(ncNm); ncRow.appendChild(ncSz); ncRow.appendChild(ncBtn); rows.appendChild(ncRow);
+  }
 
   // "Download all as ZIP" row at the top
   var allRow=document.createElement('div');allRow.className='er';
@@ -14123,6 +14198,197 @@ function makeDXFAll(lays){
   });
   L.push('0','ENDSEC','0','EOF');return L.join('\r\n');
 }
+// ═══════════════════════════════════════════════════════════════════════════
+// CNC PROGRAMS (.nc) — the same G-code VCarve writes for this workshop's
+// router, so a nested sheet can go straight to the machine.
+// Format copied from the shop's own VCarve output: N-numbered lines (step 10),
+// T/M6 · S/M3 · M8 header, every move with G0/G1 and full X Y Z (3 decimals),
+// F on the line where the feed changes, Z zero on the machine bed (material top
+// = its thickness), cut straight to Z0, park at X3000 Y0, M9M5, CRLF endings.
+// Every profile starts in the middle of its longest straight edge with a 5 mm
+// tangent lead-in arc (R100) and a 30° zig-zag ramp along the edge — no plunge
+// into the cut. Outside profiles run clockwise, holes anticlockwise (climb with
+// M3). Per part: on-line cuts and holes first, then the outline; small parts
+// first, so a part inside another's cut-out is cut before that cut-out.
+// ═══════════════════════════════════════════════════════════════════════════
+var NC_TOOLS_DEFAULT={
+  leitz:   {name:'Leitz deimantas', t:1, dia:12, s:18000, feed:7000, plunge:4000},
+  karbidas:{name:'Karbidas',        t:7, dia:6,  s:18000, feed:4000, plunge:2000}
+};
+var NC_DEFAULT={tool:'leitz', tools:JSON.parse(JSON.stringify(NC_TOOLS_DEFAULT)),
+  ramp:30, lead:5, safe:20, clear:10, below:0, parkX:3000, parkY:0, zTop:''};
+var NC=(function(){
+  try{ var s=JSON.parse(localStorage.getItem('ncSettings')||'null'); if(s&&s.tools){
+    var o=JSON.parse(JSON.stringify(NC_DEFAULT));
+    Object.keys(s).forEach(function(k){ if(k!=='tools') o[k]=s[k]; });
+    Object.keys(o.tools).forEach(function(k){ if(s.tools[k]) Object.assign(o.tools[k], s.tools[k]); });
+    return o; } }catch(e){}
+  return JSON.parse(JSON.stringify(NC_DEFAULT));
+})();
+function ncSave(){ try{ localStorage.setItem('ncSettings', JSON.stringify(NC)); }catch(e){} }
+function ncTool(){ return NC.tools[NC.tool]||NC.tools.leitz; }
+
+// Rings of one placement in machine coordinates (sheet bottom-left = 0,0, y up),
+// the same frame as the DXF export.
+function _ncPlacementGeom(lay,p){
+  var x=lay.trim+p.x, y=lay.sh-(lay.trim+p.y)-p.ph, outer, holes=[], marks=[];
+  if(p.nestPoly){
+    var f=function(pt){ return [x+pt.x, y+(p.ph-pt.y)]; };
+    outer=p.nestPoly.map(f); holes=(p.nestHoles||[]).map(function(h){ return h.map(f); });
+  } else if(p.part&&p.part.shape&&p.part.shape.length>=3){
+    var g=function(pt){ var t=shapePtInBBox(p.part,p.rot,pt.x,pt.y); return [x+t[0], y+t[1]]; };
+    outer=p.part.shape.map(g); holes=(p.part.holes||[]).map(function(h){ return h.map(g); });
+  } else {
+    outer=[[x,y],[x+p.pw,y],[x+p.pw,y+p.ph],[x,y+p.ph]];
+  }
+  if(p.part&&p.part.marks&&p.part.marks.length){
+    var mf=_markPlacer(p);
+    marks=p.part.marks.map(function(m){ return m.map(function(q){ var t=mf(q); return [x+t[0], y+(p.ph-t[1])]; }); });
+  }
+  return {outer:outer, holes:holes, marks:marks};
+}
+function _ncArea(r){ var a=0; for(var i=0;i<r.length;i++){ var j=(i+1)%r.length; a+=r[i][0]*r[j][1]-r[j][0]*r[i][1]; } return a/2; }
+// Offset a closed ring by d (mm, + grows / − shrinks) with sharp corners like VCarve.
+function _ncOffset(ring,d){
+  var SC=1000, path=ring.map(function(q){ return {X:Math.round(q[0]*SC), Y:Math.round(q[1]*SC)}; });
+  var co=new ClipperLib.ClipperOffset(2, 0.05*SC), sol=new ClipperLib.Paths();
+  co.AddPath(path, ClipperLib.JoinType.jtMiter, ClipperLib.EndType.etClosedPolygon);
+  co.Execute(sol, d*SC);
+  return sol.map(function(pp){ return pp.map(function(q){ return [q.X/SC, q.Y/SC]; }); }).filter(function(r){ return r.length>=3 && Math.abs(_ncArea(r))>0.5; });
+}
+// Rotate a closed ring so it starts in the middle of its longest edge.
+function _ncStartMidLongest(r){
+  // Among the longest edges (within 2 %) take the right-most one — where VCarve starts.
+  var bl=0, i;
+  for(i=0;i<r.length;i++){ var a0=r[i], b0=r[(i+1)%r.length]; bl=Math.max(bl, Math.hypot(b0[0]-a0[0],b0[1]-a0[1])); }
+  var bi=0, bx=-1e18;
+  for(i=0;i<r.length;i++){ var a1=r[i], b1=r[(i+1)%r.length], l=Math.hypot(b1[0]-a1[0],b1[1]-a1[1]), mx=(a1[0]+b1[0])/2;
+    if(l>=bl*0.98 && mx>bx+1e-6){ bx=mx; bi=i; } }
+  var a=r[bi], b=r[(bi+1)%r.length], m=[(a[0]+b[0])/2,(a[1]+b[1])/2];
+  var out=[m]; for(var k=1;k<=r.length;k++) out.push(r[(bi+k)%r.length]); out.push(m);
+  return out;   // closed: first == last
+}
+// Points along a polyline from its start for a given distance.
+function _ncWalk(pl, dist){
+  var pts=[pl[0]], left=dist;
+  for(var i=1;i<pl.length && left>1e-9;i++){
+    var a=pl[i-1], b=pl[i], l=Math.hypot(b[0]-a[0],b[1]-a[1]);
+    if(l<=left){ pts.push(b); left-=l; }
+    else { var f=left/l; pts.push([a[0]+(b[0]-a[0])*f, a[1]+(b[1]-a[1])*f]); left=0; }
+  }
+  return pts;
+}
+function _ncLen(pl){ var s=0; for(var i=1;i<pl.length;i++) s+=Math.hypot(pl[i][0]-pl[i-1][0],pl[i][1]-pl[i-1][1]); return s; }
+
+// One profile → G-code lines. path: points to cut (closed rings repeat the start).
+function _ncProfile(out, path, closed, z){
+  var tl=ncTool(), tanA=Math.tan((NC.ramp||30)*Math.PI/180), LEAD=+NC.lead||0, R=100;
+  var p0=path[0], p1=path[1];
+  var dl=Math.hypot(p1[0]-p0[0],p1[1]-p0[1])||1, dir=[(p1[0]-p0[0])/dl,(p1[1]-p0[1])/dl], nrm=[-dir[1],dir[0]];
+  // lead-in arc: tangent to the first edge, coming from the waste side (left of the cut direction)
+  var lead=[];
+  if(closed && LEAD>0){
+    var th=LEAD/R;
+    for(var k=6;k>=0;k--){ var a=th*k/6, al=R*Math.sin(a), off=R*(1-Math.cos(a));
+      lead.push([p0[0]-dir[0]*al+nrm[0]*off, p0[1]-dir[1]*al+nrm[1]*off]); }
+  } else lead=[p0];
+  var leadLen=_ncLen(lead);
+  // ramp: lead-in → along the path → back → back out the lead-in, descending at the ramp angle
+  var D=z.top-z.cut, rampTot=D/tanA - 2*leadLen;
+  var pathLen=_ncLen(path), maxLeg=Math.max(1, closed ? pathLen*0.45 : pathLen*0.95);
+  var nPairs=rampTot>0 ? Math.ceil((rampTot/2)/maxLeg) : 0, leg=nPairs ? rampTot/(2*nPairs) : 0;
+  var seq=[];   // [x,y] points of the ramp, in order
+  seq=seq.concat(lead.slice(1));
+  var fw=leg>0?_ncWalk(path, leg):[p0];
+  for(var n=0;n<nPairs;n++){ seq=seq.concat(fw.slice(1)); seq=seq.concat(fw.slice(0,-1).reverse()); }
+  seq=seq.concat(lead.slice(0,-1).reverse());
+  var s0=lead[0];
+  out.g0(s0[0],s0[1],z.safe); out.g0(s0[0],s0[1],z.clear); out.g1(s0[0],s0[1],z.top,tl.plunge);
+  // descend linearly with distance
+  var tot=0, prev=s0; seq.forEach(function(q){ tot+=Math.hypot(q[0]-prev[0],q[1]-prev[1]); prev=q; });
+  var run=0; prev=s0;
+  seq.forEach(function(q,i){ run+=Math.hypot(q[0]-prev[0],q[1]-prev[1]); prev=q;
+    var zz=(i===seq.length-1)?z.cut:z.top-(tot>0?D*run/tot:D); out.g1(q[0],q[1],zz); });
+  if(!seq.length) out.g1(s0[0],s0[1],z.cut);
+  // full-depth pass
+  var first=true;
+  lead.slice(1).forEach(function(q){ out.g1(q[0],q[1],z.cut, first?tl.feed:null); first=false; });
+  path.slice(1).forEach(function(q){ out.g1(q[0],q[1],z.cut, first?tl.feed:null); first=false; });
+  var e=path[path.length-1]; out.g0(e[0],e[1],z.safe);
+}
+
+// G-code for one sheet. Returns {text, notes:[...]}.
+function makeNC(lay){
+  var tl=ncTool(), r=(+tl.dia||12)/2, notes=[];
+  var th=+NC.zTop || Math.max.apply(null, lay.placements.map(function(p){ return +(p.part&&p.part.thick)||0; }).concat([0])) || 18;
+  var z={top:th, cut:-(+NC.below||0), safe:th+(+NC.safe||20), clear:th+(+NC.clear||10)};
+  var n=0, L=[], lastF=null;
+  function num(v){ return (Math.abs(v)<0.0005?0:v).toFixed(3); }
+  function line(s){ n+=10; L.push('N'+n+s); }
+  var out={
+    g0:function(x,y,zz){ line('G0X'+num(x)+'Y'+num(y)+'Z'+num(zz)); },
+    g1:function(x,y,zz,f){ var s='G1X'+num(x)+'Y'+num(y)+'Z'+num(zz); if(f!=null && f!==lastF){ s+='F'+(+f).toFixed(1); lastF=f; } line(s); }
+  };
+  line('T'+tl.t+'M6'); line('S'+tl.s+'M3'); line('M8');
+  // Real gaps between parts against the tool (a ready-made layout may be tighter than its kerf)
+  var tight=_sheetGapIssues(lay, 2*r-0.01);
+  if(tight.length) notes.push(t('ncTightWarn',{d:2*r,n:tight.length,ex:tight[0]}));
+  else if(lay.kerf!=null && 2*r>lay.kerf+0.01) notes.push(t('ncKerfWarn',{d:2*r,k:lay.kerf}));
+  // parts: smallest first (a part sitting in another's cut-out is always smaller)
+  var items=lay.placements.map(function(p){ var g=_ncPlacementGeom(lay,p); return {p:p, g:g, a:Math.abs(_ncArea(g.outer))}; })
+    .sort(function(a,b){ return a.a-b.a; });
+  var skipped=0;
+  items.forEach(function(it){
+    var name=(it.p.part&&(it.p.part.origName||it.p.part.name))||'';
+    // on-line cuts: tool centred on the line
+    it.g.marks.forEach(function(m){ if(m.length>=2) _ncProfile(out, m, false, z); });
+    // holes: tool inside, anticlockwise
+    it.g.holes.forEach(function(h){
+      var off=_ncOffset(h, -r);
+      if(!off.length){ skipped++; return; }
+      off.forEach(function(o){ if(_ncArea(o)<0) o.reverse(); _ncProfile(out, _ncStartMidLongest(o), true, z); });
+    });
+    // outline: tool outside, clockwise
+    var oo=_ncOffset(it.g.outer, r).sort(function(a,b){ return Math.abs(_ncArea(b))-Math.abs(_ncArea(a)); })[0];
+    if(!oo){ notes.push(name+': no outline'); return; }
+    if(_ncArea(oo)>0) oo.reverse();
+    _ncProfile(out, _ncStartMidLongest(oo), true, z);
+  });
+  if(skipped) notes.push(t('ncHoleSkip',{n:skipped,d:2*r}));
+  n+=10; L.push('N'+n+'X'+num(+NC.parkX||0)+'Y'+num(+NC.parkY||0)+'Z'+num(z.safe));
+  line('M9M5');
+  return {text:L.join('\r\n')+'\r\n', notes:notes};
+}
+function _ncSheets(){ return layouts.map(function(l,i){ return {l:l,i:i}; }).filter(function(o){ return o.l.machine!=='saw'; }); }
+function ncToolSlug(){ return (NC.tool==='karbidas'?'KARBIDAS':'LEITZ')+'_D'+String(+ncTool().dia).replace('.',','); }
+function ncSetTool(k){ NC.tool=k; ncSave(); ncRenderBox(); try{ buildExport(); }catch(e){} }
+function ncSetVal(path,v){
+  var p=path.split('.'), o=NC; while(p.length>1) o=o[p.shift()];
+  var k=p[0]; o[k]=(k==='name'||(k==='zTop'&&v===''))?v:(parseFloat(String(v).replace(',','.'))||0);
+  ncSave(); ncRenderBox(); try{ buildExport(); }catch(e){}
+}
+function ncResetTools(){ NC.tools=JSON.parse(JSON.stringify(NC_TOOLS_DEFAULT)); ncSave(); ncRenderBox(); try{ buildExport(); }catch(e){} }
+function ncRenderBox(){
+  var box=document.getElementById('nc-box'); if(!box) return;
+  var tl=ncTool(), open=box.querySelector('details') && box.querySelector('details').open;
+  var sheets=_ncSheets(), warn=[];
+  sheets.forEach(function(o){ if(_sheetGapIssues(o.l, +tl.dia-0.01).length || (o.l.kerf!=null && +tl.dia>o.l.kerf+0.01)) warn.push('#'+(o.i+1)); });
+  function fld(label,path,val,w){ return '<label class="nc-f"><span>'+esc(label)+'</span><input value="'+esc(String(val))+'" style="width:'+(w||58)+'px" onchange="ncSetVal(\''+path+'\',this.value)"></label>'; }
+  var tk='tools.'+NC.tool+'.';
+  box.innerHTML='<div class="nc-hd"><b>'+esc(t('ncTitle'))+'</b><span class="nc-sub">'+esc(t('ncSub'))+'</span></div>'
+    +'<div class="nc-tools">'+Object.keys(NC.tools).map(function(k){ var x=NC.tools[k];
+        return '<button type="button" class="nc-tool'+(k===NC.tool?' on':'')+'" onclick="ncSetTool(\''+k+'\')"><b>'+esc(x.name)+'</b><span>Ø'+x.dia+' · T'+x.t+' · F'+x.feed+'</span></button>'; }).join('')+'</div>'
+    +'<div class="nc-row">'+fld(t('ncDia'),tk+'dia',tl.dia,52)+'<span class="nc-hint">'+esc(t('ncDiaHint'))+'</span></div>'
+    +(warn.length?'<div class="nc-warn">⚠ '+esc(t('ncKerfWarnAll',{d:tl.dia,s:warn.join(', ')}))+'</div>':'')
+    +'<details'+(open?' open':'')+'><summary>'+esc(t('ncMore'))+'</summary><div class="nc-grid">'
+      +fld(t('ncTno'),tk+'t',tl.t,40)+fld('S',tk+'s',tl.s,60)+fld(t('ncFeed'),tk+'feed',tl.feed)+fld(t('ncPlunge'),tk+'plunge',tl.plunge)
+      +fld(t('ncRamp'),'ramp',NC.ramp,40)+fld(t('ncLead'),'lead',NC.lead,40)+fld(t('ncSafe'),'safe',NC.safe,40)+fld(t('ncBelow'),'below',NC.below,40)
+      +fld(t('ncZTop'),'zTop',NC.zTop,48)+fld(t('ncPark'),'parkX',NC.parkX,52)+fld('Y','parkY',NC.parkY,44)
+      +'<button type="button" class="btn bs" onclick="ncResetTools()" style="font-size:10px">'+esc(t('ncReset'))+'</button>'
+    +'</div><div class="nc-hint" style="margin-top:4px">'+esc(t('ncHow'))+'</div></details>'
+    +(sheets.length?'':'<div class="nc-hint">'+esc(t('ncNoCnc'))+'</div>');
+}
+
 function makeCSV(){
   var dups = computeLayoutDupGroups();
   var rows=['Sheet,Copies,Machine,Material,PartName,X,Y,Length,Width,Thickness,OP1_ID,EB1,EB2,EB3,EB4,Rotated,TrimWarning'];
