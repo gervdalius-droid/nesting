@@ -3666,7 +3666,50 @@ setInterval(function(){drainPendingQueue();},30000);
 
 // Restore the most recently worked project. Runs ONLY after a valid login
 // (see the DOMContentLoaded gate below) so the app never opens unauthenticated.
+// ── One-time import of projects from the OLD Nesting database (project qnnhvng…,
+// which had no login). Runs in the background after sign-in, as the signed-in
+// worker, once per workshop: projects already in the workshop database with a
+// newer date are left alone; nothing is deleted anywhere. Remove this block (and
+// OLD_NEST_*) once the old project is switched off.
+var OLD_NEST_URL='https://qnnhvngjxrvqamikkocw.supabase.co';
+var OLD_NEST_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFubmh2bmdqeHJ2cWFtaWtrb2N3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY0MTkwNjYsImV4cCI6MjA5MTk5NTA2Nn0.5pOH_TSsOaMhcPF8ff45EFJT25PXoLbS2vtjKvZ7Mw0';
+var _oldImportRunning=false;
+async function importOldNesting(){
+  if(_oldImportRunning)return;
+  try{if(localStorage.getItem('nest.oldImportDone')==='1')return;}catch(e){}
+  _oldImportRunning=true;
+  try{
+    await WorkshopAuth.token();
+    // what the workshop database already has
+    var have={};
+    var r0=await fetch(SUPABASE_URL+'/rest/v1/'+PROJECT_TABLE+'?select=name,updated_at',{headers:supaHeaders()});
+    if(!r0.ok)throw new Error('HTTP '+r0.status);
+    (await r0.json()).forEach(function(x){have[x.name]=Date.parse(x.updated_at)||0;});
+    // what the old database has (names + dates first, data one by one)
+    var oh={'apikey':OLD_NEST_KEY,'Authorization':'Bearer '+OLD_NEST_KEY};
+    var r1=await fetch(OLD_NEST_URL+'/rest/v1/'+PROJECT_TABLE+'?select=name,updated_at&order=updated_at.desc',{headers:oh});
+    if(!r1.ok)throw new Error('old HTTP '+r1.status);
+    var todo=(await r1.json()).filter(function(x){return !(have[x.name]>=(Date.parse(x.updated_at)||0));});
+    var done=0;
+    for(var i=0;i<todo.length;i++){
+      var x=todo[i];
+      var rr=await fetch(OLD_NEST_URL+'/rest/v1/'+PROJECT_TABLE+'?select=name,data,updated_at&name=eq.'+encodeURIComponent(x.name),{headers:oh});
+      var row=rr.ok?(await rr.json())[0]:null; if(!row||!row.data)continue;
+      await WorkshopAuth.token();
+      var w=await fetch(SUPABASE_URL+'/rest/v1/'+PROJECT_TABLE+'?on_conflict=name',{method:'POST',
+        headers:Object.assign(supaHeaders(),{'Prefer':'resolution=merge-duplicates,return=minimal'}),
+        body:JSON.stringify({name:row.name,data:row.data,updated_at:row.updated_at})});
+      if(!w.ok)throw new Error('save HTTP '+w.status);
+      done++;
+      if(done%10===0||done===todo.length)setStatus('saving','☁ Perkeliami seni projektai: '+done+'/'+todo.length);
+    }
+    try{localStorage.setItem('nest.oldImportDone','1');}catch(e){}
+    if(done)setStatus('saved','☁ Perkelta senų projektų: '+done);
+  }catch(e){console.warn('[old import]',e&&e.message||e);}
+  finally{_oldImportRunning=false;}
+}
 function bootApp(){
+  setTimeout(importOldNesting,4000);
   // Load warehouse stock now that we're authenticated (carries the user's token).
   if(typeof whLoadStock==='function') whLoadStock();
   // Restore last imported xlsm filename for Excel-based label printing
