@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <!-- Enables cross-origin isolation so the WASM nesting engine (shared memory) can load on static hosting. On a real server, send COOP/COEP headers and remove this. -->
 <script src="coi-serviceworker.js"></script>
+<script src="workshop-auth.js"></script>
 <title>Dėdės Baldai — Nesting</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
@@ -2471,8 +2472,10 @@ document.addEventListener('DOMContentLoaded',function(){translateAll();applyNDTo
 // ═══════════════════════════════════════════════════════════════
 // PROJECT PERSISTENCE — Supabase with localStorage fallback
 // ═══════════════════════════════════════════════════════════════
-var SUPABASE_URL='https://qnnhvngjxrvqamikkocw.supabase.co';
-var SUPABASE_ANON_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFubmh2bmdqeHJ2cWFtaWtrb2N3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY0MTkwNjYsImV4cCI6MjA5MTk5NTA2Nn0.5pOH_TSsOaMhcPF8ff45EFJT25PXoLbS2vtjKvZ7Mw0';
+// Workshop database (shared with ShopFlow) — connection + login in workshop-auth.js.
+// Projects are readable only by signed-in workshop members (RLS).
+var SUPABASE_URL=WorkshopAuth.cfg.url;
+var SUPABASE_ANON_KEY=WorkshopAuth.cfg.key;
 var PROJECT_TABLE='fabflow_projects';
 var LS_PROJECT_PREFIX='fabflow_project:'; // localStorage fallback key prefix
 var LS_LAST_PROJECT='fabflow_last_project'; // last-opened project name
@@ -2565,7 +2568,7 @@ window.addEventListener('beforeunload',function(e){
 function supaHeaders(){
   return {
     'apikey':SUPABASE_ANON_KEY,
-    'Authorization':'Bearer '+SUPABASE_ANON_KEY,
+    'Authorization':'Bearer '+(WorkshopAuth.tokenNow()||SUPABASE_ANON_KEY),
     'Content-Type':'application/json',
     'Prefer':'return=representation'
   };
@@ -2585,20 +2588,17 @@ var WH_STOCK=[], WH_OFFCUTS=[], WH_WS='';
 var GVS_PROJECT_ID='';
 
 // ═══════════════════════════════════════════════════════════════
-// AUTHENTICATION — shared login with the GVS warehouse / db app.
-// Both apps authenticate against the SAME Supabase project (the
-// warehouse, byvtqycd) so ONE account works in both places.
-// The familiar "code + name" is kept, plus a password; together they
-// map to a Supabase Auth account (email = name.code@AUTH_DOMAIN).
-// The logged-in user's JWT then replaces the shared anon key on every
-// warehouse call below, so Row-Level-Security on Supabase can enforce
-// who may read/write. NOTE: the login UI only becomes real protection
-// once RLS is enabled on the warehouse tables — see WAREHOUSE_AUTH_SETUP.md.
+// AUTHENTICATION — one workshop login (workshop-auth.js), shared with
+// ShopFlow, Invoices, the hub and Spintelių kūrėjas: sign in once, in any
+// app on this origin. Name + PIN map to a Supabase account in the workshop
+// project; the database answers only accounts on its member list (RLS).
+// The GVS warehouse (stock picker) is a separate project: the same name +
+// PIN are tried there too, and if that fails the picker is simply empty.
 // ═══════════════════════════════════════════════════════════════
 var AUTH_DOMAIN='dedesbaldai.lt';   // synthetic email domain (no real mail is sent)
 var WORKSHOP_CODE='gvs';            // baked-in workshop code — workers never type it; keeps the hidden email unique
 var GVS_WORKSPACE_CODE='S4OQX';     // GVS team namespace in the warehouse project — login is restricted to this team
-var PIN_LEN=4;                      // PIN length (raise to 5–6 for more brute-force resistance)
+var PIN_LEN=WorkshopAuth.cfg.pinLen; // 6 digits (set in workshop-auth.js)
 var AUTH_PIN_SALT='_dedes';         // appended to the PIN to form the real Supabase password (meets the 6-char minimum)
 var LS_AUTH='fabflow_auth';         // localStorage session key
 var AUTH=null;                      // {access_token,refresh_token,expires_at,name,code,user}
@@ -2618,46 +2618,56 @@ function pinRender(){
 function pinPush(n){ if(_pin.length<PIN_LEN){_pin+=String(n);pinRender();} }
 function pinBack(){ _pin=_pin.slice(0,-1); pinRender(); }
 function pinClear(){ _pin=''; pinRender(); }
-function authLoad(){try{var s=JSON.parse(localStorage.getItem(LS_AUTH)||'null');if(s&&s.access_token)AUTH=s;}catch(e){}return AUTH;}
-function authStore(s){AUTH=s;try{localStorage.setItem(LS_AUTH,JSON.stringify(s));}catch(e){}}
-function authClear(){AUTH=null;try{localStorage.removeItem(LS_AUTH);}catch(e){}}
-function authValid(){return !!(AUTH&&AUTH.access_token&&AUTH.expires_at&&AUTH.expires_at>Date.now()+5000);}
-
-// Exchange name+PIN for a Supabase session (PIN → real password behind the scenes).
-async function authLogin(name,pin){
-  var r=await fetch(WH_SB_URL+'/auth/v1/token?grant_type=password',{
-    method:'POST',headers:{'apikey':WH_SB_KEY,'Content-Type':'application/json'},
-    body:JSON.stringify({email:authEmail(WORKSHOP_CODE,name),password:authPinToPassword(pin)})
-  });
-  var d=await r.json().catch(function(){return {};});
-  if(!r.ok||!d.access_token)throw new Error(d.error_description||d.msg||d.error||('HTTP '+r.status));
-  authStore({access_token:d.access_token,refresh_token:d.refresh_token,
-    expires_at:Date.now()+((d.expires_in||3600)*1000),
-    name:String(name).trim(),code:WORKSHOP_CODE,user:d.user||null});
+var WH_AUTH=null;                   // optional second session for the GVS warehouse (stock picker)
+function authLoad(){
+  var ws=WorkshopAuth.session(); if(!ws){AUTH=null;return null;}
+  var x=null; try{x=JSON.parse(localStorage.getItem(LS_AUTH)||'null');}catch(e){}
+  var em=(ws.user&&ws.user.email)||'';
+  AUTH={access_token:ws.access_token,expires_at:ws.expires_at*1000,code:WORKSHOP_CODE,
+        name:(x&&x.name)||em.split('@')[0].split('.')[0]||''};
+  WH_AUTH=(x&&x.wh&&x.wh.access_token)?x.wh:null;
   return AUTH;
 }
-// Refresh the access token using the stored refresh token.
+function authStore(name){
+  try{localStorage.setItem(LS_AUTH,JSON.stringify({name:name,wh:WH_AUTH}));}catch(e){}
+  authLoad();
+}
+function authClear(){AUTH=null;WH_AUTH=null;try{localStorage.removeItem(LS_AUTH);}catch(e){}WorkshopAuth.logout(true);}
+function authValid(){var ws=WorkshopAuth.session();return !!(ws&&ws.expires_at*1000>Date.now()+5000);}
+
+// Name + PIN → workshop session (required). The warehouse login is optional:
+// it only feeds the stock picker, so a failure there never blocks the app.
+async function authLogin(name,pin){
+  var me=await WorkshopAuth.login(name,pin);        // throws: wrong PIN, or not on the member list
+  WH_AUTH=null;
+  try{WH_AUTH=await whTokenCall('password',{email:authEmail(WORKSHOP_CODE,name),password:authPinToPassword(pin)});}catch(e){}
+  authStore((me&&me.display_name)||String(name).trim());
+  return AUTH;
+}
+async function whTokenCall(grant,body){
+  var r=await fetch(WH_SB_URL+'/auth/v1/token?grant_type='+grant,{
+    method:'POST',headers:{'apikey':WH_SB_KEY,'Content-Type':'application/json'},body:JSON.stringify(body)});
+  var d=await r.json().catch(function(){return {};});
+  if(!r.ok||!d.access_token)throw new Error(d.error_description||d.msg||('HTTP '+r.status));
+  return {access_token:d.access_token,refresh_token:d.refresh_token,expires_at:Date.now()+((d.expires_in||3600)*1000)};
+}
+// Keep both sessions fresh. Returns false only when the workshop session is gone.
 async function authRefresh(){
-  if(!AUTH||!AUTH.refresh_token)return false;
-  try{
-    var r=await fetch(WH_SB_URL+'/auth/v1/token?grant_type=refresh_token',{
-      method:'POST',headers:{'apikey':WH_SB_KEY,'Content-Type':'application/json'},
-      body:JSON.stringify({refresh_token:AUTH.refresh_token})
-    });
-    var d=await r.json().catch(function(){return {};});
-    if(!r.ok||!d.access_token){authClear();return false;}
-    authStore(Object.assign({},AUTH,{access_token:d.access_token,
-      refresh_token:d.refresh_token||AUTH.refresh_token,
-      expires_at:Date.now()+((d.expires_in||3600)*1000),user:d.user||AUTH.user}));
-    return true;
-  }catch(e){return false;}
+  var tok=await WorkshopAuth.token();
+  if(!tok){AUTH=null;return false;}
+  if(WH_AUTH&&WH_AUTH.refresh_token&&WH_AUTH.expires_at<Date.now()+120000){
+    try{WH_AUTH=await whTokenCall('refresh_token',{refresh_token:WH_AUTH.refresh_token});}catch(e){WH_AUTH=null;}
+  }
+  var nm=AUTH&&AUTH.name; authLoad(); if(nm&&AUTH)AUTH.name=nm;
+  try{localStorage.setItem(LS_AUTH,JSON.stringify({name:AUTH&&AUTH.name,wh:WH_AUTH}));}catch(e){}
+  return true;
 }
 function authStartRefreshTimer(){
   if(_authTimer)return;
-  _authTimer=setInterval(function(){if(AUTH&&AUTH.expires_at&&AUTH.expires_at<Date.now()+120000)authRefresh();},60000);
+  _authTimer=setInterval(function(){authRefresh().then(function(ok){if(!ok){authRenderUser();showAuthOverlay();}});},60000);
 }
 async function authLogout(){
-  try{if(AUTH&&AUTH.access_token)await fetch(WH_SB_URL+'/auth/v1/logout',{method:'POST',headers:{'apikey':WH_SB_KEY,'Authorization':'Bearer '+AUTH.access_token}});}catch(e){}
+  try{if(WH_AUTH&&WH_AUTH.access_token)await fetch(WH_SB_URL+'/auth/v1/logout',{method:'POST',headers:{'apikey':WH_SB_KEY,'Authorization':'Bearer '+WH_AUTH.access_token}});}catch(e){}
   authClear();location.reload();
 }
 function showAuthOverlay(){
@@ -2702,18 +2712,12 @@ async function submitLogin(ev){
   if(btn){btn.disabled=true;btn.textContent='Jungiamasi…';}
   try{
     await authLogin(name,_pin);
-    // Gate: only people on the GVS team may use the app. (null = couldn't check → allow, since they already passed auth.)
-    var member=await authIsGvsMember(name);
-    if(member===false){
-      authClear();_pin='';pinRender();
-      if(err){err.textContent='Jūs nesate GVS komandoje. Kreipkitės į vadovą.';err.style.display='block';}
-      if(btn){btn.disabled=false;btn.textContent='Prisijungti';}
-      return false;
-    }
     hideAuthOverlay();authRenderUser();authStartRefreshTimer();bootApp();
   }catch(e){
     _pin='';pinRender();
-    if(err){err.textContent='Neteisingas vardas arba PIN.';err.style.display='block';}
+    var msg=(e&&e.message==='not-member')?'Jūsų paskyra dar neaktyvi. Paprašykite, kad ją pridėtų darbuotojų puslapyje.'
+           :(e&&/fetch|network/i.test(e.message||''))?'Nėra ryšio su serveriu.':'Neteisingas vardas arba PIN.';
+    if(err){err.textContent=msg;err.style.display='block';}
   }finally{ if(btn){btn.disabled=false;btn.textContent='Prisijungti';} }
   return false;
 }
@@ -2721,7 +2725,7 @@ async function submitLogin(ev){
 // Warehouse calls carry the logged-in user's JWT (falls back to the anon
 // key only when nobody is logged in, e.g. before the gate appears).
 function whHeaders(){
-  var tok=(AUTH&&AUTH.access_token)?AUTH.access_token:WH_SB_KEY;
+  var tok=(WH_AUTH&&WH_AUTH.access_token)?WH_AUTH.access_token:WH_SB_KEY;
   return {'apikey':WH_SB_KEY,'Authorization':'Bearer '+tok,'Content-Type':'application/json'};
 }
 function whStdSheetArea(){return 2800*2070/1e6;} // standard full sheet m² (for the count hint)
@@ -3708,7 +3712,50 @@ setInterval(function(){drainPendingQueue();},30000);
 
 // Restore the most recently worked project. Runs ONLY after a valid login
 // (see the DOMContentLoaded gate below) so the app never opens unauthenticated.
+// ── One-time import of projects from the OLD Nesting database (project qnnhvng…,
+// which had no login). Runs in the background after sign-in, as the signed-in
+// worker, once per workshop: projects already in the workshop database with a
+// newer date are left alone; nothing is deleted anywhere. Remove this block (and
+// OLD_NEST_*) once the old project is switched off.
+var OLD_NEST_URL='https://qnnhvngjxrvqamikkocw.supabase.co';
+var OLD_NEST_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFubmh2bmdqeHJ2cWFtaWtrb2N3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY0MTkwNjYsImV4cCI6MjA5MTk5NTA2Nn0.5pOH_TSsOaMhcPF8ff45EFJT25PXoLbS2vtjKvZ7Mw0';
+var _oldImportRunning=false;
+async function importOldNesting(){
+  if(_oldImportRunning)return;
+  try{if(localStorage.getItem('nest.oldImportDone')==='1')return;}catch(e){}
+  _oldImportRunning=true;
+  try{
+    await WorkshopAuth.token();
+    // what the workshop database already has
+    var have={};
+    var r0=await fetch(SUPABASE_URL+'/rest/v1/'+PROJECT_TABLE+'?select=name,updated_at',{headers:supaHeaders()});
+    if(!r0.ok)throw new Error('HTTP '+r0.status);
+    (await r0.json()).forEach(function(x){have[x.name]=Date.parse(x.updated_at)||0;});
+    // what the old database has (names + dates first, data one by one)
+    var oh={'apikey':OLD_NEST_KEY,'Authorization':'Bearer '+OLD_NEST_KEY};
+    var r1=await fetch(OLD_NEST_URL+'/rest/v1/'+PROJECT_TABLE+'?select=name,updated_at&order=updated_at.desc',{headers:oh});
+    if(!r1.ok)throw new Error('old HTTP '+r1.status);
+    var todo=(await r1.json()).filter(function(x){return !(have[x.name]>=(Date.parse(x.updated_at)||0));});
+    var done=0;
+    for(var i=0;i<todo.length;i++){
+      var x=todo[i];
+      var rr=await fetch(OLD_NEST_URL+'/rest/v1/'+PROJECT_TABLE+'?select=name,data,updated_at&name=eq.'+encodeURIComponent(x.name),{headers:oh});
+      var row=rr.ok?(await rr.json())[0]:null; if(!row||!row.data)continue;
+      await WorkshopAuth.token();
+      var w=await fetch(SUPABASE_URL+'/rest/v1/'+PROJECT_TABLE+'?on_conflict=name',{method:'POST',
+        headers:Object.assign(supaHeaders(),{'Prefer':'resolution=merge-duplicates,return=minimal'}),
+        body:JSON.stringify({name:row.name,data:row.data,updated_at:row.updated_at})});
+      if(!w.ok)throw new Error('save HTTP '+w.status);
+      done++;
+      if(done%10===0||done===todo.length)setStatus('saving','☁ Perkeliami seni projektai: '+done+'/'+todo.length);
+    }
+    try{localStorage.setItem('nest.oldImportDone','1');}catch(e){}
+    if(done)setStatus('saved','☁ Perkelta senų projektų: '+done);
+  }catch(e){console.warn('[old import]',e&&e.message||e);}
+  finally{_oldImportRunning=false;}
+}
 function bootApp(){
+  setTimeout(importOldNesting,4000);
   // Load warehouse stock now that we're authenticated (carries the user's token).
   if(typeof whLoadStock==='function') whLoadStock();
   // Restore last imported xlsm filename for Excel-based label printing
